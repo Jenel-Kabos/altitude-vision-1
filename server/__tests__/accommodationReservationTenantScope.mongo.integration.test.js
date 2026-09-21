@@ -15,6 +15,9 @@ const FinancialDocument = require('../models/FinancialDocument');
 const FinancialPayment = require('../models/FinancialPayment');
 const PaymentAllocation = require('../models/PaymentAllocation');
 const FinancialLedgerEntry = require('../models/FinancialLedgerEntry');
+const FinancialDeduction = require('../models/FinancialDeduction');
+const FinancialRefund = require('../models/FinancialRefund');
+const PlatformOperator = require('../models/PlatformOperator');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 const routes = require('../routes/accommodationReservationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -46,13 +49,58 @@ beforeAll(async () => {
   await startFinancialMongo();
   const fixtureA = await createTenantFixture({ label: 'Reservation A' }); const fixtureB = await createTenantFixture({ label: 'Reservation B' });
   tenantA = fixtureA.tenant; tenantB = fixtureB.tenant;
-  ({ user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' } }));
-  ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } }));
+  // Authorized in their own tenant only: cross-tenant probes must reach the
+  // resource boundary, without relying on the global identity's role.
+  ({ user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, businessRole: 'Admin', overrides: { role: 'Admin' } }));
+  ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, businessRole: 'Admin', overrides: { role: 'Admin' } }));
   guest = await User.create({ name: 'Reservation Guest', email: 'reservation-scope-guest@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   operator = await User.create({ name: 'Reservation Operator', email: 'reservation-scope-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   proprietor = await User.create({ name: 'Reservation Owner', email: 'reservation-scope-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   await grantOperator({ userId: operator._id, actor: adminA, reason: 'Certification reservation tenant', capabilities: [] });
   accommodationA = await makeAccommodation(tenantA, adminA, 'A'); accommodationB = await makeAccommodation(tenantB, adminB, 'B');
+});
+
+describe('Phase 7B — retenues et remboursements adversariaux', () => {
+  const deductionFor = (reservation, createdBy, suffix) => FinancialDeduction.create({ tenant: reservation.tenant, reservation: reservation._id, accommodation: reservation.accommodation, client: reservation.guest, category: 'damage', description: 'Dommage documenté', reportedAmountMinor: 40000, evidence: [{ url: 'https://example.test/proof.jpg', type: 'photo' }], createdBy, businessOperationKey: `tenant-deduction-${suffix}` });
+
+  test('tenant A ne peut ni lire ni valider une retenue tenant B, même avec IDs/body forgés', async () => {
+    const reservation = await makeReservation(tenantB, accommodationB, adminB, 'cancelled');
+    const deduction = await deductionFor(reservation, adminB._id, 'cross-tenant');
+    const read = await request(app).get(`/api/accommodation-reservations/${reservation._id}/deductions`).set(bearer(adminA, tenantA));
+    const approve = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/approve`).set({ ...bearer(adminA, tenantA), 'Idempotency-Key': 'cross-tenant-approve' }).send({ tenant: tenantB._id, approvedAmountMinor: 40000 });
+    const reject = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/reject`).set({ ...bearer(adminA, tenantA), 'Idempotency-Key': 'cross-tenant-reject' }).send({ tenantId: tenantB._id, reason: 'forged' });
+    expect([read.status, approve.status, reject.status]).toEqual([404, 404, 404]);
+    expect((await FinancialDeduction.findById(deduction._id)).status).toBe('pending_validation');
+  });
+
+  test('owner ne peut pas auto-valider et Admin sans tenant ne reçoit aucun bypass global', async () => {
+    const reservation = await makeReservation(tenantA, accommodationA, adminA, 'cancelled');
+    const deduction = await deductionFor(reservation, adminA._id, 'self-validation');
+    const self = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/approve`).set({ ...bearer(adminA, tenantA), 'Idempotency-Key': 'self-approve' }).send({ approvedAmountMinor: 40000 });
+    const outsider = await User.create({ name: 'Generic Admin', email: 'generic-finance-admin@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+    const global = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/approve`).set({ ...bearer(outsider), 'Idempotency-Key': 'generic-global' }).send({ approvedAmountMinor: 40000 });
+    expect(self.status).toBe(403); expect(global.status).toBe(403);
+  });
+
+  test('PlatformOperator sans capability est bloqué; finance.manage global passe; sélection A ne reroute jamais B', async () => {
+    const reservation = await makeReservation(tenantB, accommodationB, adminB, 'cancelled');
+    const deduction = await deductionFor(reservation, adminB._id, 'operator');
+    const denied = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/approve`).set({ ...bearer(operator), 'Idempotency-Key': 'operator-denied' }).send({ approvedAmountMinor: 40000 });
+    expect(denied.status).toBe(403);
+    await PlatformOperator.updateOne({ user: operator._id }, { $set: { capabilities: ['platform.finance.manage'] } });
+    const scoped = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/approve`).set({ ...bearer(operator, tenantA), 'Idempotency-Key': 'operator-scoped' }).send({ approvedAmountMinor: 40000, tenant: tenantB._id });
+    expect(scoped.status).toBe(404);
+    const global = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/approve`).set({ ...bearer(operator), 'Idempotency-Key': 'operator-global' }).send({ approvedAmountMinor: 40000, tenant: tenantA._id });
+    expect(global.status).toBe(200); expect((await FinancialDeduction.findById(deduction._id)).status).toBe('approved');
+  });
+
+  test('tenant A ne peut agir sur un refund tenant B via refundId forgé', async () => {
+    const reservation = await makeReservation(tenantB, accommodationB, adminB, 'cancelled');
+    const payment = await FinancialPayment.create({ tenant: tenantB._id, domain:'real_estate', establishmentType:'Accommodation', establishmentId: accommodationB._id, subjectType:'AccommodationReservation', subjectId: reservation._id, amountMinor:50000, allocatedAmountMinor:50000, availableAmountMinor:0, refundedAmountMinor:0, currency:'XAF', method:'cash', status:'succeeded', paymentReference:`PAY-${reservation._id}`, createdBy:guest._id });
+    const refund = await FinancialRefund.create({ tenant:tenantB._id, domain:'real_estate', establishmentType:'Accommodation', establishmentId:accommodationB._id, financialPayment:payment._id, financialDocument:new mongoose.Types.ObjectId(), subjectType:'AccommodationReservation', subjectId:reservation._id, amountMinor:50000, currency:'XAF', reasonCode:'OWNER_CANCELLATION', reason:'Test', businessOperationKey:`REF-${reservation._id}` });
+    const response = await request(app).post(`/api/accommodation-reservations/refunds/${refund._id}/approve`).set({ ...bearer(adminA, tenantA), 'Idempotency-Key':'forged-refund' }).send({ tenant:tenantB._id });
+    expect(response.status).toBe(404); expect((await FinancialRefund.findById(refund._id)).status).toBe('requested');
+  });
 });
 afterAll(stopFinancialMongo);
 
@@ -77,11 +125,16 @@ describe.each(Object.keys(endpoint))('%s — frontière tenant avant effets de b
   test.each([
     ['A→A', () => adminA, () => tenantA, () => accommodationA],
     ['B→B', () => adminB, () => tenantB, () => accommodationB],
-  ])('%s conserve la mutation autorisée', async (_label, actor, tenant, accommodation) => {
+  ])('%s conserve la mutation autorisée sauf confirmation financière', async (_label, actor, tenant, accommodation) => {
     const reservation = await makeReservation(tenant(), accommodation(), actor(), target);
     const res = await request(app).post(`/api/accommodation-reservations/${reservation._id}/${endpoint[target]}`).set(bearer(actor(), tenant())).send({ reason: 'authorized test' });
-    expect(res.status).toBe(200);
-    expect((await Reservation.findById(reservation._id)).status).toBe(target);
+    if (target === 'confirmed') {
+      expect(res.status).toBe(409);
+      expect((await Reservation.findById(reservation._id)).status).toBe('pending');
+    } else {
+      expect(res.status).toBe(200);
+      expect((await Reservation.findById(reservation._id)).status).toBe(target);
+    }
   });
 });
 

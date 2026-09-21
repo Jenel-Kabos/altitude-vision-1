@@ -19,6 +19,7 @@ const Transaction = require('../models/Transaction');
 const transactionRoutes = require('../routes/transactionRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { acceptApplication } = require('../services/realEstateApplicationService');
+const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 
 jest.setTimeout(120000);
 
@@ -41,6 +42,12 @@ afterAll(stopFinancialMongo);
 
 async function setupActiveTransaction() {
   const admin = await makeUser({ role: 'Admin' });
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-C.1 —
+  // les mutations financières marketplace (`POST /api/transactions`,
+  // `PATCH /:id/cancel`) exigent désormais l'autorité canonique
+  // plateforme : Admin + PlatformOperator + `platform.finance.manage`.
+  const granter = await makeUser({ role: 'Admin' });
+  await grantOperator({ userId: admin._id, actor: granter, reason: 'test cancellation setup', capabilities: ['platform.finance.manage'] });
   const owner = await makeUser({ role: 'Proprietaire' });
   const client = await makeUser({ role: 'Client' });
   const property = await Property.create({

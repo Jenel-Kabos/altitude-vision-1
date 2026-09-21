@@ -17,7 +17,7 @@ describe('AccommodationReservationsPanel', () => {
   test('une réservation pending propose confirmer et annuler', async () => {
     listAccommodationReservations.mockResolvedValue({ reservations: [{ _id: 'R1', status: 'pending', nights: 2, total: 75000, checkInDate: '2027-07-10', checkOutDate: '2027-07-12', accommodation: { property: { title: 'Villa Test' } } }] });
     transitionAccommodationReservation.mockResolvedValue({}); render(<AccommodationReservationsPanel accommodations={accommodations} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Confirmer' })); await waitFor(() => expect(transitionAccommodationReservation).toHaveBeenCalledWith('R1', 'confirm'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmer' })); await waitFor(() => expect(transitionAccommodationReservation).toHaveBeenCalledWith('R1', 'confirm', {}));
     expect(screen.getByRole('button', { name: 'Annuler' })).toBeInTheDocument();
   });
   test('le formulaire affiche nuits, tarif et total provenant de l’API', async () => {

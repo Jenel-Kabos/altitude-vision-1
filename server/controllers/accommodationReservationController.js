@@ -14,8 +14,11 @@ const refunds = require('../services/finance/accommodationRefundService');
 const FinancialRefund = require('../models/FinancialRefund');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const financialAuthz = require('../services/finance/financialAuthorizationService');
+const deductions = require('../services/finance/accommodationDeductionService');
+const FinancialDeduction = require('../models/FinancialDeduction');
 
-const respondError = (res, error) => res.status(error.status || 500).json({ status: 'fail', code: error.code, message: error.message });
+const respondError = (res, error) => res.status(error.status || error.statusCode || 500).json({ status: 'fail', code: error.code, message: error.message });
 const isStaff = (user) => ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'].includes(user?.role);
 const isPlatformWide = (user) => Boolean(user?.isPlatformOperatorContext && !user?.platformTenant);
 
@@ -45,7 +48,12 @@ async function assertReservationTenantBoundary(req, reservation) {
 exports.create = async (req, res) => {
   try {
     const reservation = await service.create({ input: req.body, user: req.user });
-    await notify({ recipient: reservation.owner, sender: req.user.id, type: 'accommodation_reservation_pending', title: 'Nouvelle demande de réservation', message: 'Une nouvelle demande concerne votre hébergement.', link: '/dashboard/hebergements', entityType: 'AccommodationReservation', entityId: reservation._id }).catch(() => null);
+    try { await billing.ensureAccommodationInvoice({ reservationId: reservation._id, actor: req.user }); }
+    catch (error) {
+      await Promise.all([NightLock.deleteMany({ sourceType: 'reservation', sourceId: reservation._id, lockType: 'hold' }), Reservation.deleteOne({ _id: reservation._id, status: 'pending_payment' })]);
+      throw error;
+    }
+    await notify({ recipient: reservation.owner, sender: req.user.id, type: 'accommodation_reservation_pending_payment', title: 'Nouvelle demande de réservation', message: 'Une nouvelle demande est maintenue pendant 2 heures dans l’attente de la garantie.', link: '/dashboard/hebergements', entityType: 'AccommodationReservation', entityId: reservation._id }).catch(() => null);
     logAction({ action: 'Réservation hébergement créée', description: `Demande ${reservation._id} créée`, module: 'Altimmo', typeAction: 'CRÉATION', auteur: buildAuteur(req.user), cible: { id: String(reservation._id), type: 'AccommodationReservation' }, req });
     res.status(201).json({ status: 'success', data: { reservation } });
   } catch (error) { respondError(res, error); }
@@ -102,11 +110,15 @@ exports.transition = (to) => async (req, res) => {
       authorizedReservation = await Reservation.findOne(query);
       if (!authorizedReservation) throw service.fail('Réservation introuvable.', 404, 'NOT_FOUND');
     }
-    const reservation = await service.transition({ id: req.params.id, to, user: req.user, reason: req.body.reason, authorizedReservation });
-    if (to === 'confirmed') await billing.ensureAccommodationInvoice({ reservationId: reservation._id, actor: req.user });
+    const reservation = await service.transition({ id: req.params.id, to, user: req.user, reason: req.body.reason, responsibility: req.body.responsibility, authorizedReservation });
+    const notificationClaim = to === 'cancelled' ? await Reservation.findOneAndUpdate({ _id: reservation._id, cancellationNotifiedAt: null }, { $set: { cancellationNotifiedAt: new Date() } }) : reservation;
+    if (to === 'cancelled' && Number(reservation.refundableAmount || 0) > 0) {
+      const required = await refunds.ensureCancellationRefunds({ reservationId: reservation._id, actor: req.user });
+      if (notificationClaim && required.length) await notify({ recipient: reservation.guest, sender: req.user.id, type: 'accommodation_refund_required', title: 'Remboursement en cours de traitement', message: `Un remboursement de ${required.reduce((sum, item) => sum + item.amountMinor, 0)} XAF doit être traité par l’équipe financière.`, link: '/profile', entityType: 'AccommodationReservation', entityId: reservation._id }).catch(() => null);
+    }
     const actorIsGuest = String(reservation.guest) === String(req.user.id);
     const recipient = to === 'cancelled' && actorIsGuest ? reservation.owner : reservation.guest;
-    await notify({ recipient, sender: req.user.id, type: `accommodation_reservation_${to}`, title: `Réservation ${to}`, message: `Le statut de la réservation est maintenant ${to}.`, link: '/dashboard/hebergements', entityType: 'AccommodationReservation', entityId: reservation._id }).catch(() => null);
+    if (notificationClaim) await notify({ recipient, sender: req.user.id, type: `accommodation_reservation_${to}`, title: `Réservation ${to}`, message: `Le statut de la réservation est maintenant ${to}.`, link: '/dashboard/hebergements', entityType: 'AccommodationReservation', entityId: reservation._id }).catch(() => null);
     logAction({ action: `Réservation hébergement : ${to}`, description: `Réservation ${reservation._id} passée au statut ${to}`, module: 'Altimmo', typeAction: 'MODIFICATION', auteur: buildAuteur(req.user), cible: { id: String(reservation._id), type: 'AccommodationReservation' }, metadata: { nouvelleValeur: to }, req });
     res.json({ status: 'success', data: { reservation } });
   } catch (error) { respondError(res, error); }
@@ -115,6 +127,9 @@ exports.transition = (to) => async (req, res) => {
 const accountingRoles = ['Admin', 'Collaborateur', 'Secretaire'];
 const assertReservationAccess = async (reservationId, user, req) => {
   const reservation = await Reservation.findById(reservationId); if (!reservation) throw service.fail('Réservation introuvable.', 404);
+  const platformFinance = user?.isPlatformOperatorContext && !user?.platformTenant
+    && user.platformOperatorCapabilities?.some((capability) => ['platform.finance.read', 'platform.finance.manage'].includes(capability));
+  if (platformFinance) return reservation;
   if (!(isStaff(user) || accountingRoles.includes(user.role) || String(reservation.owner) === String(user.id) || String(reservation.guest) === String(user.id))) throw service.fail('Accès refusé.', 403, 'FORBIDDEN');
   const isOwnerOrGuest = String(reservation.owner) === String(user.id) || String(reservation.guest) === String(user.id);
   if (!isOwnerOrGuest) {
@@ -129,7 +144,7 @@ const assertReservationAccess = async (reservationId, user, req) => {
   return reservation;
 };
 exports.financialSummary = async (req, res) => {
-  try { const reservation = await assertReservationAccess(req.params.id, req.user, req); const refreshed = await billing.recalculateReservationFinancials(reservation._id); const payments = await FinancialPayment.find({ subjectType: 'AccommodationReservation', subjectId: reservation._id }).select('-providerMetadata -payloadHash').sort({ createdAt: -1 }).lean(); res.json({ status: 'success', data: { paymentStatus: refreshed.paymentStatus, amountPaid: refreshed.amountPaid, remainingAmount: refreshed.remainingAmount, total: refreshed.total, payments } }); }
+  try { const reservation = await assertReservationAccess(req.params.id, req.user, req); const refreshed = await billing.recalculateReservationFinancials(reservation._id); const payments = await FinancialPayment.find({ subjectType: 'AccommodationReservation', subjectId: reservation._id }).select('-providerMetadata -payloadHash').sort({ createdAt: -1 }).lean(); const { getStayFinancialSummary } = require('../services/finance/accommodationStayBalanceService'); const stay = getStayFinancialSummary(refreshed); res.json({ status: 'success', data: { paymentStatus: refreshed.paymentStatus, amountPaid: refreshed.amountPaid, remainingAmount: refreshed.remainingAmount, total: refreshed.total, requiredToConfirm: refreshed.pricingSnapshot?.requiredToConfirm || 0, nonRefundableGuarantee: Math.min(refreshed.amountPaid, refreshed.pricingSnapshot?.requiredToConfirm || 0), ...stay, payments } }); }
   catch (error) { respondError(res, error); }
 };
 exports.createPayment = async (req, res) => {
@@ -137,7 +152,17 @@ exports.createPayment = async (req, res) => {
   catch (error) { respondError(res, error); }
 };
 exports.confirmPayment = async (req, res) => {
-  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); const payment = await FinancialPayment.findById(req.params.paymentId); if (!payment) throw service.fail('Paiement introuvable.', 404); await assertReservationAccess(payment.subjectId, req.user, req); const key = String(req.headers['idempotency-key'] || ''); if (!key) throw service.fail('Clé d’idempotence requise.', 422); const result = await billing.confirmAndAllocateAccommodationPayment({ paymentId: payment._id, actor: req.user, idempotencyKey: key }); await notify({ recipient: result.reservation.guest, sender: req.user.id, type: result.reservation.paymentStatus === 'paid' ? 'accommodation_payment_completed' : 'accommodation_payment_received', title: 'Paiement enregistré', message: `Paiement reçu. Solde : ${result.reservation.remainingAmount} XAF.`, link: '/profile', entityType: 'AccommodationReservation', entityId: result.reservation._id }).catch(() => null); res.json({ status: 'success', data: result }); }
+  try {
+    if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN');
+    const payment = await FinancialPayment.findById(req.params.paymentId); if (!payment) throw service.fail('Paiement introuvable.', 404);
+    await assertReservationAccess(payment.subjectId, req.user, req);
+    const key = String(req.headers['idempotency-key'] || ''); if (!key) throw service.fail('Clé d’idempotence requise.', 422);
+    const result = await billing.confirmAndAllocateAccommodationPayment({ paymentId: payment._id, actor: req.user, idempotencyKey: key });
+    const confirmed = result.reservation.status === 'confirmed';
+    const claimed = confirmed ? await Reservation.findOneAndUpdate({ _id: result.reservation._id, confirmationNotifiedAt: null }, { $set: { confirmationNotifiedAt: new Date() } }) : result.reservation;
+    if (claimed) await notify({ recipient: result.reservation.guest, sender: req.user.id, type: confirmed ? 'accommodation_reservation_confirmed' : 'accommodation_payment_received', title: confirmed ? 'Réservation confirmée' : 'Paiement enregistré', message: confirmed ? 'Votre paiement a été confirmé. Votre réservation est maintenant confirmée.' : `Paiement reçu. Solde : ${result.reservation.remainingAmount} XAF.`, link: '/profile', entityType: 'AccommodationReservation', entityId: result.reservation._id, metadata: { businessOperationKey: key } }).catch(() => null);
+    res.json({ status: 'success', data: result });
+  }
   catch (error) { respondError(res, error); }
 };
 exports.reversePaymentAllocation = async (req, res) => {
@@ -150,6 +175,7 @@ const assertRefundAccess = async (refundId, user, req) => {
     _id: refundId, domain: 'real_estate', subjectType: 'AccommodationReservation',
   });
   if (!refund) throw service.fail('Remboursement introuvable.', 404, 'NOT_FOUND');
+  if (user?.isPlatformOperatorContext && !user?.platformTenant && user.platformOperatorCapabilities?.includes('platform.finance.manage')) return refund;
   await assertReservationAccess(refund.subjectId, user, req);
   return refund;
 };
@@ -157,17 +183,82 @@ exports.refundableSummary = async (req, res) => {
   try { await assertReservationAccess(req.params.id, req.user, req); const summary = await refunds.refundableSummary(req.params.id); res.json({ status: 'success', data: summary }); } catch (error) { respondError(res, error); }
 };
 exports.requestRefund = async (req, res) => {
-  try { const reservation = await assertReservationAccess(req.params.id, req.user, req); if (!(req.user.role === 'Admin' || accountingRoles.includes(req.user.role) || String(reservation.guest) === String(req.user.id))) throw service.fail('Seul le client ou le staff financier peut demander ce remboursement.', 403, 'FORBIDDEN'); const result = await refunds.requestRefund({ reservationId: reservation._id, paymentId: req.body.paymentId, amountMinor: Number(req.body.amountMinor), method: req.body.method, reason: req.body.reason, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.status(result.created ? 201 : 200).json({ status: 'success', data: result }); } catch (error) { respondError(res, error); }
+  try { const reservation = await assertReservationAccess(req.params.id, req.user, req); if (!(req.user.role === 'Admin' || accountingRoles.includes(req.user.role) || String(reservation.guest) === String(req.user.id))) throw service.fail('Seul le client ou le staff financier peut demander ce remboursement.', 403, 'FORBIDDEN'); idempotencyKey(req); const result = await refunds.requestRefund({ reservationId: reservation._id, actor: req.user }); res.status(result.created ? 201 : 200).json({ status: 'success', data: result }); } catch (error) { respondError(res, error); }
+};
+const assertRefundFinancialAuthority = async (req, capability) => {
+  await financialAuthz.assertFinancialCapability(req.user, capability);
 };
 exports.approveRefund = async (req, res) => {
-  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); await assertRefundAccess(req.params.refundId, req.user, req); const refund = await refunds.approveRefund({ refundId: req.params.refundId, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
+  try { await assertRefundFinancialAuthority(req, financialAuthz.CAPABILITIES.PAYMENT_CONFIRM); await assertRefundAccess(req.params.refundId, req.user, req); const refund = await refunds.approveRefund({ refundId: req.params.refundId, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
 };
 exports.completeRefund = async (req, res) => {
-  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); await assertRefundAccess(req.params.refundId, req.user, req); const refund = await refunds.completeManualRefund({ refundId: req.params.refundId, reference: req.body.reference, effectiveDate: req.body.effectiveDate, proofUrl: req.body.proofUrl, comment: req.body.comment, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
+  try { await assertRefundFinancialAuthority(req, financialAuthz.CAPABILITIES.PAYMENT_CONFIRM); await assertRefundAccess(req.params.refundId, req.user, req); const refund = await refunds.completeManualRefund({ refundId: req.params.refundId, reference: req.body.reference, method: req.body.method, amountMinor: req.body.amountMinor, effectiveDate: req.body.effectiveDate, proofUrl: req.body.proofUrl, comment: req.body.comment, actor: req.user, idempotencyKey: idempotencyKey(req) }); const claimed = await FinancialRefund.findOneAndUpdate({ _id: refund._id, status: 'completed', 'metadata.completionNotifiedAt': { $exists: false } }, { $set: { 'metadata.completionNotifiedAt': new Date() } }); if (claimed) await notify({ recipient: (await Reservation.findById(refund.subjectId).select('guest'))?.guest, sender: req.user.id, type: 'accommodation_refund_completed', title: 'Remboursement effectué', message: `Votre remboursement de ${refund.amountMinor} XAF a été enregistré.`, link: '/profile', entityType: 'AccommodationReservation', entityId: refund.subjectId, metadata: { businessOperationKey: refund.businessOperationKey } }).catch(() => null); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
 };
 exports.cancelRefund = async (req, res) => {
-  try { if (!accountingRoles.includes(req.user.role)) throw service.fail('Permission comptable requise.', 403, 'FORBIDDEN'); await assertRefundAccess(req.params.refundId, req.user, req); const refund = await refunds.cancelRefund({ refundId: req.params.refundId, reason: req.body.reason, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
+  try { await assertRefundFinancialAuthority(req, financialAuthz.CAPABILITIES.PAYMENT_CONFIRM); await assertRefundAccess(req.params.refundId, req.user, req); const refund = await refunds.cancelRefund({ refundId: req.params.refundId, reason: req.body.reason, actor: req.user, idempotencyKey: idempotencyKey(req) }); res.json({ status: 'success', data: { refund } }); } catch (error) { respondError(res, error); }
 };
+
+exports.listRefundOperations = async (req, res) => {
+  try {
+    await financialAuthz.assertFinancialCapability(req.user, financialAuthz.CAPABILITIES.PAYMENT_VIEW);
+    const query = { domain: 'real_estate', subjectType: 'AccommodationReservation' };
+    if (req.query.status) query.status = req.query.status; else query.status = { $in: ['requested', 'approved', 'processing'] };
+    if (!(req.user.isPlatformOperatorContext && !req.user.platformTenant)) {
+      const tenant = await resolveTenantForUser(req.user._id || req.user.id, req.get('X-Platform-Tenant-Id'));
+      if (!tenant?._id) throw service.fail('Contexte tenant requis.', 403, 'FORBIDDEN'); query.tenant = tenant._id;
+    }
+    const items = await FinancialRefund.find(query).populate('financialPayment', 'paymentReference provider providerPaymentId amountMinor').sort({ createdAt: -1 }).limit(200).lean();
+    const reservations = await Reservation.find({ _id: { $in: items.map((item) => item.subjectId) } }).select('reference guest accommodation cancellationActor cancellationResponsibility cancelledAt pricingSnapshot checkInDate checkOutDate nights checkedInAt checkedOutAt amountPaid remainingAmount total nonRefundableAmount refundableAmount').populate('guest', 'name email').populate({ path: 'accommodation', select: 'property', populate: { path: 'property', select: 'title' } }).lean();
+    const { getStayFinancialSummary } = require('../services/finance/accommodationStayBalanceService');
+    const byId = new Map(reservations.map((reservation) => [String(reservation._id), reservation]));
+    res.json({ status: 'success', data: { refunds: items.map((item) => { const reservation = byId.get(String(item.subjectId)); return { ...item, subjectId: reservation ? { ...reservation, stay: getStayFinancialSummary(reservation, { now: reservation.cancelledAt || new Date() }) } : item.subjectId }; }) } });
+  } catch (error) { respondError(res, error); }
+};
+
+exports.listDeductionOperations = async (req, res) => {
+  try {
+    await financialAuthz.assertFinancialCapability(req.user, financialAuthz.CAPABILITIES.PAYMENT_VIEW);
+    const query = {};
+    if (req.query.status) query.status = req.query.status; else query.status = 'pending_validation';
+    if (!(req.user.isPlatformOperatorContext && !req.user.platformTenant)) {
+      const tenant = await resolveTenantForUser(req.user._id || req.user.id, req.get('X-Platform-Tenant-Id'));
+      if (!tenant?._id) throw service.fail('Contexte tenant requis.', 403, 'FORBIDDEN');
+      query.tenant = tenant._id;
+    }
+    const items = await FinancialDeduction.find(query)
+      .populate('createdBy', 'name email')
+      .populate('client', 'name email')
+      .populate({ path: 'reservation', select: 'reference accommodation pricingSnapshot checkInDate checkOutDate amountPaid cancellationActor cancellationResponsibility refundCalculationSnapshot', populate: { path: 'accommodation', select: 'property', populate: { path: 'property', select: 'title' } } })
+      .sort({ createdAt: -1 }).limit(200).lean();
+    res.json({ status: 'success', data: { deductions: items } });
+  } catch (error) { respondError(res, error); }
+};
+
+exports.reportDeduction = async (req, res) => {
+  try {
+    const reservation = await assertReservationAccess(req.params.id, req.user, req);
+    const owner = String(reservation.owner) === String(req.user.id);
+    const platform = req.user.isPlatformOperatorContext && req.user.platformOperatorCapabilities?.includes('platform.finance.manage');
+    if (!owner && !platform) throw service.fail('Signalement reserve au proprietaire de la ressource ou a la plateforme habilitee.', 403, 'FORBIDDEN');
+    const deduction = await deductions.report({ reservation, category: req.body.category, description: req.body.description, reportedAmountMinor: req.body.reportedAmountMinor, evidence: req.body.evidence, actor: req.user, businessOperationKey: idempotencyKey(req) });
+    res.status(201).json({ status: 'success', data: { deduction } });
+  } catch (error) { respondError(res, error); }
+};
+exports.listDeductions = async (req, res) => {
+  try { await assertReservationAccess(req.params.id, req.user, req); const result = await deductions.summary(req.params.id); res.json({ status: 'success', data: result }); } catch (error) { respondError(res, error); }
+};
+const validateDeduction = (approved) => async (req, res) => {
+  try {
+    await assertRefundFinancialAuthority(req, financialAuthz.CAPABILITIES.PAYMENT_CONFIRM);
+    const current = await FinancialDeduction.findById(req.params.deductionId); if (!current) throw service.fail('Retenue introuvable.', 404, 'NOT_FOUND');
+    await assertReservationAccess(current.reservation, req.user, req);
+    if (String(current.createdBy) === String(req.user.id)) throw service.fail('Auto-validation financiere interdite.', 403, 'FINANCIAL_DEDUCTION_SELF_VALIDATION_FORBIDDEN');
+    const deduction = await deductions.validate({ deductionId: current._id, approved, approvedAmountMinor: req.body.approvedAmountMinor, reason: req.body.reason, actor: req.user, businessOperationKey: idempotencyKey(req) });
+    res.json({ status: 'success', data: { deduction } });
+  } catch (error) { respondError(res, error); }
+};
+exports.approveDeduction = validateDeduction(true);
+exports.rejectDeduction = validateDeduction(false);
 
 exports.availability = async (req, res) => {
   try {
@@ -176,7 +267,8 @@ exports.availability = async (req, res) => {
     const from = req.query.from ? service.parseDate(req.query.from) : service.parseDate(new Date());
     const to = req.query.to ? service.parseDate(req.query.to) : new Date(from.getTime() + 90 * 86400000);
     const days = service.nightsBetween(from, to);
-    const locks = await NightLock.find({ accommodation: accommodation._id, date: { $gte: from, $lt: to } }).select('date sourceType').sort({ date: 1 }).lean();
+    const now = new Date();
+    const locks = await NightLock.find({ accommodation: accommodation._id, date: { $gte: from, $lt: to }, $or: [{ lockType: { $ne: 'hold' } }, { expiresAt: { $gt: now } }] }).select('date sourceType lockType expiresAt').sort({ date: 1 }).lean();
     const pricing = req.query.from && req.query.to ? await service.quote(accommodation, from, to).catch(() => null) : null;
     res.json({ status: 'success', data: { accommodationId: accommodation._id, from, to, days, available: locks.length === 0, pricing, unavailableDates: locks.map((lock) => ({ date: lock.date, type: lock.sourceType })) } });
   } catch (error) { respondError(res, error); }
@@ -228,7 +320,7 @@ exports.calendar = async (req, res) => {
     const from = service.parseDate(req.query.from); const to = service.parseDate(req.query.to);
     if (service.nightsBetween(from, to) > 62) throw service.fail('La période du calendrier est limitée à 62 jours.', 422);
     const [reservations, blocks] = await Promise.all([
-      Reservation.find({ accommodation: accommodation._id, status: { $in: ['pending', 'confirmed', 'checked_in'] }, checkInDate: { $lt: to }, checkOutDate: { $gt: from } }).select('checkInDate checkOutDate status guestCount total paymentStatus').sort({ checkInDate: 1 }).lean(),
+      Reservation.find({ accommodation: accommodation._id, status: { $in: ['pending', 'pending_payment', 'confirmed', 'checked_in'] }, checkInDate: { $lt: to }, checkOutDate: { $gt: from } }).select('checkInDate checkOutDate status paymentExpiresAt guestCount total paymentStatus').sort({ checkInDate: 1 }).lean(),
       Block.find({ accommodation: accommodation._id, startDate: { $lt: to }, endDate: { $gt: from } }).select('startDate endDate type reason').sort({ startDate: 1 }).lean(),
     ]);
     res.json({ status: 'success', data: { accommodation: { _id: accommodation._id, title: accommodation.property?.title }, from, to, reservations, blocks } });

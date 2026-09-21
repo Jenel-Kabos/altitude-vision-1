@@ -12,6 +12,10 @@ export const getAccommodationReservationFinancialSummary = async (id) => (await 
 export const createAccommodationPayment = async (id, data, idempotencyKey) => (await api.post(`/accommodation-reservations/${id}/payments`, data, { headers: { 'Idempotency-Key': idempotencyKey } })).data?.data;
 export const confirmAccommodationPayment = async (paymentId, idempotencyKey) => (await api.post(`/accommodation-reservations/payments/${paymentId}/confirm`, {}, { headers: { 'Idempotency-Key': idempotencyKey } })).data?.data;
 export const getAccommodationRefundableSummary = async (id) => (await api.get(`/accommodation-reservations/${id}/refundable-summary`)).data?.data;
+export const listAccommodationRefundOperations = async (params = {}) => (await api.get('/accommodation-reservations/refunds/operations', { params })).data?.data?.refunds || [];
+export const listAccommodationDeductionOperations = async (params = {}) => (await api.get('/accommodation-reservations/deductions/operations', { params })).data?.data?.deductions || [];
+export const approveAccommodationDeduction = async (id, approvedAmountMinor, key) => (await api.post(`/accommodation-reservations/deductions/${id}/approve`, { approvedAmountMinor }, { headers: { 'Idempotency-Key': key } })).data?.data?.deduction;
+export const rejectAccommodationDeduction = async (id, reason, key) => (await api.post(`/accommodation-reservations/deductions/${id}/reject`, { reason }, { headers: { 'Idempotency-Key': key } })).data?.data?.deduction;
 export const requestAccommodationRefund = async (id, data, key) => (await api.post(`/accommodation-reservations/${id}/refunds`, data, { headers: { 'Idempotency-Key': key } })).data?.data;
 export const approveAccommodationRefund = async (id, key) => (await api.post(`/accommodation-reservations/refunds/${id}/approve`, {}, { headers: { 'Idempotency-Key': key } })).data?.data;
 export const completeAccommodationRefund = async (id, data, key) => (await api.post(`/accommodation-reservations/refunds/${id}/complete`, data, { headers: { 'Idempotency-Key': key } })).data?.data;
