@@ -13,11 +13,11 @@ import { resolveMobileDestination } from '../../navigation/navigationSdk';
 
 const FILTERS = [
   ['all', 'Toutes'], ['pending', 'En attente'], ['confirmed', 'Confirmées'],
-  ['checked_in', 'En cours'], ['checked_out', 'Terminées'], ['cancelled', 'Annulées'],
+  ['pending_payment', 'Paiement'], ['checked_in', 'En cours'], ['checked_out', 'Terminées'], ['cancelled', 'Annulées'], ['expired', 'Expirées'],
 ];
 const date = (value) => new Date(value).toLocaleDateString('fr-FR');
 const money = (value, currency = 'XAF') => `${Number(value || 0).toLocaleString('fr-FR')} ${currency}`;
-const label = (value) => ({ pending: 'En attente', confirmed: 'Confirmée', checked_in: 'En cours', checked_out: 'Terminée', cancelled: 'Annulée', no_show: 'Non-présentation' }[value] || value);
+const label = (value) => ({ pending: 'En attente', pending_payment: 'En attente de paiement', confirmed: 'Confirmée', checked_in: 'En cours', checked_out: 'Terminée', cancelled: 'Annulée', expired: 'Expirée', no_show: 'Non-présentation' }[value] || value);
 
 export default function MyAccommodationReservationsScreen({ navigation }) {
   const { themeColors: c } = useTheme(); const { width } = useWindowDimensions();

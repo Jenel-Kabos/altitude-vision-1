@@ -54,7 +54,7 @@ const buildQuery = (filters) => buildPropertyQueryParams(filters, {});
 
 const LocalityBubble = memo(function LocalityBubble({ count, label, isSelected, bubbleStyles }) {
   return (
-    <View style={bubbleStyles.wrapper}>
+    <View style={bubbleStyles.wrapper} collapsable={false}>
       <View style={[bubbleStyles.bubble, isSelected && bubbleStyles.bubbleSelected]}>
         <Text style={[bubbleStyles.count, isSelected && bubbleStyles.countSelected]}>{count}</Text>
       </View>
@@ -64,6 +64,38 @@ const LocalityBubble = memo(function LocalityBubble({ count, label, isSelected, 
     </View>
   );
 });
+
+// react-native-maps #1631 — sur Android, un Marker avec un enfant personnalisé
+// reste invisible sur GoogleMap tant que `tracksViewChanges` n'a pas été forcé
+// à true pour la première mesure. On garde `tracksViewChanges: true` pendant
+// ~700ms au montage puis on le désactive (perfs sur pan/zoom). Un marker
+// sélectionné réactive le suivi pour animer proprement le style.
+function LocalityMarker({ area, isSelected, onPress, bubbleStyles }) {
+  const [tracks, setTracks] = React.useState(true);
+  React.useEffect(() => {
+    const t = setTimeout(() => setTracks(false), 700);
+    return () => clearTimeout(t);
+  }, [area.key]);
+  const lat = Number(area.latitude);
+  const lng = Number(area.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return (
+    <Marker
+      coordinate={{ latitude: lat, longitude: lng }}
+      onPress={onPress}
+      accessibilityLabel={`${area.count} bien${area.count > 1 ? 's' : ''} à ${area.label}`}
+      tracksViewChanges={tracks || isSelected}
+      anchor={{ x: 0.5, y: 1 }}
+    >
+      <LocalityBubble
+        count={area.count}
+        label={area.label}
+        isSelected={isSelected}
+        bubbleStyles={bubbleStyles}
+      />
+    </Marker>
+  );
+}
 
 function ActiveChip({ label, onRemove, c, styles }) {
   return (
@@ -189,7 +221,9 @@ export default function CarteScreen({ navigation }) {
       ) : (
         <MapView
           ref={mapRef}
-          style={StyleSheet.absoluteFillObject}
+          // ALTIMMO-MAP-ZERO-HEIGHT-FIX-6 — `flex: 1` remplace absoluteFillObject
+          // (yoga+Fabric mesurait la MapView à 0 de hauteur en absolute).
+          style={{ flex: 1 }}
           provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
           initialRegion={BRAZZAVILLE}
           customMapStyle={isDark ? DARK_MAP_STYLE : []}
@@ -199,26 +233,19 @@ export default function CarteScreen({ navigation }) {
           toolbarEnabled={false}
         >
           {aggregates.areas.map((area) => (
-            <Marker
+            <LocalityMarker
               key={area.key}
-              coordinate={{ latitude: area.latitude, longitude: area.longitude }}
+              area={area}
+              isSelected={selected?.key === area.key}
               onPress={() => onMarkerPress(area)}
-              accessibilityLabel={`${area.count} bien${area.count > 1 ? 's' : ''} à ${area.label}`}
-              tracksViewChanges={selected?.key === area.key}
-            >
-              <LocalityBubble
-                count={area.count}
-                label={area.label}
-                isSelected={selected?.key === area.key}
-                bubbleStyles={bubbleStyles}
-              />
-            </Marker>
+              bubbleStyles={bubbleStyles}
+            />
           ))}
         </MapView>
       )}
 
-      {/* ─── Header ─── */}
-      <SafeAreaView edges={['top']} pointerEvents="box-none">
+      {/* ─── Header ─── (position: absolute — la MapView occupe le flex flow) */}
+      <SafeAreaView edges={['top']} pointerEvents="box-none" style={styles.headerLayer}>
         <View style={styles.header} pointerEvents="box-none">
           <View style={styles.headerRow} pointerEvents="auto">
             <Ionicons name="map-outline" size={18} color={c.gold} />
@@ -393,6 +420,12 @@ const makeBubbleStyles = (c) => StyleSheet.create({
 
 const makeStyles = (c) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bgCardAlt },
+  // ALTIMMO-MAP-ZERO-HEIGHT-FIX-6 — la MapView occupe désormais le flex flow
+  // (`flex: 1`) car `absoluteFillObject` la mesurait à 0×0 sur Fabric. Les
+  // overlays qui s'affichaient au-dessus de la carte doivent donc être
+  // extraits du flow avec position:absolute, sinon le header pousserait la
+  // MapView vers le bas.
+  headerLayer: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   loaderText: { fontFamily: fonts.body, fontSize: fontSize.md, color: c.textSub },
 

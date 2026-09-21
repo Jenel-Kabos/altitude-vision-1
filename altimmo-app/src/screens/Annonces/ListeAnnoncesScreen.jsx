@@ -270,6 +270,17 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
     ...DEFAULT_FILTERS,
     ...(route?.params?.initialFilters || {}),
   }));
+
+  // ALTIMMO-MAP-LOCALITY-NAV-FIX-8 — quand l'écran est déjà monté (cas normal,
+  // ListeAnnonces étant la route initiale du stack Annonces), useState ci-dessus
+  // ne se ré-exécute pas au montage suivant. Cet effet applique les nouveaux
+  // `initialFilters` à chaque navigation depuis la carte (nouvelle référence
+  // params), tout en préservant les filtres non couverts par l'appelant.
+  const incomingInitialFilters = route?.params?.initialFilters;
+  useEffect(() => {
+    if (!incomingInitialFilters) return;
+    setActiveFilters((prev) => ({ ...prev, ...incomingInitialFilters }));
+  }, [incomingInitialFilters]);
   const [page, setPage]               = useState(1);
   const [hasMore, setHasMore]         = useState(true);
 

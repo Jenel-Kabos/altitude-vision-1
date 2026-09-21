@@ -49,6 +49,16 @@ export async function requestAccommodationRefund(id, payload, idempotencyKey) {
   invalidateReservations();
   return response.data?.data;
 }
+export async function initiateAccommodationMtnPayment(reservationId, msisdn, idempotencyKey, paymentPurpose = 'guarantee') {
+  const response = await api.post('/financial/accommodation/payments/mtn/initiate', { reservationId, msisdn, paymentPurpose }, { headers: { 'Idempotency-Key': idempotencyKey } });
+  invalidateReservations();
+  return response.data?.data;
+}
+export async function checkAccommodationMtnPayment(paymentId, idempotencyKey) {
+  const response = await api.post(`/financial/accommodation/payments/${paymentId}/mtn/check-status`, {}, { headers: { 'Idempotency-Key': idempotencyKey } });
+  invalidateReservations();
+  return response.data?.data;
+}
 
 export async function downloadFinancialDocument(documentId, documentNumber = 'facture') {
   const token = await getToken();
