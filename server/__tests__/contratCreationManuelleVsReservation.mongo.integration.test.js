@@ -23,6 +23,7 @@ const RealEstateApplication = require('../models/RealEstateApplication');
 const Contrat = require('../models/Contrat');
 const contratRoutes = require('../routes/contratRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 const { acceptApplication } = require('../services/realEstateApplicationService');
 
 jest.setTimeout(120000);
@@ -44,6 +45,16 @@ beforeAll(async () => { await startFinancialMongo(); await Contrat.syncIndexes()
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
 
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-MARKETPLACE-RENTAL-COMMERCIAL-
+// BOUNDARY — `POST /api/contrats` est désormais PLATFORM-only : Admin
+// global + PlatformOperator actif + `platform.commercial.manage`.
+async function makeAdminOperator() {
+  const admin = await makeUser({ role: 'Admin' });
+  const granter = await makeUser({ role: 'Admin' });
+  await grantOperator({ userId: admin._id, actor: granter, reason: 'Fixture: platform commercial marketplace conclusion', capabilities: ['platform.commercial.manage'] });
+  return admin;
+}
+
 async function makeAvailableProperty(overrides = {}) {
   const owner = await makeUser({ role: 'Proprietaire' });
   return Property.create({
@@ -57,7 +68,7 @@ async function makeAvailableProperty(overrides = {}) {
 }
 
 test('[BUG REPRODUIT] création manuelle (payload GestionLocativePage, sans `reservation`) réussit — ne renvoie plus 409 ACTIVE_RESERVATION_REQUIRED', async () => {
-  const admin = await makeUser({ role: 'Admin' });
+  const admin = await makeAdminOperator();
   const property = await makeAvailableProperty();
 
   // Payload exact tel que construit par GestionLocativePage.jsx::handleSaveContrat
@@ -74,7 +85,7 @@ test('[BUG REPRODUIT] création manuelle (payload GestionLocativePage, sans `res
 });
 
 test('bien non disponible (availability !== "Disponible") sans réservation : 409 explicite, pas de contrat créé', async () => {
-  const admin = await makeUser({ role: 'Admin' });
+  const admin = await makeAdminOperator();
   const property = await makeAvailableProperty({ availability: 'Loué' });
 
   const res = await request(app).post('/api/contrats').set('Authorization', `Bearer ${signToken(admin._id)}`).send({
@@ -87,7 +98,7 @@ test('bien non disponible (availability !== "Disponible") sans réservation : 40
 });
 
 test('double soumission (double clic) sur la création manuelle : un seul contrat créé, la seconde requête échoue proprement', async () => {
-  const admin = await makeUser({ role: 'Admin' });
+  const admin = await makeAdminOperator();
   const property = await makeAvailableProperty();
   const payload = {
     type: 'location', bien: property._id, statut: 'actif',
@@ -106,7 +117,7 @@ test('double soumission (double clic) sur la création manuelle : un seul contra
 });
 
 test('[GL-ARCH-1] bien non publié (statusAdmin !== "Validée") mais disponible, sans réservation : le bail se crée quand même — la publication n’est plus une condition de la Gestion Locative', async () => {
-  const admin = await makeUser({ role: 'Admin' });
+  const admin = await makeAdminOperator();
   const property = await makeAvailableProperty({ statusAdmin: 'En attente' });
 
   const res = await request(app).post('/api/contrats').set('Authorization', `Bearer ${signToken(admin._id)}`).send({
@@ -118,7 +129,7 @@ test('[GL-ARCH-1] bien non publié (statusAdmin !== "Validée") mais disponible,
 });
 
 test('parcours réservation (candidature acceptée) : la réservation reste strictement requise et cohérente — comportement inchangé', async () => {
-  const admin = await makeUser({ role: 'Admin' });
+  const admin = await makeAdminOperator();
   const owner = await makeUser({ role: 'Proprietaire' });
   const client = await makeUser({ role: 'Client' });
   const property = await Property.create({

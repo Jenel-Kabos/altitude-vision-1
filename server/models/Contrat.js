@@ -169,6 +169,30 @@ const contratSchema = new mongoose.Schema({
   },
   commissionAgence:      { type: Number, min: 0 },
   conditionsSuspensives: { type: String, trim: true },
+
+  // SCL-2 — cycle de vie du contrat de vente (Contrat.type='vente'),
+  // parallèle et strictement disjoint de `cycleVie` (rental only).
+  // Additif, nullable : dérivé depuis dateSignatureActe/Compromis pour les
+  // contrats créés avant ce sprint, aucune migration ni backfill. La
+  // machine d'état vit dans `saleContractLifecycleService.js` — jamais
+  // écrit ailleurs. `statut` reste synchronisé avec le mapping canonique
+  // {projet_vente,compromis_signe → 'en_attente' ; acte_signe → 'actif'}.
+  saleCycle: {
+    type: String,
+    enum: ['projet_vente', 'compromis_signe', 'acte_signe'],
+    default: null,
+  },
+  saleCycleHistory: {
+    type: [{
+      from: String,
+      to: { type: String, required: true },
+      action: { type: String, required: true },
+      actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      comment: { type: String, trim: true, maxlength: 1000 },
+      at: { type: Date, default: Date.now },
+    }],
+    default: [],
+  },
 }, { timestamps: true });
 
 // Verrou persistant contre deux engagements incompatibles sur le même bien.

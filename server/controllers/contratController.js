@@ -14,9 +14,34 @@ const { ensureRentalManagementActive, syncLeaseOccupation } = require('../servic
 // changement de `statut` sur un bail (comportement inchangé pour les
 // contrats de vente, hors périmètre du cycle de vie locatif).
 const leaseLifecycle = require('../services/rentalLeaseLifecycleService');
+// SCL-2 — la machine d'état du cycle de vie du contrat de VENTE devient
+// l'unique porte d'entrée pour toute progression de `saleCycle` — le
+// controller n'écrit JAMAIS `saleCycle`/`saleCycleHistory` directement.
+const saleLifecycle = require('../services/saleContractLifecycleService');
 const { generatePaiements } = require('../services/rentalPaymentScheduleService');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { isModuleAvailable } = require('../middleware/tenantModuleGate');
+
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV — CONTRAT-DOMAIN-SPLIT.
+// Sur la surface POLYMORPHIQUE legacy `/api/contrats/:id` (PUT/DELETE),
+// la présence du module `location` est vérifiée à l'exécution en fonction
+// du type persisté du contrat visé — les surfaces typées
+// `/api/contrats/location/*` appliquent déjà cette garde en amont via
+// `requireTenantModule('location')`. Sans cette garde inline, un tenant
+// dépourvu du module `location` pourrait encore atteindre la mutation d'un
+// contrat de location par la route polymorphique historique.
+async function ensureModuleAvailableForContratType(req, contratType) {
+  if (contratType !== 'location') return;
+  const tenantId = req.platformTenant?._id;
+  if (!tenantId) return; // requireTenantScope amont a déjà bloqué le cas
+  const ok = await isModuleAvailable(tenantId, 'location');
+  if (!ok) {
+    const err = new Error('Module tenant indisponible (attendu : location).');
+    err.statusCode = 403; err.code = 'TENANT_MODULE_UNAVAILABLE';
+    throw err;
+  }
+}
 
 // SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — même frontière
 // canonique que `router.param('id', …)` de contratRoutes.js (TENANT-CERT-2) :
@@ -30,12 +55,49 @@ async function assertPropertyTenantAccess(req, property) {
 
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-A, finding RA-04) — même relation
 // canonique que `paiementController.scopedContratIdsForTenant`
-// (SECURITY-CLOSURE-P0-WAVE-1) : `Contrat.bien.owner → OrgMembership`, pas
-// un champ `tenant` dénormalisé sur `Property`.
+// (SECURITY-CLOSURE-P0-WAVE-1) : `Contrat.bien.owner → OrgMembership`, plus
+// PROPERTY-DIRECT-TENANT — `Property.tenant` prend la précédence quand il
+// est renseigné (canonique 2E.1.X), fallback historique via `owner`.
 async function scopedContratFilterForTenant(req) {
   if (!req.platformTenant) return {};
-  const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+  const propertyIds = await Property.find({
+    $or: [
+      { tenant: req.platformTenant._id },
+      { tenant: null, owner: { $in: req.tenantScopeUserIds || [] } },
+    ],
+  }).distinct('_id');
   return { bien: { $in: propertyIds } };
+}
+
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIII (B2) — PUT allow-list schema-
+// backed. Un `updates = { ...req.body }` sans allow-list permet à un membre
+// tenant légitime de rebinder `bien`, `proprietaire`, `locataire`, `type`,
+// `reservation`, … après le contrôle de frontière `router.param('id', …)`
+// qui n'inspecte QUE la pré-image. Interdiction canonique (schema-driven) :
+//  - `comment` est accepté dans le body en passthrough vers
+//    rentalLeaseLifecycleService (contrat existant) mais JAMAIS persisté
+//    directement par le controller.
+//  - `cycleVie`/`cycleHistory` sont persistés UNIQUEMENT par la state
+//    machine — écriture directe interdite.
+const LOCATION_MUTABLE_FIELDS = new Set(['statut', 'dateEntree', 'dateFinBail', 'montantLoyer', 'montantCaution', 'notes', 'documents']);
+const VENTE_MUTABLE_FIELDS = new Set(['statut', 'prixVente', 'dateSignatureCompromis', 'dateSignatureActe', 'commissionAgence', 'conditionsSuspensives', 'notes', 'documents']);
+const PASSTHROUGH_FIELDS = new Set(['comment']);
+
+function partitionUpdate(body, contratType) {
+  const allowed = contratType === 'vente' ? VENTE_MUTABLE_FIELDS : LOCATION_MUTABLE_FIELDS;
+  const rejected = [];
+  const persisted = {};
+  const passthrough = {};
+  for (const key of Object.keys(body || {})) {
+    if (allowed.has(key)) {
+      persisted[key] = body[key];
+    } else if (PASSTHROUGH_FIELDS.has(key)) {
+      passthrough[key] = body[key];
+    } else {
+      rejected.push(key);
+    }
+  }
+  return { persisted, passthrough, rejected };
 }
 
 exports.getAll = async (req, res) => {
@@ -189,13 +251,55 @@ exports.update = async (req, res) => {
     const existing = await Contrat.findById(req.params.id).select('type statut');
     if (!existing) return res.status(404).json({ status: 'error', message: 'Contrat introuvable' });
 
-    const updates = { ...req.body };
+    try { await ensureModuleAvailableForContratType(req, existing.type); }
+    catch (e) { return res.status(e.statusCode || 403).json({ status: 'fail', code: e.code, message: e.message }); }
+
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIII (B2) — allow-list
+    // schema-backed. Un champ hors allow-list (identité structurelle ou
+    // inconnu) fait échouer la requête en 400 SANS écriture partielle.
+    const { persisted, passthrough, rejected } = partitionUpdate(req.body, existing.type);
+    if (rejected.length) {
+      return res.status(400).json({
+        status: 'fail',
+        code: 'CONTRACT_FIELD_NOT_MUTABLE',
+        message: `Champ(s) non modifiable(s) via PUT /api/contrats/:id : ${rejected.join(', ')}.`,
+        fields: rejected,
+      });
+    }
+
+    const updates = { ...persisted };
     if (existing.type === 'location' && updates.statut !== undefined && updates.statut !== existing.statut) {
       // GL-LIFE-1 : toute demande de changement de statut sur un bail passe
       // désormais par la machine d'état centralisée — rejetée (409) si la
       // transition est illégale, jamais un écrasement silencieux.
-      await leaseLifecycle.requestStatutChange(existing._id, updates.statut, { actor: req.user.id, comment: updates.comment });
+      await leaseLifecycle.requestStatutChange(existing._id, updates.statut, { actor: req.user.id, comment: passthrough.comment });
       delete updates.statut; // déjà appliqué et synchronisé par la state machine
+    }
+
+    // SCL-2 — pour un contrat de VENTE, toute progression légale
+    // (dateSignatureCompromis / dateSignatureActe) et toute demande de
+    // changement de `statut` passent par la machine d'état. Le controller
+    // n'écrit JAMAIS ces champs directement.
+    if (existing.type === 'vente') {
+      try {
+        const outcome = await saleLifecycle.applyPutMutation({
+          contratId: existing._id,
+          payload: { ...updates, ...(Object.prototype.hasOwnProperty.call(req.body, 'statut') ? { statut: req.body.statut } : {}) },
+          actor: req.user.id,
+          comment: passthrough.comment,
+        });
+        // Champs déjà persistés par la machine — ne pas les ré-écrire ici.
+        for (const k of outcome.consumedFields) delete updates[k];
+        // La machine gère `statut` de bout en bout pour la vente : jamais
+        // écrit directement par le controller.
+        delete updates.statut;
+      } catch (err) {
+        return res.status(err.statusCode || 409).json({
+          status: 'fail',
+          code: err.code || 'CONTRACT_LIFECYCLE_ERROR',
+          message: err.message,
+        });
+      }
     }
 
     const c = await Contrat.findByIdAndUpdate(req.params.id, updates, {
@@ -237,6 +341,8 @@ exports.delete = async (req, res) => {
   try {
     const c = await Contrat.findById(req.params.id);
     if (!c) return res.status(404).json({ status: 'error', message: 'Contrat introuvable' });
+    try { await ensureModuleAvailableForContratType(req, c.type); }
+    catch (e) { return res.status(e.statusCode || 403).json({ status: 'fail', code: e.code, message: e.message }); }
     const historicalPayment = await Paiement.findOne({
       contrat: c._id,
       $or: [
@@ -290,18 +396,18 @@ exports.getPaiements = async (req, res) => {
   }
 };
 
-// POST /api/contrats/:id/paiements
+// POST /api/contrats/:id/paiements — RETIRÉ (décision B3).
+// Ancien comportement : `Paiement.create({...req.body, contrat: id})` — un
+// chemin d'écriture parallèle sans idempotence, sans CAS, sans reçu, sans
+// marker `paymentDomain`, sans discrimination location/vente. Aucun caller
+// runtime (frontend/mobile/scripts) — voir audit lot PCCTA §17. La surface
+// canonique d'écriture de paiement locatif reste `/api/paiements/location/*`
+// (B.2). L'endpoint est conservé authentifié + tenant-frontière pour ne pas
+// devenir un oracle non authentifié, puis répond 410 Gone.
 exports.createPaiement = async (req, res) => {
-  try {
-    const p = await Paiement.create({ ...req.body, contrat: req.params.id });
-    const { notifyContractTenant } = require('../services/rentalTenantNotificationService');
-    await notifyContractTenant(req.params.id, {
-      type: 'tenant_payment_recorded', title: 'Paiement locatif enregistré',
-      body: `Une échéance ${p.mois || ''}/${p.annee || ''} a été enregistrée.`, entityType: 'Paiement', entityId: p._id,
-      dedupeKey: `tenant:payment:${p._id}:${p.statut}`, metadata: { paymentId: String(p._id), status: p.statut },
-    }).catch(() => {});
-    res.status(201).json({ status: 'success', data: { paiement: p } });
-  } catch (err) {
-    res.status(400).json({ status: 'error', message: err.message });
-  }
+  return res.status(410).json({
+    status: 'fail',
+    code: 'CONTRACT_PAYMENT_ENDPOINT_RETIRED',
+    message: 'Point d\'entrée retiré. Utilisez la surface canonique /api/paiements/location/*.',
+  });
 };

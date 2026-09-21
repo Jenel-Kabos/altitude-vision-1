@@ -42,6 +42,11 @@ afterAll(stopFinancialMongo);
 
 async function setupActiveRentalReservation() {
   const admin = await makeUser({ role: 'Admin' });
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X — POST /api/contrats est
+  // désormais PLATFORM-only ; fixture élève l'admin en operator.
+  const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+  const granter = await makeUser({ role: 'Admin' });
+  await grantOperator({ userId: admin._id, actor: granter, reason: 'concurrency test fixture', capabilities: ['platform.commercial.manage'] });
   const owner = await makeUser({ role: 'Proprietaire' });
   const client = await makeUser({ role: 'Client' });
   const property = await Property.create({

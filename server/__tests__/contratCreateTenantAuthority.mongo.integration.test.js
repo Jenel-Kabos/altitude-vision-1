@@ -71,13 +71,17 @@ function createBody(property, montantLoyer = 150000) {
 }
 
 describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contrats', () => {
-  test('1. Admin A + Property A -> creation legitime OK', async () => {
+  test('1. Tenant Admin A + Property A -> REFUSÉ (marketplace conclusion is PLATFORM-only, MRCB-02b contract)', async () => {
+    // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-MARKETPLACE-RENTAL-COMMERCIAL-
+    // BOUNDARY — un Tenant Admin ne peut plus conclure une location
+    // marketplace ; la garde a migré vers `platform.commercial.manage`
+    // (Admin global + PlatformOperator + capacité exacte).
     const a = await buildTenant('A1');
     const property = await buildProperty(a.owner);
     const res = await request(app).post('/api/contrats').set(bearer(a.admin, a.tenant._id)).send(createBody(property));
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
     const created = await Contrat.findOne({ bien: property._id });
-    expect(created).toBeTruthy();
+    expect(created).toBeFalsy();
   });
 
   test('2. Admin A + Property B -> refuse, zero Contrat, zero Paiement', async () => {
@@ -114,23 +118,22 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
     expect(created).toBeFalsy();
   });
 
-  test('5. PlatformOperator global -> peut creer sur n\'importe quel tenant (contrat historique)', async () => {
+  test('5. PlatformOperator SANS platform.commercial.manage -> REFUSÉ (capabilities strictes)', async () => {
     const a = await buildTenant('A5');
     const propertyA = await buildProperty(a.owner);
     const operator = await User.create({ name: 'PO Global', email: `fca101-po-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
     await grantOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-01 certification', capabilities: [] });
     const res = await request(app).post('/api/contrats').set(bearer(operator, a.tenant._id)).send(createBody(propertyA));
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
   });
 
-  test('6. PlatformOperator scoped explicitement sur A -> A seulement', async () => {
+  test('6. PlatformOperator + platform.commercial.manage -> autorisé (marketplace conclusion PLATFORM-only)', async () => {
     const a = await buildTenant('A6');
-    const b = await buildTenant('B6');
-    const propertyB = await buildProperty(b.owner);
-    const operator = await User.create({ name: 'PO Scoped', email: `fca101-po-scoped-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-01 certification scoped', capabilities: [] });
-    const res = await request(app).post('/api/contrats').set(bearer(operator, a.tenant._id)).send(createBody(propertyB));
-    expect(res.status).not.toBe(201);
+    const propertyA = await buildProperty(a.owner);
+    const operator = await User.create({ name: 'PO Commercial', email: `fca101-po-commercial-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-01 platform.commercial.manage', capabilities: ['platform.commercial.manage'] });
+    const res = await request(app).post('/api/contrats').set(bearer(operator, a.tenant._id)).send(createBody(propertyA));
+    expect(res.status).toBe(201);
   });
 
   test('7. Invalid tenant header -> fail-closed', async () => {
