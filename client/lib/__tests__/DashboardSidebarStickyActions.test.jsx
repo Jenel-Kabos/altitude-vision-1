@@ -18,7 +18,8 @@ vi.doMock('../context/AuthContext', () => ({
   }),
 }));
 vi.doMock('../context/PlatformTenantRuntimeContext', () => ({
-  usePlatformTenantRuntime: () => ({ tenantReady: true, tenantRequired: false, selectedTenantId: null, can }),
+  // Le provider garantit toujours un tableau, même sans tenant accessible.
+  usePlatformTenantRuntime: () => ({ tenantReady: true, tenantRequired: false, selectedTenantId: null, tenants: [], can }),
 }));
 
 describe('AdminDashboard sidebar — footer ancré, nav scrollable', () => {

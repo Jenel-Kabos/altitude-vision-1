@@ -28,7 +28,7 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
-  const { tenantLoading, tenantRequired, selectedTenantId } = usePlatformTenantRuntime();
+  const { tenantLoading, tenantRequired, selectedTenantId, tenants } = usePlatformTenantRuntime();
   const { data: session, status: sessionStatus } = useSession();
 
   // Resolve role from either auth system (email/password or Google OAuth)
@@ -49,10 +49,10 @@ export default function DashboardLayout({ children }) {
       return;
     }
 
-    if (role && !ALLOWED_ROLES.includes(role)) {
+    if (role && !ALLOWED_ROLES.includes(role) && !(tenants || []).length) {
       router.replace(REDIRECT_BY_ROLE[role] ?? '/');
     }
-  }, [isLoading, isAuthenticated, role, router]);
+  }, [isLoading, isAuthenticated, role, router, tenants]);
 
   if (isLoading) {
     return (
@@ -62,7 +62,7 @@ export default function DashboardLayout({ children }) {
     );
   }
 
-  if (!isAuthenticated || (role && !ALLOWED_ROLES.includes(role))) {
+  if (!isAuthenticated || (role && !ALLOWED_ROLES.includes(role) && !(tenants || []).length)) {
     return null;
   }
 

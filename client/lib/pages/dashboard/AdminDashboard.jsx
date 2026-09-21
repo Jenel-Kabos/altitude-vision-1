@@ -42,11 +42,11 @@ const NAV_SECTIONS = [
   {
     label: null,
     links: [
-      { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      roles: ALL_STAFF },
+      { to: '/dashboard',                    end: true,  Icon: BarChart3,    label: 'Tableau de bord',    accent: BLUE,      tenantRoles: ALL_STAFF },
       // ERP-CORE-1 — Centre d'Administration Global, réservé à la Direction
       // (même périmètre que la route serveur /api/erp) : orchestration pure,
       // ne remplace aucun des dashboards listés ci-dessous.
-      { to: '/dashboard/erp',                end: true,  Icon: Gauge,           label: "Centre d'Administration", accent: GOLD, roles: ['Admin'] },
+      { to: '/dashboard/erp',                end: true,  Icon: Gauge,           label: "Centre d'Administration", accent: GOLD, tenantRoles: ['Admin'] },
       // TENANT-CORE-1 — administration SaaS multi-tenant, réservée Admin
       // (même périmètre que /api/platform-tenants). Nommé « Multi-Tenant »
       // dans l'UI pour rester sans ambiguïté avec l'espace locataire
@@ -60,7 +60,7 @@ const NAV_SECTIONS = [
       { to: ORGANIZATION_ROUTE,              end: true,  Icon: Network,         label: 'Organisation',        accent: BLUE,   roles: ['Admin'] },
       // API-PUBLIC-1 — portail développeur (clés API, webhooks, journal
       // d'appels), réservé Admin (émission de clé = action sensible).
-      { to: API_PLATFORM_ROUTE,              end: true,  Icon: KeyRound,        label: 'API publique',        accent: GOLD,   roles: ['Admin'] },
+      { to: API_PLATFORM_ROUTE,              end: true,  Icon: KeyRound,        label: 'API publique',        accent: GOLD,   tenantRoles: ['Admin'] },
     ],
   },
   {
@@ -74,6 +74,7 @@ const NAV_SECTIONS = [
       { to: '/dashboard/rentals',            end: true,  Icon: KeyRound,   label: 'Locations',            accent: BLUE, roles: ROLES_ALTIMMO },
       { to: '/dashboard/dossiers-immobiliers', end: true, Icon: ClipboardList, label: 'Offres & candidatures', accent: BLUE, roles: ['Admin', 'Collaborateur', 'GestionnaireImmobilier'] },
       { to: '/dashboard/hebergements',       end: true,  Icon: Palmtree,   label: 'Hébergements',         accent: GOLD, roles: ROLES_ALTIMMO },
+      { to: '/dashboard/remboursements-hebergements', end: true, Icon: CreditCard, label: 'Remboursements à traiter', accent: BLUE, roles: ['Admin', 'Collaborateur', 'Secretaire'] },
       { to: '/dashboard/estimations',        end: false, Icon: Calculator, label: 'Estimations',  accent: GOLD, roles: ROLES_ESTIM, badge: 'estimations' },
       { to: '/dashboard/devis',              end: false, Icon: FileText,   label: 'Devis locatif', accent: GOLD, roles: ROLES_ESTIM },
       { to: '/dashboard/visites', end: false, Icon: Calendar, label: 'Visites', accent: GOLD, capability: 'visits.read', badge: 'visites' },
@@ -127,7 +128,7 @@ const NAV_SECTIONS = [
       { to: '/dashboard/altcom', end: false, Icon: Briefcase, label: 'Altcom', accent: GOLD, capability: 'altcom.read' },
       // MARKETING-AUTOMATION-1 — même périmètre rôles qu'Altcom (ROLES_CM) :
       // segments, modèles, campagnes, journal d'envoi.
-      { to: '/dashboard/altcom/marketing',   end: false, Icon: Megaphone,    label: 'Marketing Automation', accent: GOLD,      roles: ROLES_CM   },
+      { to: '/dashboard/altcom/marketing',   end: false, Icon: Megaphone,    label: 'Marketing Automation', accent: GOLD,      tenantRoles: ROLES_CM   },
     ],
   },
   {
@@ -142,7 +143,7 @@ const NAV_SECTIONS = [
   {
     label: 'CRM 360°',
     links: [
-      { to: CRM_ROUTE, end: false, Icon: ContactRound, label: 'Customers & pipeline', accent: '#0F766E', roles: ALL_STAFF },
+      { to: CRM_ROUTE, end: false, Icon: ContactRound, label: 'Customers & pipeline', accent: '#0F766E', tenantRoles: ALL_STAFF },
     ],
   },
   {
@@ -152,7 +153,7 @@ const NAV_SECTIONS = [
       { to: '/dashboard/users',            end: false, Icon: Users,         label: 'Utilisateurs',       accent: '#0D9488', capability: 'platform.users.read' },
       { to: '/dashboard/notifications',    end: false, Icon: Bell,          label: 'Notifications',      accent: BLUE,      roles: ['Admin'] },
       { to: '/dashboard/active-sessions',  end: false, Icon: ShieldCheck,   label: 'Sessions Actives',   accent: '#DC2626', roles: ['Admin'] },
-      { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',         accent: '#7C3AED', roles: ['Admin'] },
+      { to: '/dashboard/historique',       end: false, Icon: ClipboardList, label: 'Historique',         accent: '#7C3AED', tenantRoles: ['Admin'] },
       { to: '/dashboard/export-marketing', end: false, Icon: BarChart2,     label: 'Export Marketing',   accent: GOLD,      roles: ['Admin'] },
       { to: '/dashboard/litiges',          end: false, Icon: Scale,         label: 'Litiges',             accent: '#DC2626', roles: ROLES_LITIGES, badge: 'litiges' },
     ],
@@ -188,7 +189,7 @@ const AdminDashboard = ({ children }) => {
   const pathname = usePathname();
   const isActive = (to, end = false) => end ? pathname === to : pathname.startsWith(to);
   const { logout, user, isCollaborateur, activeWrites, timeLeft } = useAuth();
-  const { tenantReady, tenantRequired, selectedTenantId, can } = usePlatformTenantRuntime();
+  const { tenantReady, tenantRequired, selectedTenantId, tenantBusinessRole, tenants, can } = usePlatformTenantRuntime();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const menuButtonRef = useRef(null);
@@ -363,7 +364,7 @@ const AdminDashboard = ({ children }) => {
 
           {/* PLATFORM-ADMIN-1 — invisible pour tout utilisateur qui n'est pas
               un PlatformOperator actif (voir le composant lui-même). */}
-          {user?.role === 'Admin' && (
+          {(tenants?.length > 0 || user?.role === 'Admin') && (
             <div className="px-3 pt-3">
               <PlatformOperatorContextSwitcher />
             </div>
@@ -381,7 +382,11 @@ const AdminDashboard = ({ children }) => {
                 // backend (getEffectiveCapabilities, RBAC-2), parité prouvée
                 // avec l'ancien hasStaffCapability/CAPABILITIES_BY_ROLE (voir
                 // server/docs/RBAC3_WEB_MIGRATION_MATRIX.md).
-                link.capability ? can(link.capability) : (!link.roles || link.roles.includes(user?.role))
+                link.capability
+                  ? can(link.capability)
+                  : link.tenantRoles
+                    ? link.tenantRoles.includes(tenantBusinessRole)
+                    : (!link.roles || link.roles.includes(user?.role))
               ));
               // Une section dont aucun lien n'est visible pour le rôle
               // courant ne doit jamais afficher un en-tête "orphelin" sans

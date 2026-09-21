@@ -7,6 +7,9 @@ import api from './api';
 // existant (`tenantLinkService`, `TENANT_PORTAL`).
 
 export const listTenants = async (params = {}) => (await api.get('/platform-tenants', { params })).data.data.tenants;
+export const listAccessibleTenants = async () => (
+  await api.get('/platform-tenants/accessible', { platformScoped: true })
+).data.data.tenants;
 export const createTenant = async (payload) => (await api.post('/platform-tenants', payload)).data.data.tenant;
 export const getTenantOverview = async (id) => (await api.get(`/platform-tenants/${id}`)).data.data.overview;
 export const suspendTenant = async (id, reason) => (await api.patch(`/platform-tenants/${id}/suspend`, { reason })).data.data.tenant;

@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { PlatformTenantRuntimeProvider, usePlatformTenantRuntime } from '../context/PlatformTenantRuntimeContext';
 import { getMyOperatorStatus } from '../services/platformOperatorService';
-import { listTenants } from '../services/platformTenantService';
+import { listAccessibleTenants, listTenants } from '../services/platformTenantService';
 import { clearValidatedPlatformTenant } from '../services/api';
 
 let authUser = { _id: 'operator-a', role: 'Admin' };
@@ -14,17 +14,20 @@ vi.mock('../context/AuthContext', () => ({
   }),
 }));
 vi.mock('../services/platformOperatorService', () => ({ getMyOperatorStatus: vi.fn() }));
-vi.mock('../services/platformTenantService', () => ({ listTenants: vi.fn() }));
+vi.mock('../services/platformTenantService', () => ({ listAccessibleTenants: vi.fn(), listTenants: vi.fn() }));
 
 const wrapper = ({ children }) => <PlatformTenantRuntimeProvider>{children}</PlatformTenantRuntimeProvider>;
 const CAPABILITY = 'platform.tenant_applications.read';
 
 describe('propagation des capacités PlatformOperator vers can()', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     localStorage.clear();
     clearValidatedPlatformTenant();
     authUser = { _id: 'operator-a', role: 'Admin' };
     roleCapabilities = [];
+    // La découverte des memberships précède la composition des capacités.
+    listAccessibleTenants.mockResolvedValue([]);
     listTenants.mockResolvedValue([]);
   });
 
@@ -33,6 +36,10 @@ describe('propagation des capacités PlatformOperator vers can()', () => {
     const { result } = renderHook(() => usePlatformTenantRuntime(), { wrapper });
     await waitFor(() => expect(result.current.tenantReady).toBe(true));
     expect(result.current.can(CAPABILITY)).toBe(true);
+    expect(listAccessibleTenants).toHaveBeenCalledOnce();
+    expect(result.current.tenantMembership).toBeNull();
+    expect(result.current.tenantBusinessRole).toBeNull();
+    expect(result.current.isTenantAdmin).toBe(false);
   });
 
   test('CAP-03 — un opérateur suspendu avec la capacité ne débloque rien', async () => {
@@ -50,6 +57,7 @@ describe('propagation des capacités PlatformOperator vers can()', () => {
   });
 
   test('CAP-05 — un Admin sans PlatformOperator ne reçoit jamais la capacité par le rôle', async () => {
+    roleCapabilities = [CAPABILITY];
     getMyOperatorStatus.mockResolvedValue({ status: 'active', capabilities: [] });
     const { result } = renderHook(() => usePlatformTenantRuntime(), { wrapper });
     await waitFor(() => expect(result.current.tenantReady).toBe(true));

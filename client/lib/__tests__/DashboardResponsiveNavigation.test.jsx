@@ -24,7 +24,8 @@ vi.mock('../context/AuthContext', () => ({
 
 vi.mock('../hooks/useDashboardBadges', () => ({ useDashboardBadges: () => ({ badges: {} }) }));
 vi.mock('../context/PlatformTenantRuntimeContext', () => ({
-  usePlatformTenantRuntime: () => ({ tenantReady: true, tenantRequired: false, selectedTenantId: null, can: () => true }),
+  // Le provider garantit toujours un tableau, même sans tenant accessible.
+  usePlatformTenantRuntime: () => ({ tenantReady: true, tenantRequired: false, selectedTenantId: null, tenants: [], can: () => true }),
 }));
 
 vi.mock('socket.io-client', () => ({

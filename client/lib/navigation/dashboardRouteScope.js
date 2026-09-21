@@ -11,6 +11,7 @@ const DASHBOARD_ROUTE_SCOPES = Object.freeze([
   ['/dashboard/etablissements', DASHBOARD_SCOPE.GLOBAL_FIRST],
   ['/dashboard/hotel-reservations', DASHBOARD_SCOPE.GLOBAL_FIRST],
   ['/dashboard/visites', DASHBOARD_SCOPE.GLOBAL_FIRST],
+  ['/dashboard/remboursements-hebergements', DASHBOARD_SCOPE.GLOBAL_FIRST],
   ['/dashboard/moderation', DASHBOARD_SCOPE.PLATFORM_ONLY],
   ['/dashboard/messages', DASHBOARD_SCOPE.PLATFORM_ONLY],
   ['/dashboard/contact-messages', DASHBOARD_SCOPE.PLATFORM_ONLY],

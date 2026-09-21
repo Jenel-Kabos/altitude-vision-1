@@ -245,7 +245,8 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         updateUser,
-        isAdmin:         user?.role === 'Admin',
+        isGlobalAdmin:   user?.role === 'Admin',
+        isAdmin:         user?.role === 'Admin', // compatibilité : identité globale uniquement
         isCollaborateur: isCollab,
         canAdd:          ['Admin', ...COLLAB_ROLES].includes(user?.role),
         canEdit:         user?.role === 'Admin',

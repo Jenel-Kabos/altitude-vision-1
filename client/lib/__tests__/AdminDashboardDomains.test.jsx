@@ -22,7 +22,7 @@ const CAPABILITIES_BY_ROLE = {
   Communicant: ['messages.read', 'messages.manage', 'visits.read'],
 };
 
-const renderAsRole = (role, explicitCapabilities) => {
+const renderAsRole = (role, explicitCapabilities, tenantBusinessRole = role) => {
   const capabilities = explicitCapabilities || CAPABILITIES_BY_ROLE[role] || [];
   const can = (capability) => capability === 'platform.tenant_applications.read'
     ? capabilities.includes(capability)
@@ -37,7 +37,14 @@ const renderAsRole = (role, explicitCapabilities) => {
   // PlatformTenantRuntimeContext (rôle + capacité PlatformOperator active),
   // jamais via useAuth().can seul, pour éviter deux systèmes de capacités.
   vi.doMock('../context/PlatformTenantRuntimeContext', () => ({
-    usePlatformTenantRuntime: () => ({ tenantReady: true, tenantRequired: false, selectedTenantId: null, can }),
+    usePlatformTenantRuntime: () => ({
+      tenantReady: true,
+      tenantRequired: Boolean(tenantBusinessRole),
+      selectedTenantId: tenantBusinessRole ? 'TENANT-A' : null,
+      tenantBusinessRole,
+      tenants: tenantBusinessRole ? [{ _id: 'TENANT-A', name: 'Tenant A' }] : [],
+      can,
+    }),
   }));
 };
 
@@ -148,5 +155,34 @@ describe('AdminDashboard — domaines métier Altimmo (Sprint 0) — TEST DATA',
     const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
     render(<Dashboard><p>CONTENU</p></Dashboard>);
     expect(screen.queryByRole('link', { name: 'Activations professionnelles' })).not.toBeInTheDocument();
+  });
+
+  test('UIROLE-01 — Proprietaire + Admin tenant voit les contrôles tenant, jamais la plateforme', async () => {
+    renderAsRole('Proprietaire', [], 'Admin');
+    const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
+    render(<Dashboard><p>CONTENU</p></Dashboard>);
+    expect(screen.getByRole('link', { name: "Centre d'Administration" })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Customers & pipeline' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Multi-Tenant (SaaS)' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Utilisateurs' })).not.toBeInTheDocument();
+  });
+
+  test('UIROLE-02 — Admin global sans membership ne reçoit aucun contrôle tenant canonique', async () => {
+    renderAsRole('Admin', ['platform.tenants.read'], null);
+    const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
+    render(<Dashboard><p>CONTENU</p></Dashboard>);
+    expect(screen.getByRole('link', { name: 'Multi-Tenant (SaaS)' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: "Centre d'Administration" })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Customers & pipeline' })).not.toBeInTheDocument();
+  });
+
+  test('UIROLE-04..06 — le menu est recalculé depuis le businessRole sélectionné', async () => {
+    renderAsRole('Proprietaire', [], 'Collaborateur');
+    const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
+    render(<Dashboard><p>CONTENU</p></Dashboard>);
+    expect(screen.getByRole('link', { name: 'Customers & pipeline' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Marketing Automation' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: "Centre d'Administration" })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Historique' })).not.toBeInTheDocument();
   });
 });

@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { getMyOperatorStatus } from '../services/platformOperatorService';
-import { listTenants } from '../services/platformTenantService';
+import { listAccessibleTenants, listTenants } from '../services/platformTenantService';
 import { clearValidatedPlatformTenant, setValidatedPlatformTenant } from '../services/api';
 
 const STORAGE_KEY = 'platformOperatorTenantSelection';
@@ -15,6 +15,10 @@ const DEFAULT_RUNTIME = {
   operator: null,
   tenants: [],
   selectedTenantId: null,
+  selectedTenant: null,
+  tenantMembership: null,
+  tenantBusinessRole: null,
+  isTenantAdmin: false,
   selectTenant: () => {},
   can: () => false,
 };
@@ -23,6 +27,8 @@ const userIdOf = (user) => String(user?._id || user?.id || '');
 
 export function PlatformTenantRuntimeProvider({ children }) {
   const { user, loading: authLoading, can: roleCan } = useAuth();
+  const runtimeUserId = userIdOf(user);
+  const globalRole = user?.role;
   const [state, setState] = useState({ loading: true, operator: null, tenants: [], selectedTenantId: null });
 
   useEffect(() => {
@@ -30,9 +36,9 @@ export function PlatformTenantRuntimeProvider({ children }) {
     clearValidatedPlatformTenant();
 
     const initialize = async () => {
-      const userId = userIdOf(user);
+      const userId = runtimeUserId;
       if (authLoading) return;
-      if (!userId || user?.role !== 'Admin') {
+      if (!userId) {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(LEGACY_STORAGE_KEY);
         if (!cancelled) setState({ loading: false, operator: null, tenants: [], selectedTenantId: null });
@@ -40,14 +46,17 @@ export function PlatformTenantRuntimeProvider({ children }) {
       }
 
       try {
-        const operator = await getMyOperatorStatus();
-        if (!operator || operator.status !== 'active') {
-          localStorage.removeItem(STORAGE_KEY);
-          localStorage.removeItem(LEGACY_STORAGE_KEY);
-          if (!cancelled) setState({ loading: false, operator: null, tenants: [], selectedTenantId: null });
-          return;
-        }
-        const tenants = await listTenants();
+        const [accessibleTenants, operator] = await Promise.all([
+          listAccessibleTenants(),
+          globalRole === 'Admin' ? getMyOperatorStatus().catch(() => null) : Promise.resolve(null),
+        ]);
+        const canonicalAccessibleTenants = (accessibleTenants || []).filter(
+          (tenant) => tenant.membership?.status === 'active' && tenant.membership?.businessRole,
+        );
+        const platformTenants = operator?.status === 'active' ? await listTenants().catch(() => []) : [];
+        const tenantsById = new Map((platformTenants || []).map((tenant) => [String(tenant._id), tenant]));
+        canonicalAccessibleTenants.forEach((tenant) => tenantsById.set(String(tenant._id), tenant));
+        const tenants = [...tenantsById.values()];
         let persisted = null;
         try { persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { persisted = null; }
         const selectedTenantId = persisted?.userId === userId
@@ -57,7 +66,12 @@ export function PlatformTenantRuntimeProvider({ children }) {
         localStorage.removeItem(LEGACY_STORAGE_KEY);
         if (selectedTenantId) setValidatedPlatformTenant(selectedTenantId);
         else localStorage.removeItem(STORAGE_KEY);
-        if (!cancelled) setState({ loading: false, operator, tenants: tenants || [], selectedTenantId });
+        if (!cancelled) setState({
+          loading: false,
+          operator: operator?.status === 'active' ? operator : null,
+          tenants: tenants || [],
+          selectedTenantId,
+        });
       } catch {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(LEGACY_STORAGE_KEY);
@@ -66,7 +80,7 @@ export function PlatformTenantRuntimeProvider({ children }) {
     };
     initialize();
     return () => { cancelled = true; };
-  }, [authLoading, user?._id, user?.id, user?.role]);
+  }, [authLoading, runtimeUserId, globalRole]);
 
   const selectTenant = useCallback((tenantId) => {
     const userId = userIdOf(user);
@@ -94,19 +108,30 @@ export function PlatformTenantRuntimeProvider({ children }) {
     if (String(capability || '').startsWith('platform.')) {
       return Boolean(state.operator?.status === 'active' && state.operator.capabilities?.includes(capability));
     }
-    return roleCan(capability);
+    return roleCan?.(capability) || false;
   }, [roleCan, state.operator]);
+
+  const selectedTenant = useMemo(
+    () => state.tenants.find((tenant) => String(tenant._id) === String(state.selectedTenantId)) || null,
+    [state.selectedTenantId, state.tenants],
+  );
+  const tenantMembership = selectedTenant?.membership?.status === 'active' ? selectedTenant.membership : null;
+  const tenantBusinessRole = tenantMembership?.businessRole || null;
 
   const value = useMemo(() => ({
     tenantLoading: authLoading || state.loading,
     tenantReady: !authLoading && !state.loading,
-    tenantRequired: state.operator?.status === 'active',
+    tenantRequired: state.tenants.length > 0 || state.operator?.status === 'active',
     operator: state.operator,
     tenants: state.tenants,
     selectedTenantId: state.selectedTenantId,
+    selectedTenant,
+    tenantMembership,
+    tenantBusinessRole,
+    isTenantAdmin: tenantBusinessRole === 'Admin',
     selectTenant,
     can,
-  }), [authLoading, state, selectTenant, can]);
+  }), [authLoading, state, selectedTenant, tenantMembership, tenantBusinessRole, selectTenant, can]);
 
   return <TenantRuntimeContext.Provider value={value}>{children}</TenantRuntimeContext.Provider>;
 }
