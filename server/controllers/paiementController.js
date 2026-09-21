@@ -10,27 +10,34 @@ const { uploadPrivateAsset, deletePrivateAsset, readPrivateAsset } = require('..
 const { runFinancialOperation } = require('../services/finance/financialTransactionService');
 const logger = require('../utils/logger');
 const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 
-// SECURITY-CLOSURE-P0-WAVE-1 (P0-B, finding RA-02) — `Paiement` n'a aucun
-// champ `tenant` direct. IMPORTANT : la frontière tenant canonique déjà
-// utilisée par `tenantResourceAttributionService.resolveResourceTenant`
-// (appelée par `assertResourceTenantOrUnattributed`, elle-même utilisée par
-// le `router.param('id', …)` de ce même fichier) résout le tenant d'un
-// Contrat via `Contrat.bien.owner` **et l'appartenance (OrgMembership) de ce
-// propriétaire**, PAS via un éventuel champ `Property.tenant` — ce serait
-// une frontière parallèle et potentiellement divergente si réinventée ici.
-// Réutilise donc exactement la même primitive de scope que
-// `rentalManagementController.js` (`resolveScope`/`req.tenantScopeUserIds`,
-// peuplé par `requireTenantScopeForStaffOrPlatformOperator`) : l'ensemble
-// des utilisateurs membres du tenant résolu, puis les Property dont
-// `owner` appartient à cet ensemble.
+// Paiement → Contrat → Property : l'attribution explicite est prioritaire.
+// Les memberships du propriétaire ne servent qu'à présélectionner les
+// biens legacy sans tenant ; le résolveur canonique tranche ensuite et
+// exclut toute attribution ambiguë/non résolue.
 async function scopedContratIdsForTenant(req) {
   if (!req.platformTenant) return null; // pas de restriction — tenant non résolu (mode plateforme) ou route non tenant-scopée.
-  const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
+  const properties = await Property.find({ $or: [
+    { tenant: req.platformTenant._id },
+    { tenant: null, owner: { $in: req.tenantScopeUserIds || [] } },
+  ] }).select('_id owner tenant').lean();
+  const propertyIds = [];
+  for (const property of properties) {
+    const attribution = await resolveResourceTenant({ resourceType: 'Property', resource: property });
+    if (attribution.status === 'resolved' && String(attribution.tenantId) === String(req.platformTenant._id)) {
+      propertyIds.push(property._id);
+    }
+  }
   if (propertyIds.length === 0) return [];
-  return Contrat.find({ bien: { $in: propertyIds } }).distinct('_id');
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-B.2 —
+  // quand le middleware `markPaymentDomain('location')` a posé
+  // `req.paymentDomain`, on filtre canoniquement par `Contrat.type`.
+  // Sans domaine explicite, comportement inchangé (compat legacy).
+  const contractFilter = { bien: { $in: propertyIds } };
+  if (req.paymentDomain === 'location') contractFilter.type = 'location';
+  return Contrat.find(contractFilter).distinct('_id');
 }
 
 const safePaiement = (value) => {

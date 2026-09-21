@@ -4,11 +4,13 @@ jest.mock('../models/HotelReservation');
 jest.mock('../models/FinancialPayment');
 jest.mock('../services/finance/financialAuthorizationService');
 jest.mock('../services/finance/mtnHotelPaymentBridge');
+jest.mock('../services/finance/mtnAccommodationPaymentBridge');
 jest.mock('../services/payments/providers/mtn/mtnMoMoProvider');
 
 const FinancialPayment = require('../models/FinancialPayment');
 const authz = require('../services/finance/financialAuthorizationService');
 const bridge = require('../services/finance/mtnHotelPaymentBridge');
+const accommodationBridge = require('../services/finance/mtnAccommodationPaymentBridge');
 const mtnMoMoProvider = require('../services/payments/providers/mtn/mtnMoMoProvider');
 const ctrl = require('../controllers/mtnMomoPaymentController');
 
@@ -35,6 +37,17 @@ describe('mtnMomoPaymentController.callback — jamais de confiance dans le corp
     // Le contrôleur ne lit jamais body.status pour décider quoi que ce soit :
     // seul reconcileMtnHotelPayment (qui rappelle MTN) peut confirmer.
     expect(res.statusCode).toBe(200);
+  });
+
+  test('un callback Accommodation ignore tenantId, montant et statut du body et interroge MTN via le bridge dédié', async () => {
+    mtnMoMoProvider.extractCallbackReference.mockReturnValue({ referenceId: 'ref-acc', trusted: false });
+    FinancialPayment.findOne.mockResolvedValue({ _id: 'pay-acc', subjectType: 'AccommodationReservation' });
+    accommodationBridge.reconcileMtnAccommodationPayment.mockResolvedValue({ transition: 'confirmed' });
+    const req = { headers: {}, body: { tenantId: 'forged', status: 'SUCCESSFUL', amount: 1 } };
+    const res = response();
+    await ctrl.callback(req, res);
+    expect(accommodationBridge.reconcileMtnAccommodationPayment).toHaveBeenCalledWith(expect.objectContaining({ paymentId: 'pay-acc' }));
+    expect(bridge.reconcileMtnHotelPayment).not.toHaveBeenCalled();
   });
 
   test('une référence inconnue répond 200 neutre sans fuite d’information ni erreur', async () => {
@@ -82,5 +95,16 @@ describe('mtnMomoPaymentController.checkStatus — ownership (PAY-4 §37, IDOR)'
 
     expect(authz.assertCanViewFinancialPayment).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('mtnMomoPaymentController.initiateAccommodation — autorité serveur', () => {
+  test('ne transmet jamais le montant ni tenantId du body au bridge', async () => {
+    accommodationBridge.initiateMtnAccommodationPayment.mockResolvedValue({ payment: { _id: 'pay-acc', status: 'pending' }, amountMinor: 50000, nextAction: 'CONFIRM_ON_PHONE' });
+    const req = { body: { reservationId: 'res-acc', msisdn: '060000000', amountMinor: 1, tenantId: 'forged' }, headers: { 'idempotency-key': 'acc-key' }, user: { id: 'guest-1' } };
+    const res = response();
+    await ctrl.initiateAccommodation(req, res, jest.fn());
+    expect(accommodationBridge.initiateMtnAccommodationPayment).toHaveBeenCalledWith({ reservationId: 'res-acc', msisdn: '060000000', actor: req.user, businessOperationKey: 'acc-key' });
+    expect(res.statusCode).toBe(201);
   });
 });

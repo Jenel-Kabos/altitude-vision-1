@@ -22,6 +22,7 @@ const { requireCapability } = require('../middleware/capabilityMiddleware');
 // exclusivement staff (capacités `payments.read`/`payments.manage`), donc
 // ce garde ne change rien pour un acteur non-staff (il n'en existe aucun ici).
 const { requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
+const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
 
 const readPayments = [auth.protect, requireCapability('payments.read')];
 const managePayments = [auth.protect, requireCapability('payments.manage')];
@@ -42,7 +43,15 @@ router.post('/webhook-cinetpay',               cinetpay.webhookCinetpay);
 // Routes spécifiques AVANT /:id pour éviter les conflits
 router.get( '/alertes', readPayments, requireTenantScopeForStaffOrPlatformOperator, ctrl.getAlertes);
 router.get( '/stats', readPayments, requireTenantScopeForStaffOrPlatformOperator, ctrl.getStats);
-router.post('/calculer-penalites', managePayments, ctrl.calculerPenalites);
+// USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-B.2 —
+// L'endpoint TRANSVERSAL de calcul de pénalités mute potentiellement des
+// paiements de TOUS les tenants. Il ne peut donc pas se contenter d'une
+// autorité tenant (Admin/`payments.manage`), qui exposerait chaque tenant
+// à un déclenchement platform-wide par un simple tenant Admin. Autorité
+// requise : PlatformOperator actif avec `platform.finance.manage`.
+// Les tenants disposent d'un pendant tenant-local canonique sur
+// `POST /api/paiements/location/calculer-penalites` (§B.2 §13/§14).
+router.post('/calculer-penalites', auth.protect, requirePlatformOperatorCapability('platform.finance.manage'), ctrl.calculerPenalites);
 // GL-DEBT-1.1 — un encaissement réparti sur plusieurs échéances du même contrat.
 // SECURITY-CLOSURE-P0-WAVE-1 — PAS de `requireTenantScopeForStaffOrPlatformOperator`
 // ici (contrairement aux 3 routes de liste ci-dessus) : c'est une autorité sur UNE

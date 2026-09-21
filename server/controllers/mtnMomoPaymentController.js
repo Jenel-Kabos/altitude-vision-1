@@ -7,6 +7,7 @@ const FinancialPayment = require('../models/FinancialPayment');
 const authz = require('../services/finance/financialAuthorizationService');
 const { fail } = require('../services/finance/financialError');
 const { initiateMtnHotelPayment, reconcileMtnHotelPayment } = require('../services/finance/mtnHotelPaymentBridge');
+const { initiateMtnAccommodationPayment, reconcileMtnAccommodationPayment } = require('../services/finance/mtnAccommodationPaymentBridge');
 const mtnMoMoProvider = require('../services/payments/providers/mtn/mtnMoMoProvider');
 
 const requiredOperationKey = (req) => {
@@ -20,6 +21,7 @@ const requiredOperationKey = (req) => {
 const safePayment = (payment) => ({
   id: payment._id, status: payment.status, provider: payment.provider, method: payment.method,
   amountMinor: payment.amountMinor, currency: payment.currency, paymentReference: payment.paymentReference,
+  providerRefundStatus: payment.providerRefundStatus || 'none',
   createdAt: payment.createdAt, confirmedAt: payment.confirmedAt || null, failedAt: payment.failedAt || null,
 });
 
@@ -59,6 +61,18 @@ exports.initiate = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
+// POST /api/financial/accommodation/payments/mtn/initiate
+// Le montant n'est volontairement pas accepté : il est dérivé de la garantie
+// restant à payer dans le snapshot serveur de l'AccommodationReservation.
+exports.initiateAccommodation = async (req, res, next) => {
+  try {
+    const { reservationId, msisdn, paymentPurpose } = req.body;
+    if (!reservationId || !msisdn) fail('FINANCIAL_INVALID_AMOUNT', 'reservationId et msisdn sont requis.');
+    const result = await initiateMtnAccommodationPayment({ reservationId, msisdn, paymentPurpose, actor: req.user, businessOperationKey: requiredOperationKey(req) });
+    res.status(201).json({ status: 'success', data: { paymentId: result.payment._id, provider: 'mtn_direct', status: result.payment.status, amountMinor: result.amountMinor, paymentPurpose: result.paymentPurpose, paymentExpiresAt: result.paymentExpiresAt, nextAction: result.nextAction, message: NEXT_ACTION_MESSAGE[result.nextAction] || null } });
+  } catch (e) { next(e); }
+};
+
 // POST /api/financial/hotel/payments/:paymentId/mtn/check-status
 // PAY-4 §25 — action utilisateur explicite "Vérifier le paiement", toujours
 // une vraie GET status inquiry MTN, jamais une confiance en un état local.
@@ -69,7 +83,8 @@ exports.checkStatus = async (req, res, next) => {
     const actorId = String(req.user.id || req.user._id || '');
     const isOwner = payment.payer?.userId && String(payment.payer.userId) === actorId;
     if (!isOwner) await authz.assertCanViewFinancialPayment(req.user, payment.establishmentId);
-    const result = await reconcileMtnHotelPayment({ paymentId: payment._id, actor: req.user, businessOperationKey: requiredOperationKey(req) });
+    const reconcile = payment.subjectType === 'AccommodationReservation' ? reconcileMtnAccommodationPayment : reconcileMtnHotelPayment;
+    const result = await reconcile({ paymentId: payment._id, actor: req.user, businessOperationKey: requiredOperationKey(req) });
     res.json({ status: 'success', data: { payment: safePayment(result.payment), transition: result.transition } });
   } catch (e) { next(e); }
 };
@@ -88,7 +103,8 @@ exports.callback = async (req, res) => {
     // callback provider (voir PAY4_MTN_MOMO_REPORT.md §38, limite documentée :
     // le ledger existant attribue `actorType: 'user'` même ici, la fonction
     // canonique n'étant pas modifiée pour ce sprint — mandat §30).
-    await reconcileMtnHotelPayment({ paymentId: payment._id, actor: { id: null }, businessOperationKey: `mtn-callback:${referenceId}` });
+    const reconcile = payment.subjectType === 'AccommodationReservation' ? reconcileMtnAccommodationPayment : reconcileMtnHotelPayment;
+    await reconcile({ paymentId: payment._id, actor: { id: null }, businessOperationKey: `mtn-callback:${referenceId}` });
     res.status(200).json({ received: true });
   } catch {
     // PAY-4 §21 — MTN ne retente pas le callback : on ne doit jamais renvoyer

@@ -6,11 +6,13 @@ const schema = new mongoose.Schema({
   currency: { type: String, enum: C.FINANCIAL_CURRENCIES, required: true }, amountMinor: { type: Number, required: true, min: 1 }, allocatedAmountMinor: { type: Number, default: 0, min: 0 }, refundedAmountMinor: { type: Number, default: 0, min: 0 }, availableAmountMinor: { type: Number, required: true, min: 0 },
   payer: { name: String, email: String, phone: String, userId: { type: ObjectId, ref: 'User' } }, subjectType: { type: String, enum: C.FINANCIAL_SUBJECT_TYPES }, subjectId: ObjectId,
   providerPaymentId: { type: String, trim: true, minlength: 1, set(value) { if (value == null) return undefined; if (typeof value !== 'string') throw new mongoose.Error.CastError('String', value, 'providerPaymentId'); return value; } }, providerIntentId: String, providerMetadata: { type: mongoose.Schema.Types.Mixed, default: {}, select: false }, receivedAt: Date, confirmedAt: Date, failedAt: Date, cancelledAt: Date,
+  providerRefundStatus: { type: String, enum: ['none', 'refund_required', 'processing', 'completed', 'failed'], default: 'none', index: true }, refundRequiredAt: Date,
   manualValidation: { status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }, submittedBy: { type: ObjectId, ref: 'User' }, approvedBy: { type: ObjectId, ref: 'User' }, approvedAt: Date, rejectedBy: { type: ObjectId, ref: 'User' }, rejectedAt: Date, reason: String },
   proof: { asset: { type: privateAssetSchema, select: false }, uploadedBy: { type: ObjectId, ref: 'User' }, uploadedAt: Date },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} }, createdBy: { type: ObjectId, ref: 'User', required: true }, confirmedBy: { type: ObjectId, ref: 'User' },
-  businessOperationKey: { type: String, trim: true, maxlength: 200 }, payloadHash: { type: String, select: false },
+  businessOperationKey: { type: String, trim: true, maxlength: 200 }, obligationKey: { type: String, trim: true, maxlength: 240 }, payloadHash: { type: String, select: false },
 }, { timestamps: true });
 ['amountMinor', 'allocatedAmountMinor', 'refundedAmountMinor', 'availableAmountMinor'].forEach((path) => schema.path(path).validate(Number.isSafeInteger, `${path} doit être un entier sûr.`));
 schema.index({ domain: 1, establishmentId: 1, paymentReference: 1 }, { unique: true }); schema.index({ provider: 1, providerPaymentId: 1 }, { unique: true, partialFilterExpression: { providerPaymentId: { $type: 'string' } } }); schema.index({ subjectType: 1, subjectId: 1 }); schema.index({ domain: 1, establishmentId: 1, businessOperationKey: 1 }, { unique: true, partialFilterExpression: { businessOperationKey: { $type: 'string' } } });
+schema.index({ obligationKey: 1 }, { unique: true, partialFilterExpression: { obligationKey: { $type: 'string' } } });
 module.exports = mongoose.model('FinancialPayment', schema);

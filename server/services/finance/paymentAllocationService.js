@@ -66,7 +66,10 @@ async function allocatePaymentToDocumentCore({ paymentId, documentId, amountMino
   await financialCheckpoint(faultInjector, 'allocation.after_ledger', { businessOperationKey, allocationId: allocation._id });
   return allocation;
 }
-async function allocatePaymentToDocument(args) { return runFinancialOperation({ operationName: 'payment.allocate', transactionMode: args.transactionMode }, (context) => allocatePaymentToDocumentCore({ ...args, ...context })); }
+async function allocatePaymentToDocument(args) {
+  if (args.session) return allocatePaymentToDocumentCore({ ...args, transactional: true });
+  return runFinancialOperation({ operationName: 'payment.allocate', transactionMode: args.transactionMode }, (context) => allocatePaymentToDocumentCore({ ...args, ...context }));
+}
 async function reversePaymentAllocationCore({ allocationId, reason, businessOperationKey, actor, session, faultInjector }) {
   const normalizedReason = String(reason || '').trim();
   if (!normalizedReason) fail('FINANCIAL_ALLOCATION_REASON_REQUIRED', 'Une raison de renversement est obligatoire.');
