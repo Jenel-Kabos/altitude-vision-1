@@ -1,6 +1,8 @@
 const Hotel = require('../../models/Hotel');
 const { fail } = require('./financialError');
-const { resolveHotelAccessScope } = require('../hotel/hotelAccessScopeService');
+const { resolveTenantMembership } = require('../tenantMembershipService');
+const { resolveActiveOperator } = require('../platformOperator/platformOperatorService');
+const { DEFAULT_CAPABILITIES } = require('../../utils/iamArchitecture');
 const { assertResourceTenant } = require('../platformTenant/tenantResourceAttributionService');
 
 const CAPABILITIES = Object.freeze({
@@ -39,110 +41,83 @@ const managerCapabilities = [
   CAPABILITIES.DASHBOARD_VIEW, CAPABILITIES.DASHBOARD_ALERTS_VIEW,
 ];
 const adminCapabilities = [...managerCapabilities, CAPABILITIES.RECONCILIATION_RUN, CAPABILITIES.HOTEL_CHECKOUT_OVERRIDE, CAPABILITIES.DASHBOARD_OVERRIDE_AUDIT_VIEW];
-const ownerCapabilities = [
-  CAPABILITIES.DOCUMENT_VIEW, CAPABILITIES.PAYMENT_VIEW,
-  CAPABILITIES.LEDGER_VIEW, CAPABILITIES.RECONCILIATION_VIEW,
-  CAPABILITIES.HOTEL_CHECKOUT_VIEW,
-  CAPABILITIES.DOCUMENT_PDF_DOWNLOAD, CAPABILITIES.DOCUMENT_DELIVERY_VIEW,
-  CAPABILITIES.DASHBOARD_VIEW, CAPABILITIES.DASHBOARD_ALERTS_VIEW,
-];
-
-const FINANCIAL_CAPABILITIES = Object.freeze({
-  Admin: Object.freeze(adminCapabilities),
-  Collaborateur: Object.freeze(managerCapabilities),
-  Secretaire: Object.freeze(managerCapabilities),
-  Proprietaire: Object.freeze(ownerCapabilities),
-});
-const ACCOUNTING_ROLES = ['Admin', 'Collaborateur', 'Secretaire'];
-const HOTEL_FINANCE_ROLES = Object.keys(FINANCIAL_CAPABILITIES);
-const id = (value) => String(value?._id || value?.id || value || '');
-
-// PLATFORM-ADMIN-1 — mission §26 : "ne jamais transformer PlatformOperator
-// en permission financière implicite non auditée". Un opérateur ne reçoit
-// donc PAS automatiquement les capacités `Admin` : il doit détenir
-// explicitement `platform.finance.manage` (équivalent complet des capacités
-// Admin) ou `platform.finance.read` (lecture seule, sous-ensemble) — les
-// deux SEULES capacités PlatformOperator qui influencent ce module. Chaque
-// action reste par ailleurs journalisée par `financialController`/`actionLogService`
-// exactement comme pour tout autre acteur, aucune exception d'audit créée ici.
+// Financial capabilities remain operation-specific. The tenant plane consumes
+// the canonical membership resolver and named IAM capabilities, never User.role
+// or the legacy.full wildcard. Hotel.manager is relationship data only.
 const readOnlyFinanceCapabilities = [
   CAPABILITIES.DOCUMENT_VIEW, CAPABILITIES.PAYMENT_VIEW, CAPABILITIES.LEDGER_VIEW,
   CAPABILITIES.RECONCILIATION_VIEW, CAPABILITIES.HOTEL_CHECKOUT_VIEW,
   CAPABILITIES.DOCUMENT_PDF_DOWNLOAD, CAPABILITIES.DOCUMENT_DELIVERY_VIEW,
   CAPABILITIES.DASHBOARD_VIEW, CAPABILITIES.DASHBOARD_ALERTS_VIEW,
 ];
+const operationalPaymentCapabilities = [CAPABILITIES.PAYMENT_CREATE, CAPABILITIES.PAYMENT_CONFIRM, CAPABILITIES.PAYMENT_ALLOCATE];
+const tenantCapabilities = (businessRole) => {
+  const named = DEFAULT_CAPABILITIES[businessRole] || [];
+  if (businessRole === 'Admin' && named.includes('*')) return adminCapabilities;
+  return [
+    ...(named.includes('payments.read') || named.includes('payment.status') ? readOnlyFinanceCapabilities : []),
+    ...(named.includes('payments.manage') ? operationalPaymentCapabilities : []),
+  ];
+};
+const FINANCIAL_CAPABILITIES = Object.freeze(Object.fromEntries(
+  Object.keys(DEFAULT_CAPABILITIES).map((role) => [role, Object.freeze(tenantCapabilities(role))]),
+));
+const ACCOUNTING_ROLES = Object.keys(FINANCIAL_CAPABILITIES).filter((role) => FINANCIAL_CAPABILITIES[role].includes(CAPABILITIES.PAYMENT_CONFIRM));
+const HOTEL_FINANCE_ROLES = Object.keys(FINANCIAL_CAPABILITIES).filter((role) => FINANCIAL_CAPABILITIES[role].length);
+const id = (value) => value?._id || value?.id || value;
 
-function hasPlatformOperatorFinanceCapability(user, capability) {
-  if (!user?.isPlatformOperatorContext) return false;
-  const capabilities = user.platformOperatorCapabilities || [];
-  // `.manage` = équivalent complet des capacités Admin (émission, override,
-  // reconciliation.run inclus). `.read` = strictement les capacités de
-  // consultation, jamais une action qui modifie/émet/override.
-  if (capabilities.includes('platform.finance.manage')) return adminCapabilities.includes(capability);
-  if (capabilities.includes('platform.finance.read')) return readOnlyFinanceCapabilities.includes(capability);
-  return false;
+async function hasFinancialCapability(user, capability) {
+  if (!user || !Object.values(CAPABILITIES).includes(capability)) return false;
+  const userId = id(user);
+  if (!userId) return false;
+  const operator = await resolveActiveOperator(userId);
+  if (operator?.status === 'active') {
+    if (operator.capabilities?.includes('platform.finance.manage')) return adminCapabilities.includes(capability);
+    if (operator.capabilities?.includes('platform.finance.read') && readOnlyFinanceCapabilities.includes(capability)) return true;
+  }
+  const tenantId = id(user.platformTenant);
+  if (!tenantId) return false;
+  const resolved = await resolveTenantMembership(userId, tenantId);
+  if (!resolved || resolved.ambiguous || resolved.status !== 'active'
+    || ['suspended', 'archived'].includes(resolved.tenant?.status)) return false;
+  return tenantCapabilities(resolved.businessRole).includes(capability);
 }
 
-function hasFinancialCapability(user, capability) {
-  if (hasPlatformOperatorFinanceCapability(user, capability)) return true;
-  return Boolean(user && FINANCIAL_CAPABILITIES[user.role]?.includes(capability));
-}
-
-function assertFinancialCapability(user, capability) {
+async function assertFinancialCapability(user, capability) {
   if (!user) fail('FINANCIAL_UNAUTHORIZED', 'Authentification requise.', 401);
-  if (!hasFinancialCapability(user, capability)) fail('FINANCIAL_UNAUTHORIZED', 'Capacite financiere requise.', 403);
+  if (!await hasFinancialCapability(user, capability)) fail('FINANCIAL_UNAUTHORIZED', 'Capacite financiere requise.', 403);
   return true;
 }
 
-// F2.6 : la portee accepte, dans l'ordre, Admin (bypass), le legacy Hotel.manager (compatibilite
-// F0-F2.5, aucune migration n'est un prealable bloquant), puis un rattachement HotelStaffAssignment
-// actif portant la capacite requise (quand elle est precisee par l'appelant).
-async function assertFinancialScope(user, hotelId, capability) {
-  if (!user) fail('FINANCIAL_UNAUTHORIZED', 'Authentification requise.', 401);
+async function assertFinancialScope(user, hotelId, capability = CAPABILITIES.DOCUMENT_VIEW) {
+  await assertFinancialCapability(user, capability);
+  const tenantId = id(user.platformTenant);
+  if (!tenantId) fail('FINANCIAL_UNAUTHORIZED', 'Contexte tenant requis.', 403);
   const hotel = await Hotel.findById(hotelId).select('tenant manager name brand email phone property createdBy');
   if (!hotel) fail('FINANCIAL_UNAUTHORIZED', 'Etablissement inaccessible.', 404);
-  if (!user.platformTenant) {
-    if (id(hotel.manager) === id(user)) return hotel;
-    fail('FINANCIAL_UNAUTHORIZED', 'Contexte tenant requis.', 403);
-  }
-  await assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: user.platformTenant._id || user.platformTenant })
+  await assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId })
     .catch(() => fail('FINANCIAL_UNAUTHORIZED', 'Etablissement inaccessible.', 404));
-  // PLATFORM-ADMIN-1 — additif : un opérateur n'atteint cette ligne QUE s'il
-  // a explicitement sélectionné le tenant du présent hôtel (sinon
-  // `user.platformTenant` serait `null`, branche ci-dessus) ET détient la
-  // capacité finance requise — jamais un bypass tenant, jamais implicite.
-  if (user.role === 'Admin' || id(hotel.manager) === id(user) || hasPlatformOperatorFinanceCapability(user, capability)) return hotel;
-  const scope = await resolveHotelAccessScope({ actor: user, requiredCapability: capability, requestedHotelId: hotelId }).catch(() => null);
-  if (!scope) fail('FINANCIAL_UNAUTHORIZED', 'Acces financier refuse.', 403);
   return hotel;
 }
 
 async function authorizeFinancialAction({ user, capability, establishmentId }) {
-  assertFinancialCapability(user, capability);
   return assertFinancialScope(user, establishmentId, capability);
 }
 
-// F2.6 : delegue la resolution reelle multi-hotels a hotelAccessScopeService (Admin -> global ;
-// un seul hotel accessible -> auto-selectionne ; plusieurs -> selection explicite requise ;
-// aucun -> refuse). Les codes d'erreur historiques F2.5 sont preserves pour ne pas regresser.
 async function assertFinancialDashboardScope(user, capability, hotelId) {
-  assertFinancialCapability(user, capability);
-  let scope;
-  try {
-    scope = await resolveHotelAccessScope({ actor: user, requiredCapability: capability, requestedHotelId: hotelId });
-  } catch (error) {
-    if (error.code === 'HOTEL_SCOPE_REQUIRED') fail('FINANCIAL_DASHBOARD_ACCESS_DENIED', error.message, 403);
-    if (error.code === 'HOTEL_ACCESS_DENIED') fail('FINANCIAL_UNAUTHORIZED', 'Acces financier refuse.', error.statusCode || 403);
-    throw error;
+  await assertFinancialCapability(user, capability);
+  if (!id(user.platformTenant)) fail('FINANCIAL_UNAUTHORIZED', 'Contexte tenant requis.', 403);
+  if (!hotelId) {
+    const hotels = await Hotel.find({ tenant: id(user.platformTenant) }).select('_id').lean();
+    if (hotels.length !== 1) fail('FINANCIAL_DASHBOARD_ACCESS_DENIED', 'Sélectionnez un établissement accessible.', 403);
+    hotelId = hotels[0]._id;
   }
-  if (scope.globalAccess) return { hotel: null, global: true, hotelId: hotelId || null, accessibleHotelIds: null };
-  const resolvedHotelId = hotelId || scope.hotelIds[0];
-  return { hotel: { _id: resolvedHotelId }, global: false, hotelId: resolvedHotelId, accessibleHotelIds: scope.hotelIds };
+  const hotel = await assertFinancialScope(user, hotelId, capability);
+  return { hotel, global: false, hotelId, accessibleHotelIds: [hotelId] };
 }
 
 async function assertAccountingRole(user) {
-  if (!user || !ACCOUNTING_ROLES.includes(user.role)) fail('FINANCIAL_UNAUTHORIZED', 'Permission comptable requise.', 403);
-  return true;
+  return assertFinancialCapability(user, CAPABILITIES.PAYMENT_CONFIRM);
 }
 
 const withCapability = (capability) => (user, hotelId) => authorizeFinancialAction({ user, capability, establishmentId: hotelId });

@@ -28,14 +28,14 @@ const operationKey = (req, fallback) => String(req.headers['idempotency-key'] ||
 const requiredOperationKey = (req) => { const key = req.headers['idempotency-key'] || req.body?.idempotencyKey; if (!String(key || '').trim()) fail('FINANCIAL_IDEMPOTENCY_KEY_REQUIRED', 'Une clé d’idempotence est obligatoire.'); return String(key).trim(); };
 const pagination = (req) => ({ page: Math.max(1, Number(req.query.page) || 1), limit: Math.min(100, Math.max(1, Number(req.query.limit) || 20)) });
 
-const accommodationReaderRoles = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager', 'Secretaire'];
 async function assertAccommodationDocumentReader(user, document) {
   if (document.domain !== 'real_estate' || document.establishmentType !== 'Accommodation' || document.subjectType !== 'AccommodationReservation') return false;
   const reservation = await AccommodationReservation.findOne({ _id: document.subjectId, financialDocument: document._id }).select('guest owner');
   if (!reservation) fail('FINANCIAL_DOCUMENT_ACCESS_DENIED', 'Document de séjour inaccessible.', 403);
   const userId = String(user.id || user._id);
-  if (!accommodationReaderRoles.includes(user.role) && String(reservation.guest) !== userId && String(reservation.owner) !== userId) {
-    fail('FINANCIAL_DOCUMENT_ACCESS_DENIED', 'Document de séjour inaccessible.', 403);
+  if (String(reservation.guest) !== userId && String(reservation.owner) !== userId) {
+    await authz.assertFinancialCapability(user, authz.CAPABILITIES.DOCUMENT_VIEW);
+    if (!user.platformTenant || !document.tenant || String(document.tenant) !== String(user.platformTenant._id || user.platformTenant)) fail('FINANCIAL_DOCUMENT_ACCESS_DENIED', 'Document de séjour inaccessible.', 403);
   }
   return true;
 }
@@ -105,7 +105,7 @@ exports.listHotelDocuments = async (req, res, next) => { try { const hotelId = r
 // — l'accès est donc gardé au niveau route (STAFF_IMMO), pas via
 // `assertCanViewFinancialDocument` (couplé au modèle Hotel uniquement, cf.
 // `assertFinancialScope`, non réutilisable tel quel pour Accommodation).
-exports.listAccommodationDocuments = async (req, res, next) => { try { const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20)); const query = { domain: 'real_estate', establishmentType: 'Accommodation', documentType: 'invoice' }; if (req.query.status) query.status = req.query.status; if (req.query.establishmentId) query.establishmentId = req.query.establishmentId; const [documents, total] = await Promise.all([FinancialDocument.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), FinancialDocument.countDocuments(query)]); res.json({ status: 'success', data: { documents: documents.map((doc) => safeDocument(doc)), total, page, limit } }); } catch (e) { next(e); } };
+exports.listAccommodationDocuments = async (req, res, next) => { try { await authz.assertFinancialCapability(req.user, authz.CAPABILITIES.DOCUMENT_VIEW); if (!req.user.platformTenant) fail('FINANCIAL_UNAUTHORIZED', 'Contexte tenant requis.', 403); const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20)); const query = { tenant: req.user.platformTenant._id || req.user.platformTenant, domain: 'real_estate', establishmentType: 'Accommodation', documentType: 'invoice' }; if (req.query.status) query.status = req.query.status; if (req.query.establishmentId) query.establishmentId = req.query.establishmentId; const [documents, total] = await Promise.all([FinancialDocument.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit), FinancialDocument.countDocuments(query)]); res.json({ status: 'success', data: { documents: documents.map((doc) => safeDocument(doc)), total, page, limit } }); } catch (e) { next(e); } };
 exports.issue = async (req, res, next) => { try { const doc = await FinancialDocument.findById(req.params.documentId); if (!doc) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'Facture introuvable.', 404); const hotel = await authz.assertCanIssueFinancialDocument(req.user, doc.establishmentId); const issued = await issueFinancialDocument({ documentId: doc._id, actor: req.user, businessOperationKey: operationKey(req, `issue:${doc._id}`), establishmentCode: hotel._id.toString().slice(-6) }); res.json({ status: 'success', data: { document: safeDocument(issued) } }); } catch (e) { next(e); } };
 exports.createManualPayment = async (req, res, next) => { try { const establishmentId = req.body.establishmentId; await authz.assertCanCreateFinancialPayment(req.user, establishmentId); if (req.body.confirmed) await authz.assertCanConfirmFinancialPayment(req.user, establishmentId); const payment = await createManualPayment({ data: { establishmentId, amountMinor: req.body.amountMinor, currency: req.body.currency, method: req.body.method, payer: req.body.payer, subjectType: req.body.subjectType, subjectId: req.body.subjectId, paymentReference: req.body.paymentReference, confirmed: req.body.confirmed }, actor: req.user, businessOperationKey: requiredOperationKey(req) }); res.status(201).json({ status: 'success', data: { payment: safePayment(payment) } }); } catch (e) { next(e); } };
 exports.createHotelPayment = async (req, res, next) => { try {

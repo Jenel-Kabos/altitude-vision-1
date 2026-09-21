@@ -1,14 +1,20 @@
 const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
-const Hotel = require('../models/Hotel'); const HotelReservation = require('../models/HotelReservation'); const RoomCategory = require('../models/RoomCategory'); const Room = require('../models/Room'); const RoomAssignment = require('../models/RoomAssignment'); const HousekeepingTask = require('../models/HousekeepingTask'); const FinancialLedgerEntry = require('../models/FinancialLedgerEntry');
+const Hotel = require('../models/Hotel'); const HotelReservation = require('../models/HotelReservation'); const RoomCategory = require('../models/RoomCategory'); const Room = require('../models/Room'); const RoomAssignment = require('../models/RoomAssignment'); const HousekeepingTask = require('../models/HousekeepingTask'); const FinancialLedgerEntry = require('../models/FinancialLedgerEntry'); const User = require('../models/User');
 const { performCheckOut } = require('../services/checkOutService');
 const { createTenantFixture, tenantActor } = require('./helpers/tenantAwareFixture');
 jest.setTimeout(120000); const id = () => new mongoose.Types.ObjectId();
 async function fixture() {
-  const admin = { id: id(), _id: id(), role: 'Admin' };
-  admin._id = admin.id;
-  const { tenant } = await createTenantFixture({ label: 'Hotel checkout', bootstrap: admin });
-  Object.assign(admin, tenantActor(admin, tenant), { id: admin.id });
+  // FINANCIAL-AUTHORITY-HARDENING (F2.2) — l'autorité financière (dont
+  // HOTEL_CHECKOUT_OVERRIDE) provient exclusivement d'une OrgMembership
+  // canonique avec businessRole=Admin (ou d'un PlatformOperator explicite).
+  // Le bootstrap DOIT être un vrai document User (sinon
+  // organizationService.grantMembership renvoie "Utilisateur introuvable").
+  const bootstrapUser = await User.create({ name: 'Hotel Checkout Admin', email: `hotel-checkout-admin-${Date.now()}-${id()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+  const admin = bootstrapUser;
+  admin.id = admin._id;
+  const { tenant } = await createTenantFixture({ label: 'Hotel checkout', bootstrap: admin, withAdminMembership: true });
+  Object.assign(admin, tenantActor(admin, tenant), { id: admin._id });
   const hotel = await Hotel.create({ name: 'Hôtel F2.3', tenant: tenant._id, manager: id(), createdBy: admin.id });
   const category = await RoomCategory.create({ hotel: hotel._id, name: 'Standard', createdBy: admin.id });
   const room = await Room.create({ hotel: hotel._id, roomCategory: category._id, roomNumber: '101', status: 'occupied', createdBy: admin.id });

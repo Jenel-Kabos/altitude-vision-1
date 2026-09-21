@@ -30,11 +30,11 @@ const actorOf = (user) => tenantActor(user, tenantFixture.tenant);
 // (modèle User.js préexistant), contourné en gardant les emails de test dans un format sûr.
 let userCounter = 0;
 let hotelCounter = 0;
-async function makeUser(overrides = {}) {
+async function makeUser(overrides = {}, businessRole = null) {
   userCounter += 1;
   const context = await ensureTenant();
   const user = await User.create({ name: 'Ada Lovelace', email: `staffuser${userCounter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Collaborateur', ...overrides });
-  await addTenantMember({ tenant: context.tenant, user, bootstrap: admin });
+  await addTenantMember({ tenant: context.tenant, user, bootstrap: admin, businessRole });
   return user;
 }
 async function makeHotel(overrides = {}) {
@@ -129,9 +129,9 @@ test('ressource hôtel étrangère : un rattachement sur l’hôtel A ne donne j
   await expect(assertHotelCapability({ actor: actorOf(user), requiredCapability: HOTEL_OPERATIONAL_CAPABILITIES.RESERVATION_VIEW, hotelId: hotelB._id })).rejects.toMatchObject({ code: 'HOTEL_ACCESS_DENIED' });
 });
 
-test('accès dashboard, document financier et paiement via un rattachement local "finance" (sans être Hotel.manager)', async () => {
+test('rattachement local finance distinct de la capacité de lecture financière du membership (sans être Hotel.manager)', async () => {
   const hotel = await makeHotel();
-  const financeUser = await makeUser();
+  const financeUser = await makeUser({}, 'GestionnaireImmobilier');
   await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: financeUser._id, assignmentRole: 'finance' });
   const actor = actorOf(financeUser);
 
@@ -139,6 +139,11 @@ test('accès dashboard, document financier et paiement via un rattachement local
   expect(dashboardScope.hotelIds).toEqual([String(hotel._id)]);
   await authz.assertCanViewFinancialDocument(actor, hotel._id);
   await authz.assertCanViewFinancialPayment(actor, hotel._id);
+
+  // A local finance assignment alone remains insufficient after F2.2.
+  const assignmentOnly = await makeUser();
+  await assignmentService.createHotelStaffAssignment({ actor: admin, hotelId: hotel._id, userId: assignmentOnly._id, assignmentRole: 'finance' });
+  await expect(authz.assertCanViewFinancialDocument(actorOf(assignmentOnly), hotel._id)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
 
   // Un rattachement "housekeeping" (sans capacité finance) sur ce même hôtel doit être refusé.
   const housekeepingUser = await makeUser();

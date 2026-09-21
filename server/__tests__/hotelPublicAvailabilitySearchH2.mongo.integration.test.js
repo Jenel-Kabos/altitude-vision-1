@@ -12,6 +12,7 @@ const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
 const RatePlan = require('../models/RatePlan');
 const RoomInventory = require('../models/RoomInventory');
+const Room = require('../models/Room');
 const HotelReservation = require('../models/HotelReservation');
 const { createReservation } = require('../services/hotelReservationService');
 const hotelRoutes = require('../routes/hotelRoutes');
@@ -30,11 +31,14 @@ async function makeHotel(overrides = {}) {
   return { actor, hotel };
 }
 async function makeCategory(hotel, actor, overrides = {}) {
-  return RoomCategory.create({
+  const category = await RoomCategory.create({
     hotel: hotel._id, name: 'Chambre Standard', code: overrides.code || `STD-${Date.now()}-${Math.random()}`,
     unitsAvailable: 2, capacity: { maxAdults: 2, maxChildren: 1 }, beds: 2, surface: 24,
     status: 'actif', createdBy: actor.id, ...overrides,
   });
+  const count = Number(category.unitsAvailable || 1);
+  await Room.create(Array.from({ length: count }, (_, index) => ({ hotel: hotel._id, roomCategory: category._id, roomNumber: `H2-${category._id}-${index + 1}`, createdBy: actor.id })));
+  return category;
 }
 async function makeRate(category, actor, overrides = {}) {
   return RatePlan.create({
@@ -52,7 +56,7 @@ const search = ({ hotelId, checkIn = '2026-11-10', checkOut = '2026-11-12', adul
 
 beforeAll(async () => {
   await startFinancialMongo();
-  await Promise.all([Hotel, RoomCategory, RatePlan, RoomInventory, HotelReservation].map((m) => m.syncIndexes()));
+  await Promise.all([Hotel, RoomCategory, Room, RatePlan, RoomInventory, HotelReservation].map((m) => m.syncIndexes()));
 });
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);

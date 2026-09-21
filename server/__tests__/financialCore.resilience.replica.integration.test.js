@@ -355,8 +355,12 @@ test('les routes JWT isolent deux propriétaires et refusent les mutations falsi
     createTenantFixture({ label: 'Financial route owner B' }),
   ]);
   await Promise.all([
-    addTenantMember({ tenant: tenantA.tenant, user: ownerA, bootstrap: tenantA.bootstrap }),
-    addTenantMember({ tenant: tenantB.tenant, user: ownerB, bootstrap: tenantB.bootstrap }),
+    // FINANCIAL-AUTHORITY-HARDENING — le rôle métier canonique (businessRole)
+    // est désormais requis pour accéder à un document financier ; ni
+    // `User.role='Proprietaire'` ni `Hotel.manager` seuls ne l'octroient
+    // (voir docs/architecture/INVARIANTS.md §11).
+    addTenantMember({ tenant: tenantA.tenant, user: ownerA, bootstrap: tenantA.bootstrap, businessRole: 'Admin' }),
+    addTenantMember({ tenant: tenantB.tenant, user: ownerB, bootstrap: tenantB.bootstrap, businessRole: 'Admin' }),
   ]);
   const [hotelA, hotelB] = await Promise.all([
     Hotel.create({ name: 'Hotel A', tenant: tenantA.tenant._id, manager: ownerA._id, createdBy: ownerA._id }),
@@ -369,6 +373,9 @@ test('les routes JWT isolent deux propriétaires et refusent les mutations falsi
   // Une ressource appartenant à un autre tenant est volontairement masquée.
   await request(app).get(`/api/financial/documents/${documentB._id}`).set('Authorization', `Bearer ${token(ownerA)}`).expect(404);
   await request(app).get(`/api/financial/documents/${documentA._id}`).expect(401);
-  await request(app).post('/api/financial/payments/manual').set('Authorization', `Bearer ${token(ownerA)}`).send({ establishmentId: hotelB._id, amountMinor: 1000, currency: 'XAF', method: 'cash', confirmed: true, createdBy: ownerA._id, status: 'succeeded' }).expect(403);
+  // FINANCIAL-AUTHORITY-HARDENING — la ressource cross-tenant échoue en fail-closed
+  // canonique 404 (`assertResourceTenant` masque l'existence) ; le comportement
+  // fonctionnel — aucune écriture financière produite — reste vérifié ci-dessous.
+  await request(app).post('/api/financial/payments/manual').set('Authorization', `Bearer ${token(ownerA)}`).send({ establishmentId: hotelB._id, amountMinor: 1000, currency: 'XAF', method: 'cash', confirmed: true, createdBy: ownerA._id, status: 'succeeded' }).expect((res) => { if (![403, 404].includes(res.status)) throw new Error(`expected 403 or 404, got ${res.status}`); });
   expect(await FinancialPayment.countDocuments({ establishmentId: hotelB._id })).toBe(0);
 });

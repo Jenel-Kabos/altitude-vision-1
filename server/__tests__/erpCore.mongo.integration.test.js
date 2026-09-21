@@ -200,11 +200,18 @@ describe('HTTP /api/erp — réservé Direction (Admin)', () => {
     expect(res.status).toBe(403);
   });
 
-  test('un Admin obtient les 4 endpoints', async () => {
-    const admin = await makeUser({ role: 'Admin' });
-    const tenant = await platformTenantService.createTenant({ name: `ERP HTTP ${Date.now()}`, actor: admin });
-    await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
-    const headers = { Authorization: `Bearer ${signToken(admin._id)}`, 'X-Platform-Tenant-Id': String(tenant._id) };
+  test('DEP-03/07/11/12 — un Proprietaire avec membership businessRole=Admin obtient les 4 endpoints', async () => {
+    const platformAdmin = await makeUser({ role: 'Admin' });
+    const tenantAdmin = await makeUser({ role: 'Proprietaire' });
+    const tenant = await platformTenantService.createTenant({ name: `ERP HTTP ${Date.now()}`, actor: platformAdmin });
+    await organizationService.grantMembership({
+      userId: tenantAdmin._id,
+      orgUnitId: tenant.rootOrgUnit,
+      roleInUnit: 'owner',
+      businessRole: 'Admin',
+      actor: platformAdmin,
+    });
+    const headers = { Authorization: `Bearer ${signToken(tenantAdmin._id)}`, 'X-Platform-Tenant-Id': String(tenant._id) };
     const executive = await request(app).get('/api/erp/executive').set(headers);
     expect(executive.status).toBe(200);
     expect(executive.body.data.overview).toHaveProperty('alerts');
@@ -221,13 +228,23 @@ describe('HTTP /api/erp — réservé Direction (Admin)', () => {
     expect(health.status).toBe(200);
     expect(health.body.data.health.modules).toHaveLength(8);
   });
+
+  test('DEP-02/05 — un Admin global sans membership ne reçoit aucune autorité ERP tenant', async () => {
+    const creator = await makeUser({ role: 'Proprietaire' });
+    const globalAdmin = await makeUser({ role: 'Admin' });
+    const tenant = await platformTenantService.createTenant({ name: `ERP no membership ${Date.now()}`, actor: creator });
+    const res = await request(app).get('/api/erp/executive')
+      .set('Authorization', `Bearer ${signToken(globalAdmin._id)}`)
+      .set('X-Platform-Tenant-Id', String(tenant._id));
+    expect(res.status).toBe(403);
+  });
 });
 
 describe('HTTP /api/action-logs — filtre organisationnel additif (Phase 7)', () => {
   test('orgUnitId isole les journaux aux seuls membres actifs de cette unité', async () => {
-    const admin = await makeUser({ role: 'Admin' });
+    const admin = await makeUser({ role: 'Proprietaire' });
     const tenant = await platformTenantService.createTenant({ name: `ERP logs ${Date.now()}`, actor: admin });
-    await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
+    await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, businessRole: 'Admin', actor: admin });
     const insider = await makeUser({ role: 'Collaborateur' });
     const outsider = await makeUser({ role: 'Collaborateur' });
 
@@ -246,9 +263,9 @@ describe('HTTP /api/action-logs — filtre organisationnel additif (Phase 7)', (
   });
 
   test('un orgUnitId sans membre ne renvoie jamais tout silencieusement', async () => {
-    const admin = await makeUser({ role: 'Admin' });
+    const admin = await makeUser({ role: 'Proprietaire' });
     const tenant = await platformTenantService.createTenant({ name: `ERP empty logs ${Date.now()}`, actor: admin });
-    await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
+    await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, businessRole: 'Admin', actor: admin });
     const someone = await makeUser({ role: 'Collaborateur' });
     await logAction({ action: 'test.anyone', description: 'x', module: 'Dashboard', typeAction: 'MODIFICATION', auteur: buildAuteur(someone), metadata: { platformTenantId: tenant._id } });
 

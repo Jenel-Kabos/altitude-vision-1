@@ -197,12 +197,24 @@ test.each([
 
 test('PII, demandes spéciales et montants B ne fuient pas vers Admin A', async () => {
   const response = await request(app).get('/api/hotel-reservations/admin/list').set(bearer(adminA, tenantA));
-  const serialized = JSON.stringify(response.body);
-  expect(serialized).not.toContain('Guest-B');
-  expect(serialized).not.toContain('SPECIAL-B');
-  expect(serialized).not.toContain('777');
-  expect(serialized).not.toContain('778');
-  expect(serialized).not.toContain('779');
+  expect(response.status).toBe(200);
+  const reservations = response.body.data.reservations;
+  // Structural assertions on returned reservations — avoid substring
+  // matches over the entire JSON, which collide with random ObjectId
+  // hex bytes (an ObjectId can contain "777"/"778"/"779").
+  const tenantBReservationIds = new Set(reservationsB.map((r) => String(r._id)));
+  const tenantBAmounts = new Set([777, 778, 779]);
+  for (const reservation of reservations) {
+    expect(String(reservation.tenant)).toBe(String(tenantA._id));
+    expect(tenantBReservationIds.has(String(reservation._id))).toBe(false);
+    expect(reservation.reference).toEqual(expect.stringMatching(/^HZ05-A/));
+    expect(reservation.guest?.firstName).toEqual(expect.stringMatching(/^Guest-A/));
+    expect(reservation.guest?.email).not.toEqual(expect.stringMatching(/^guest-b\d+@example\.test$/i));
+    if (reservation.specialRequests) expect(reservation.specialRequests).not.toEqual(expect.stringMatching(/^SPECIAL-B/));
+    expect(tenantBAmounts.has(reservation.totalAmount)).toBe(false);
+    expect(tenantBAmounts.has(reservation.subtotal)).toBe(false);
+    expect(tenantBAmounts.has(reservation.unitPrice)).toBe(false);
+  }
 });
 
 test('filtres, recherche, pagination, sort et populate restent composés avec le tenant', async () => {

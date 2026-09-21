@@ -9,6 +9,7 @@ const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require
 const User = require('../models/User');
 const Hotel = require('../models/Hotel');
 const RoomCategory = require('../models/RoomCategory');
+const Room = require('../models/Room');
 const RatePlan = require('../models/RatePlan');
 const HotelReservation = require('../models/HotelReservation');
 const hotelRoutes = require('../routes/hotelRoutes');
@@ -33,7 +34,9 @@ async function makeHotel(overrides = {}) {
   return { hotel, manager: manager._id };
 }
 async function makeCategory(hotel) {
-  return RoomCategory.create({ hotel: hotel._id, name: 'Standard', code: `C-${Date.now()}-${Math.random()}`, status: 'actif', capacity: { maxAdults: 2, maxChildren: 1 }, createdBy: hotel.manager });
+  const category = await RoomCategory.create({ hotel: hotel._id, name: 'Standard', code: `C-${Date.now()}-${Math.random()}`, unitsAvailable: 2, status: 'actif', capacity: { maxAdults: 2, maxChildren: 1 }, createdBy: hotel.manager });
+  await Room.create([{ hotel: hotel._id, roomCategory: category._id, roomNumber: `H5-${category._id}-1`, createdBy: hotel.manager }, { hotel: hotel._id, roomCategory: category._id, roomNumber: `H5-${category._id}-2`, createdBy: hotel.manager }]);
+  return category;
 }
 async function makeRate(category, hotel, overrides = {}) {
   return RatePlan.create({ roomCategory: category._id, rateType: 'public', amount: 40000, currency: 'XAF', active: true, createdBy: hotel.manager, ...overrides });
@@ -41,7 +44,7 @@ async function makeRate(category, hotel, overrides = {}) {
 
 beforeAll(async () => {
   await startFinancialMongo();
-  await Promise.all([Hotel, RoomCategory, RatePlan, HotelReservation].map((m) => m.syncIndexes()));
+  await Promise.all([Hotel, RoomCategory, Room, RatePlan, HotelReservation].map((m) => m.syncIndexes()));
 });
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);

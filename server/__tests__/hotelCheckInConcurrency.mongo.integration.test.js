@@ -40,10 +40,11 @@ async function fixture() {
 
 test('deux check-in concurrents sur la même réservation : une seule chambre passe occupied, un seul historique', async () => {
   const f = await fixture();
+  const checkIn = new Date(); checkIn.setUTCHours(0,0,0,0); const checkOut = new Date(checkIn.getTime() + 3 * 86400000);
   const reservation = await createReservation({
     hotelId: f.hotel._id, roomCategoryId: f.category._id, ratePlanId: f.rate._id,
     guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test' },
-    checkInDate: '2026-09-10', checkOutDate: '2026-09-13', roomsCount: 1, adults: 1, children: 0,
+    checkInDate: checkIn.toISOString().slice(0,10), checkOutDate: checkOut.toISOString().slice(0,10), roomsCount: 1, adults: 1, children: 0,
     source: 'public_web', actingUser: {}, reservationRequestId: 'checkin-race-001',
     notificationDependencies: { emailSender: jest.fn().mockResolvedValue({ success: true }) },
   });

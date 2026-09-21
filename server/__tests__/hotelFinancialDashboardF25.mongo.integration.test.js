@@ -11,15 +11,28 @@ const FinancialDocumentDelivery = require('../models/FinancialDocumentDelivery')
 const { HOTEL_CHECKOUT_FINANCIAL_OVERRIDE_EVENT } = require('../services/finance/hotelCheckoutFinancialReadinessService');
 const dashboard = require('../services/finance/hotelFinancialDashboardService');
 const { createTenantFixture, tenantActor } = require('./helpers/tenantAwareFixture');
+const User = require('../models/User');
 
 jest.setTimeout(180000);
 const id = () => new mongoose.Types.ObjectId();
-const admin = { role: 'Admin', _id: id() };
+// FINANCIAL-AUTHORITY-HARDENING (F2.2) — l'autorité financière requiert
+// une OrgMembership canonique. Le bootstrap doit être un vrai document User
+// (sinon organizationService.grantMembership renvoie "Utilisateur
+// introuvable") et la fixture doit demander `withAdminMembership: true`
+// pour attacher le businessRole 'Admin' au membership.
+const admin = {};
 let tenantFixture;
 async function ensureTenant() {
-  if (!tenantFixture) {
-    tenantFixture = await createTenantFixture({ label: 'Hotel dashboard', bootstrap: admin });
-    Object.assign(admin, tenantActor(admin, tenantFixture.tenant));
+  // `afterEach(clearFinancialMongo)` supprime toutes les collections entre
+  // deux tests : la fixture DOIT être reconstruite à chaque appel, sinon
+  // `tenantFixture.tenant._id` pointerait sur un document effacé et les
+  // vérifications d'appartenance (OrgMembership canonique) échoueraient.
+  if (!tenantFixture || !(await User.exists({ _id: admin._id }))) {
+    tenantFixture = null;
+    const bootstrap = await User.create({ name: 'Hotel Dashboard Admin', email: `hotel-dashboard-admin-${Date.now()}-${id()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+    Object.assign(admin, { _id: bootstrap._id, id: bootstrap._id, role: bootstrap.role });
+    tenantFixture = await createTenantFixture({ label: 'Hotel dashboard', bootstrap, withAdminMembership: true });
+    Object.assign(admin, tenantActor(bootstrap, tenantFixture.tenant));
   }
   return tenantFixture;
 }
@@ -111,13 +124,15 @@ test('isole strictement les données entre deux hôtels différents', async () =
   const foreignManager = { role: 'Collaborateur', _id: id() };
   await expect(dashboard.getHotelFinancialDashboardSummary({ user: foreignManager, filters: filtersA })).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
 
-  // F2.6 : le manager légitime de l'hôtel A n'a qu'un seul hôtel accessible (rattachement legacy
-  // Hotel.manager) — le serveur le déduit automatiquement même sans hotelId explicite (§26), et
-  // ne lui montre jamais que les données de son propre hôtel.
+  // FINANCIAL-AUTHORITY-HARDENING (F2.2) — `Hotel.manager` seul n'octroie
+  // plus l'accès financier (voir docs/architecture/INVARIANTS.md §11) : le
+  // manager rattaché uniquement par legacy `Hotel.manager` (sans
+  // `OrgMembership` canonique) doit être rejeté au même titre que
+  // `foreignManager` ci-dessus. Ceci renforce l'isolation inter-hôtel :
+  // un accès légitime nécessite un membership canonique (validé par les
+  // autres tests de cette suite via `admin`).
   const managerA = { role: 'Collaborateur', _id: hotelA.manager };
-  const autoScoped = await dashboard.getHotelFinancialDashboardSummary({ user: managerA, filters: dashboard.validateDashboardFilters({}) });
-  expect(autoScoped.scope).toMatchObject({ global: false, hotelId: String(hotelA._id) });
-  expect(autoScoped.totals.invoicedMinor).toBe(111000);
+  await expect(dashboard.getHotelFinancialDashboardSummary({ user: managerA, filters: dashboard.validateDashboardFilters({}) })).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
 });
 
 test('hotelId omis reste automatiquement borné à l’unique hôtel du tenant Admin', async () => {
@@ -127,10 +142,15 @@ test('hotelId omis reste automatiquement borné à l’unique hôtel du tenant A
   const filters = dashboard.validateDashboardFilters({ dateFrom: farPast, dateTo: farFuture });
   const summary = await dashboard.getHotelFinancialDashboardSummary({ user: admin, filters });
   expect(summary.scope.global).toBe(false);
-  expect(summary.scope.hotelId).toBe(String(hotelA._id));
+  expect(String(summary.scope.hotelId)).toBe(String(hotelA._id));
 
+  // FINANCIAL-AUTHORITY-HARDENING (F2.2) — un acteur sans OrgMembership
+  // canonique est refusé par la vérification de capacité en amont
+  // (`assertFinancialCapability`) — avant même le calcul de portée
+  // (`FINANCIAL_DASHBOARD_ACCESS_DENIED`). L'invariant reste : aucun accès
+  // dashboard sans autorité financière canonique.
   const managerNoHotel = { role: 'Collaborateur', _id: id() };
-  await expect(dashboard.getHotelFinancialDashboardSummary({ user: managerNoHotel, filters })).rejects.toMatchObject({ code: 'FINANCIAL_DASHBOARD_ACCESS_DENIED' });
+  await expect(dashboard.getHotelFinancialDashboardSummary({ user: managerNoHotel, filters })).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
 });
 
 test('signale une devise non-XAF comme anomalie plutôt que de l’agréger silencieusement', async () => {

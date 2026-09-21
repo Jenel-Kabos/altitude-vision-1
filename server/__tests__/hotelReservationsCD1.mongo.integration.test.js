@@ -1,23 +1,26 @@
 jest.mock('../services/emailService', () => ({ sendEmailViaZoho: jest.fn().mockResolvedValue({ success: true }) }));
 
-const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const Hotel = require('../models/Hotel'); const RoomCategory = require('../models/RoomCategory'); const RatePlan = require('../models/RatePlan'); const HotelReservation = require('../models/HotelReservation'); const RoomInventory = require('../models/RoomInventory'); const Room = require('../models/Room'); const RoomAssignment = require('../models/RoomAssignment'); const HousekeepingTask = require('../models/HousekeepingTask');
 const { createReservation } = require('../services/hotelReservationService');
 const { assignRoom, autoAssignRooms, changeRoom } = require('../services/roomAssignmentService');
 const { performCheckIn } = require('../services/checkInService'); const { performCheckOut } = require('../services/checkOutService');
+const { createTenantFixture, tenantActor } = require('./helpers/tenantAwareFixture');
 const RoomInspection = require('../models/RoomInspection'); const MaintenanceTicket = require('../models/MaintenanceTicket'); const HotelReservationNotification = require('../models/HotelReservationNotification');
 const { startTask, completeTask } = require('../services/housekeepingService'); const { createInspection, approveInspection, rejectInspection } = require('../services/inspectionService'); const { createTicket, resolveTicket } = require('../services/maintenanceService');
 
-jest.setTimeout(120000); const id = () => new mongoose.Types.ObjectId();
+jest.setTimeout(120000);
 async function fixture({ units = 3 } = {}) {
-  const actor = { id: id(), role: 'Admin' };
-  const hotel = await Hotel.create({ name: 'Hôtel C/D.1', manager: actor.id, createdBy: actor.id });
+  const { tenant, bootstrap } = await createTenantFixture({ label: 'Hotel C/D.1', withAdminMembership: true });
+  const actor = { ...tenantActor(bootstrap, tenant), id: bootstrap._id };
+  const hotel = await Hotel.create({ name: 'Hôtel C/D.1', tenant: tenant._id, manager: actor.id, createdBy: actor.id });
   const category = await RoomCategory.create({ hotel: hotel._id, name: 'Standard', code: 'STD', unitsAvailable: units, createdBy: actor.id });
   const rate = await RatePlan.create({ roomCategory: category._id, rateType: 'public', amount: 35000, currency: 'XAF', createdBy: actor.id });
   return { actor, hotel, category, rate };
 }
-const reservationInput = (f, key) => ({ hotelId: f.hotel._id, roomCategoryId: f.category._id, ratePlanId: f.rate._id, guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test' }, checkInDate: '2026-09-10', checkOutDate: '2026-09-13', roomsCount: 2, adults: 2, children: 0, source: 'public_web', actingUser: {}, reservationRequestId: key });
+const isoDay = (date) => date.toISOString().slice(0, 10);
+const stableStay = () => { const start = new Date(); start.setUTCHours(0,0,0,0); start.setUTCDate(start.getUTCDate() + 30); return { checkInDate:isoDay(start), checkOutDate:isoDay(new Date(start.getTime() + 3 * 86400000)), start }; };
+const reservationInput = (f, key) => { const stay = stableStay(); return { hotelId: f.hotel._id, roomCategoryId: f.category._id, ratePlanId: f.rate._id, guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test' }, checkInDate:stay.checkInDate, checkOutDate:stay.checkOutDate, roomsCount: 2, adults: 2, children: 0, source: 'public_web', actingUser: {}, reservationRequestId: key }; };
 const createPhysicalRooms = (f, count) => Room.create(Array.from({ length: count }, (_, index) => ({ hotel: f.hotel._id, roomCategory: f.category._id, roomNumber: `PRE-${index + 1}`, createdBy: f.actor.id })));
 
 beforeAll(async () => {
@@ -43,9 +46,10 @@ test('même clé avec payload différent renvoie RESERVATION_IDEMPOTENCY_CONFLIC
 test('C29 réel : un séjour traversant deux périodes persiste son détail tarifaire nuit par nuit', async () => {
   const f = await fixture({ units: 2 });
   await createPhysicalRooms(f, 2);
+  const stay = stableStay();
   f.rate.seasonalPeriods = [
-    { label: 'Vacances', startDate: '2026-09-01', endDate: '2026-09-30', amount: 50000, priority: 10 },
-    { label: 'Festival', startDate: '2026-09-11', endDate: '2026-09-12', amount: 85000, priority: 20 },
+    { label: 'Vacances', startDate: stay.checkInDate, endDate: stay.checkOutDate, amount: 50000, priority: 10 },
+    { label: 'Festival', startDate: isoDay(new Date(stay.start.getTime() + 86400000)), endDate: isoDay(new Date(stay.start.getTime() + 2 * 86400000)), amount: 85000, priority: 20 },
   ];
   await f.rate.save();
   const reservation = await createReservation({ ...reservationInput(f, 'seasonal-001'), roomsCount: 1 });

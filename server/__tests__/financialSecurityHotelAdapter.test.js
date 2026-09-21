@@ -13,47 +13,70 @@ const OWNER_ID = '507f1f77bcf86cd799439015';
 const TENANT_ID = '607f1f77bcf86cd799439001';
 const query = (value) => ({ select: jest.fn().mockResolvedValue(value) });
 
-describe('Financial Core — isolation et permissions', () => {
-  beforeEach(() => jest.clearAllMocks());
-  test('le gestionnaire rattaché peut gérer uniquement son établissement', async () => {
-    Hotel.findById.mockReturnValue(query({ _id: HOTEL_ID, manager: OWNER_ID }));
-    await expect(authz.assertCanIssueFinancialDocument({ id: OWNER_ID, role: 'Collaborateur' }, HOTEL_ID)).resolves.toMatchObject({ _id: HOTEL_ID });
-  });
-  test('un propriétaire tiers est refusé', async () => {
-    Hotel.findById.mockReturnValue(query({ _id: HOTEL_ID, manager: OWNER_ID }));
-    await expect(authz.assertCanManageHotelFinance({ id: '507f1f77bcf86cd799439099', role: 'Proprietaire' }, HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED', statusCode: 403 });
-  });
-  test('un rôle non comptable ne peut émettre ni allouer', async () => {
-    await expect(authz.assertAccountingRole({ role: 'GestionnaireImmobilier' })).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
-  });
-  test('admin et secrétaire ont la capacité comptable sans contourner l’ownership', async () => {
-    await expect(authz.assertAccountingRole({ role: 'Admin' })).resolves.toBe(true);
-    await expect(authz.assertAccountingRole({ role: 'Secretaire' })).resolves.toBe(true);
-  });
-  test('la matrice de capacités financières reste explicite et fermée', () => {
-    expect(authz.hasFinancialCapability({ role: 'Secretaire' }, 'financial.payment.create')).toBe(true);
-    expect(authz.hasFinancialCapability({ role: 'Proprietaire' }, 'financial.document.issue')).toBe(false);
-    expect(authz.hasFinancialCapability({ role: 'Proprietaire' }, authz.CAPABILITIES.DOCUMENT_VIEW)).toBe(true);
-    expect(authz.hasFinancialCapability({ role: 'Admin' }, authz.CAPABILITIES.HOTEL_CHECKOUT_OVERRIDE)).toBe(true);
-    expect(authz.hasFinancialCapability({ role: 'Collaborateur' }, authz.CAPABILITIES.HOTEL_CHECKOUT_OVERRIDE)).toBe(false);
-    expect(() => authz.assertFinancialCapability({ role: 'Client' }, 'financial.ledger.view')).toThrow(expect.objectContaining({ code: 'FINANCIAL_UNAUTHORIZED' }));
-  });
-  test('le propriétaire rattaché consulte mais ne modifie pas', async () => {
-    Hotel.findById.mockReturnValue(query({ _id: HOTEL_ID, manager: OWNER_ID }));
-    await expect(authz.assertCanViewFinancialDocument({ id: OWNER_ID, role: 'Proprietaire' }, HOTEL_ID)).resolves.toMatchObject({ _id: HOTEL_ID });
-    await expect(authz.assertCanCreateFinancialDraft({ id: OWNER_ID, role: 'Proprietaire' }, HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
-    await expect(authz.assertCanAllocatePayment({ id: OWNER_ID, role: 'Proprietaire' }, HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
-  });
-  test('un collaborateur non rattaché est refusé sans résidu', async () => {
-    Hotel.findById.mockReturnValue(query({ _id: HOTEL_ID, manager: OWNER_ID }));
-    await expect(authz.assertCanCreateFinancialDraft({ id: '507f1f77bcf86cd799439099', role: 'Collaborateur' }, HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED', statusCode: 403 });
-  });
-  test('Admin conserve toutes les capacités dans son tenant', async () => {
+jest.mock('../services/tenantMembershipService', () => ({ resolveTenantMembership: jest.fn() }));
+jest.mock('../services/platformOperator/platformOperatorService', () => ({ resolveActiveOperator: jest.fn() }));
+const { resolveTenantMembership } = require('../services/tenantMembershipService');
+const { resolveActiveOperator } = require('../services/platformOperator/platformOperatorService');
+const { assertResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const tenantActor = (role = 'Client') => ({ id: OWNER_ID, role, platformTenant: { _id: TENANT_ID, status: 'active' } });
+const membership = (businessRole = 'Admin') => ({ status: 'active', businessRole, tenant: { _id: TENANT_ID, status: 'active' }, membership: { status: 'active' } });
+
+describe('Financial authority — explicit tenant and platform planes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resolveTenantMembership.mockResolvedValue(null);
+    resolveActiveOperator.mockResolvedValue(null);
+    assertResourceTenant.mockResolvedValue({ tenantId: TENANT_ID });
     Hotel.findById.mockReturnValue(query({ _id: HOTEL_ID, tenant: TENANT_ID, manager: OWNER_ID }));
-    await expect(authz.assertCanIssueFinancialDocument({ id: '507f1f77bcf86cd799439099', role: 'Admin', platformTenant: { _id: TENANT_ID } }, HOTEL_ID)).resolves.toMatchObject({ _id: HOTEL_ID });
-    expect(Object.values(authz.CAPABILITIES).every((capability) => authz.hasFinancialCapability({ role: 'Admin' }, capability))).toBe(true);
   });
-  test('le hash invité et les métadonnées fournisseur sont exclus par défaut', () => {
+  test.each(['assertCanCreateFinancialPayment', 'assertCanConfirmFinancialPayment', 'assertCanAllocatePayment'])('FA-01..03 global Admin alone denied: %s', async (operation) => {
+    await expect(authz[operation](tenantActor('Admin'), HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  });
+  test.each(['Client', 'Proprietaire', 'Collaborateur', 'Admin'])('FA-08/13/14 manager or identity %s without membership denied', async (role) => {
+    await expect(authz.assertCanCreateFinancialPayment(tenantActor(role), HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  });
+  test('FA-04/09 active membership authorizes independently of global identity and manager', async () => {
+    resolveTenantMembership.mockResolvedValue(membership());
+    const actor = { ...tenantActor(), id: '507f1f77bcf86cd799439099' };
+    await expect(authz.assertCanCreateFinancialPayment(actor, HOTEL_ID)).resolves.toMatchObject({ _id: HOTEL_ID });
+    expect(resolveTenantMembership).toHaveBeenCalledWith(actor.id, TENANT_ID);
+  });
+  test.each([null, { ambiguous: true }, { ...membership(), status: 'suspended' }, { ...membership(), status: 'revoked' }, { ...membership(), tenant: { status: 'suspended' } }])('FA-05..07 invalid membership fails closed: %j', async (resolved) => {
+    resolveTenantMembership.mockResolvedValue(resolved);
+    await expect(authz.assertCanAllocatePayment(tenantActor(), HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  });
+  test.each(['Collaborateur', 'CommunityManager', 'Communicant', 'GestionnaireImmobilier'])('no implicit money-management permission for membership %s', async (role) => {
+    resolveTenantMembership.mockResolvedValue(membership(role));
+    await expect(authz.assertCanConfirmFinancialPayment(tenantActor(), HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  });
+  test('secretary gets payments.manage operations, not reversal or override', async () => {
+    resolveTenantMembership.mockResolvedValue(membership('Secretaire'));
+    await expect(authz.assertCanConfirmFinancialPayment(tenantActor(), HOTEL_ID)).resolves.toBeDefined();
+    await expect(authz.assertCanReverseAllocation(tenantActor(), HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  });
+  test('FA-10/12 operator without finance capability cannot fall back to global Admin', async () => {
+    resolveActiveOperator.mockResolvedValue({ status: 'active', capabilities: [] });
+    await expect(authz.assertCanConfirmFinancialPayment({ ...tenantActor('Admin'), isPlatformOperatorContext: true }, HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  });
+  test('FA-11 explicit platform finance works without membership', async () => {
+    resolveActiveOperator.mockResolvedValue({ status: 'active', capabilities: ['platform.finance.manage'] });
+    await expect(authz.assertCanAllocatePayment({ ...tenantActor(), isPlatformOperatorContext: true }, HOTEL_ID)).resolves.toBeDefined();
+    expect(resolveTenantMembership).not.toHaveBeenCalled();
+  });
+  test('platform finance.read cannot mutate', async () => {
+    resolveActiveOperator.mockResolvedValue({ status: 'active', capabilities: ['platform.finance.read'] });
+    await expect(authz.assertCanViewFinancialPayment(tenantActor(), HOTEL_ID)).resolves.toBeDefined();
+    await expect(authz.assertCanConfirmFinancialPayment(tenantActor(), HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  });
+  test('FA-15/16 cross-tenant resource fails closed even for platform finance', async () => {
+    resolveActiveOperator.mockResolvedValue({ status: 'active', capabilities: ['platform.finance.manage'] });
+    assertResourceTenant.mockRejectedValue(new Error('wrong tenant'));
+    await expect(authz.assertCanAllocatePayment(tenantActor(), HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  });
+  test('manager without canonical tenant context denied', async () => {
+    await expect(authz.assertCanCreateFinancialPayment({ id: OWNER_ID, role: 'Admin' }, HOTEL_ID)).rejects.toMatchObject({ code: 'FINANCIAL_UNAUTHORIZED' });
+  });
+  test('sensitive fields remain excluded', () => {
     expect(FinancialDocument.schema.path('guestAccess.tokenHash').options.select).toBe(false);
     expect(FinancialPayment.schema.path('providerMetadata').options.select).toBe(false);
   });

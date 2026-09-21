@@ -26,10 +26,10 @@ const signToken = (id, tokenVersion = 0) => jwt.sign({ id, tokenVersion }, proce
 
 let counter = 0;
 let tenantFixture;
-const makeUser = async (overrides = {}) => {
+const makeUser = async (overrides = {}, businessRole = null) => {
   counter += 1;
   const user = await User.create({ name: 'Test User', email: `finacc${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
-  await addTenantMember({ tenant: tenantFixture.tenant, user, bootstrap: tenantFixture.bootstrap });
+  await addTenantMember({ tenant: tenantFixture.tenant, user, bootstrap: tenantFixture.bootstrap, businessRole });
   return user;
 };
 
@@ -59,8 +59,8 @@ test('403 — un Client ne peut pas lister les factures hébergement', async () 
   expect(res.status).toBe(403);
 });
 
-test.each(['Admin', 'GestionnaireImmobilier', 'Collaborateur'])('200 — %s peut lister les factures hébergement, jamais celles d’un autre domaine (hôtel)', async (role) => {
-  const staff = await makeUser({ role });
+test.each(['Admin', 'GestionnaireImmobilier', 'Secretaire'])('200 — membership %s peut lister les factures hébergement, jamais celles d’un autre domaine (hôtel)', async (businessRole) => {
+  const staff = await makeUser({ role: 'Client' }, businessRole);
   const invoice = await makeAccommodationInvoice(staff._id);
   await FinancialDocument.create({
     tenant: tenantFixture.tenant._id,
@@ -75,8 +75,14 @@ test.each(['Admin', 'GestionnaireImmobilier', 'Collaborateur'])('200 — %s peut
   expect(res.body.data.documents[0].id).toBe(String(invoice._id));
 });
 
+test('403 — membership Collaborateur ne donne aucune autorité financière implicite', async () => {
+  const staff = await makeUser({ role: 'Collaborateur' }, 'Collaborateur');
+  const res = await request(app).get('/api/financial/accommodations/documents').set('Authorization', `Bearer ${signToken(staff._id)}`);
+  expect(res.status).toBe(403);
+});
+
 test('filtre par statut fonctionne (?status=issued exclut les brouillons)', async () => {
-  const staff = await makeUser({ role: 'Admin' });
+  const staff = await makeUser({ role: 'Admin' }, 'Admin');
   const issued = await makeAccommodationInvoice(staff._id, { status: 'issued' });
   await makeAccommodationInvoice(staff._id, { status: 'draft' });
 
