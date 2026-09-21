@@ -5,7 +5,7 @@ const platformTenantService = require('../../services/platformTenant/platformTen
 
 let sequence = 0;
 
-async function createTenantFixture({ label = 'Tenant fixture', bootstrap } = {}) {
+async function createTenantFixture({ label = 'Tenant fixture', bootstrap, withAdminMembership = false } = {}) {
   sequence += 1;
   const actor = bootstrap || await User.create({
     name: 'Tenant Bootstrap',
@@ -16,11 +16,26 @@ async function createTenantFixture({ label = 'Tenant fixture', bootstrap } = {})
     isEmailVerified: true,
   });
   const tenant = await platformTenantService.createTenant({ name: `${label} ${Date.now()} ${sequence}`, actor });
+  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — opt-in: grant the
+  // bootstrap a canonical founder OrgMembership. Aligns the fixture with
+  // real `approveApplication` semantics for tests that hit tenant-scoped
+  // routes gated by `requireTenantMembershipRole`. Default remains OFF to
+  // preserve every other test suite's expectations.
+  if (withAdminMembership) {
+    await organizationService.grantMembership({
+      userId: actor._id, orgUnitId: tenant.rootOrgUnit, roleInUnit: 'owner', actor,
+    });
+    const OrgMembership = require('../../models/OrgMembership');
+    await OrgMembership.updateOne(
+      { user: actor._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
+      { $set: { businessRole: 'Admin' } },
+    );
+  }
   return { tenant, bootstrap: actor };
 }
 
-async function addTenantMember({ tenant, user, bootstrap }) {
-  await organizationService.grantMembership({ userId: user._id, orgUnitId: tenant.rootOrgUnit, actor: bootstrap });
+async function addTenantMember({ tenant, user, bootstrap, businessRole = null }) {
+  await organizationService.grantMembership({ userId: user._id, orgUnitId: tenant.rootOrgUnit, businessRole, actor: bootstrap });
   return tenantActor(user, tenant);
 }
 
@@ -33,7 +48,7 @@ function tenantActor(user, tenant, tenantScopeUserIds) {
   };
 }
 
-async function createTenantUser({ tenant, bootstrap, overrides = {} }) {
+async function createTenantUser({ tenant, bootstrap, overrides = {}, businessRole = null }) {
   sequence += 1;
   const user = await User.create({
     name: 'Tenant User',
@@ -44,7 +59,7 @@ async function createTenantUser({ tenant, bootstrap, overrides = {} }) {
     isEmailVerified: true,
     ...overrides,
   });
-  const actor = await addTenantMember({ tenant, user, bootstrap });
+  const actor = await addTenantMember({ tenant, user, bootstrap, businessRole });
   return { user, actor };
 }
 

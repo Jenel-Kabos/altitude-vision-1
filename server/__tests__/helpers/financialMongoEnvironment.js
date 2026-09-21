@@ -4,6 +4,7 @@ const { MongoMemoryReplSet, MongoMemoryServer } = require('mongodb-memory-server
 let replSet;
 let standalone;
 let connected = false;
+let diagnostics;
 
 async function startFinancialMongo() {
   const externalUri = process.env.MONGODB_FINANCIAL_INTEGRATION_URI;
@@ -12,7 +13,9 @@ async function startFinancialMongo() {
     if (process.env.FINANCIAL_MONGO_STANDALONE === '1') { standalone = await MongoMemoryServer.create(); uri = standalone.getUri(`financial_f11_${Date.now()}`); }
     else { replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } }); uri = replSet.getUri(`financial_f11_${Date.now()}`); }
   }
-  await mongoose.connect(uri, { maxPoolSize: 20, serverSelectionTimeoutMS: 15000, socketTimeoutMS: 45000, autoIndex: false });
+  await mongoose.connect(uri, { maxPoolSize: 20, serverSelectionTimeoutMS: 15000, socketTimeoutMS: 45000, autoIndex: false, monitorCommands: Boolean(process.env.TEST_MONGO_LIFECYCLE_LOG) });
+  diagnostics = require('../../test-utils/mongoLifecycleDiagnostics').observeMongoLifecycle(mongoose.connection.getClient());
+  diagnostics.record('connected');
   connected = true;
   const hello = await mongoose.connection.db.admin().command({ hello: 1 });
   if (!hello.setName && process.env.FINANCIAL_MONGO_STANDALONE !== '1') throw new Error('FINANCIAL_REPLICA_SET_REQUIRED');
@@ -30,14 +33,28 @@ async function startFinancialMongo() {
 // pour laisser le driver terminer son cycle de session interne.
 async function clearFinancialMongo() {
   if (!connected) return;
-  const collections = mongoose.connection.collections;
+  diagnostics?.record('clear:start');
+  // Shared suites have different model registries. Enumerate the active test
+  // database itself so native/unregistered collections are also emptied.
+  // Preserve collections and indexes; never traverse another database.
+  const db = mongoose.connection.db;
+  const clearCollections = async () => {
+    const collections = await db.listCollections({}, { nameOnly: true }).toArray();
+    const results = await Promise.allSettled(collections
+      .filter(({ name }) => !name.startsWith('system.'))
+      .map(({ name }) => db.collection(name).deleteMany({})));
+    // Wait for all deletes before exposing a failure or retrying a session.
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
+  };
   try {
-    await Promise.all(Object.values(collections).map((collection) => collection.deleteMany({})));
+    await clearCollections();
   } catch (error) {
     if (!/session/i.test(error?.message || '')) throw error;
     await new Promise((resolve) => setImmediate(resolve));
-    await Promise.all(Object.values(collections).map((collection) => collection.deleteMany({})));
+    await clearCollections();
   }
+  diagnostics?.record('clear:end');
 }
 
 async function stopFinancialMongo() {
@@ -48,11 +65,15 @@ async function stopFinancialMongo() {
   // rendre la connexion garantit l'isolation même si une suite conserve des
   // fixtures en beforeAll et n'utilise pas clearFinancialMongo en afterEach.
   if (connected) {
+    diagnostics?.record('stop:start');
     await clearFinancialMongo();
     await mongoose.disconnect();
+    diagnostics?.record('disconnected');
   }
   if (replSet) await replSet.stop();
   if (standalone) await standalone.stop();
+  diagnostics?.record('stopped');
+  diagnostics?.stop();
   replSet = null;
   standalone = null;
   connected = false;
