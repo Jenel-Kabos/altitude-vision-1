@@ -101,22 +101,15 @@ exports.getAlerts = async (req, res) => {
   } catch (error) { fail(res, error); }
 };
 
-// GL-ASSET-UX-1 — Phase 8 : tableau de bord portefeuille. Le staff (ROLES_DOCS)
-// voit tout le patrimoine ; un propriétaire ne voit que ses propres biens
-// (même filtrage que rentalManagementController.ownerList).
-// HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — `?status=vente|location` restreint
-// le dashboard Patrimoine à un seul univers métier (utilisé par les pages
-// Sales/Rentals, qui montent ce widget côte à côte du portefeuille global).
-// Toute autre valeur forgée par le client est ignorée (jamais un filtre
-// arbitraire non prévu) — comportement identique à l'absence du paramètre.
+// Tenant portfolio: authority/context is supplied by the canonical route guards.
+// Missing/invalid status keeps both business domains inside that tenant only.
 const PORTFOLIO_DASHBOARD_STATUS_VALUES = ['vente', 'location'];
 
 exports.getPortfolioDashboard = async (req, res) => {
   try {
-    const isStaff = ROLES_DOCS.includes(req.user.role);
     const status = PORTFOLIO_DASHBOARD_STATUS_VALUES.includes(req.query.status) ? req.query.status : undefined;
     const dashboard = await getPortfolioDashboard({
-      ...(isStaff ? {} : { ownerId: req.user._id || req.user.id }),
+      tenantId: req.platformTenant?._id,
       status,
     });
     res.status(200).json({ status: 'success', data: { dashboard } });

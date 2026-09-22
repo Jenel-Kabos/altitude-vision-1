@@ -7,6 +7,7 @@ const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
+const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Proprietaire = require('../models/Proprietaire');
@@ -34,6 +35,7 @@ app.use(errorHandler);
 const signToken = (userId, tokenVersion = 0) => jwt.sign({ id: userId, tokenVersion }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
 let counter = 0;
+let portfolioTenant = null;
 const makeUser = (overrides = {}) => {
   counter += 1;
   return User.create({ name: 'Test User', email: `propasset${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
@@ -47,6 +49,7 @@ async function buildManagedProperty(overrides = {}) {
     address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.24,
     images: ['https://placehold.co/1200x800/png?text=Test'], surface: 90,
     statusAdmin: 'Validée', availability: 'Disponible', owner: owner._id,
+    ...(portfolioTenant ? { tenant: portfolioTenant._id } : {}),
     ...overrides,
   });
   return { owner, property };
@@ -262,23 +265,24 @@ test('une transition locative (bail activé) fait avancer le cycle de vie patrim
 
 // GL-ASSET-UX-1 — Phase 8 : tableau de bord portefeuille.
 describe('GET /portfolio/dashboard — agrégation portefeuille (Phase 8)', () => {
-  test('le staff voit tout le patrimoine (plusieurs propriétaires confondus)', async () => {
+  beforeEach(async () => { portfolioTenant = (await createTenantFixture()).tenant; });
+  afterEach(() => { portfolioTenant = null; });
+  test('le membre Admin voit le patrimoine de son tenant (plusieurs propriétaires)', async () => {
     const admin = await makeUser({ role: 'Admin' });
+    await addTenantMember({ tenant: portfolioTenant, user: admin, bootstrap: admin, businessRole: 'Admin' });
     await buildManagedProperty({ price: 300000 });
     await buildManagedProperty({ price: 500000 });
-    const res = await request(app).get('/api/property-asset/portfolio/dashboard').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
     expect(res.status).toBe(200);
     expect(res.body.data.dashboard.totalBiens).toBeGreaterThanOrEqual(2);
     expect(res.body.data.dashboard.valeurTotale).toBeGreaterThanOrEqual(800000);
   });
 
-  test('un propriétaire ne voit que ses propres biens', async () => {
+  test('un propriétaire sans membership ne peut pas lire les KPI tenant', async () => {
     const { owner, property } = await buildManagedProperty({ price: 300000 });
     await buildManagedProperty({ price: 999999 }); // un autre propriétaire, ne doit jamais apparaître
-    const res = await request(app).get('/api/property-asset/portfolio/dashboard').set('Authorization', `Bearer ${signToken(owner._id)}`);
-    expect(res.status).toBe(200);
-    expect(res.body.data.dashboard.totalBiens).toBe(1);
-    expect(res.body.data.dashboard.valeurTotale).toBe(300000);
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(owner._id)}`);
+    expect(res.status).toBe(403);
     void property;
   });
 
@@ -295,8 +299,11 @@ describe('GET /portfolio/dashboard — agrégation portefeuille (Phase 8)', () =
 // des fixtures réalistes (Parcelle vente 80M + Maison location 20M) et
 // prouve la séparation stricte après correctif.
 describe('GET /portfolio/dashboard?status=vente|location — séparation stricte Vente/Location (HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1)', () => {
+  beforeEach(async () => { portfolioTenant = (await createTenantFixture()).tenant; });
+  afterEach(() => { portfolioTenant = null; });
   async function seedSaleAndRental() {
     const admin = await makeUser({ role: 'Admin' });
+    await addTenantMember({ tenant: portfolioTenant, user: admin, bootstrap: admin, businessRole: 'Admin' });
     const { property: saleProperty } = await buildManagedProperty({
       title: 'PARCELLE A VENDRE', type: 'Parcelle', status: 'vente', price: 80000000,
     });
@@ -306,9 +313,9 @@ describe('GET /portfolio/dashboard?status=vente|location — séparation stricte
     return { admin, saleProperty, rentalProperty };
   }
 
-  test('sans ?status : comportement historique inchangé — les deux univers restent mélangés (patrimoine global)', async () => {
+  test('sans ?status : comportement historique inchangé — les deux univers restent mélangés (patrimoine du tenant)', async () => {
     const { admin } = await seedSaleAndRental();
-    const res = await request(app).get('/api/property-asset/portfolio/dashboard').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
     expect(res.status).toBe(200);
     expect(res.body.data.dashboard.totalBiens).toBe(2);
     expect(res.body.data.dashboard.valeurTotale).toBe(100000000);
@@ -316,7 +323,7 @@ describe('GET /portfolio/dashboard?status=vente|location — séparation stricte
 
   test('?status=vente : la vente Parcelle 80M est incluse, la location Maison 20M est exclue (jamais 100M)', async () => {
     const { admin } = await seedSaleAndRental();
-    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
     expect(res.status).toBe(200);
     expect(res.body.data.dashboard.totalBiens).toBe(1);
     expect(res.body.data.dashboard.valeurTotale).toBe(80000000);
@@ -325,7 +332,7 @@ describe('GET /portfolio/dashboard?status=vente|location — séparation stricte
 
   test('?status=location : la location Maison 20M est incluse, la vente Parcelle 80M est exclue (jamais 100M)', async () => {
     const { admin } = await seedSaleAndRental();
-    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
     expect(res.status).toBe(200);
     expect(res.body.data.dashboard.totalBiens).toBe(1);
     expect(res.body.data.dashboard.valeurTotale).toBe(20000000);
@@ -334,54 +341,56 @@ describe('GET /portfolio/dashboard?status=vente|location — séparation stricte
 
   test('type physique ignoré pour la séparation : une Parcelle en location est bien exclue de ?status=vente', async () => {
     const admin = await makeUser({ role: 'Admin' });
+    await addTenantMember({ tenant: portfolioTenant, user: admin, bootstrap: admin, businessRole: 'Admin' });
     await buildManagedProperty({ title: 'Parcelle en location', type: 'Parcelle', status: 'location', price: 15000000 });
-    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
     expect(res.status).toBe(200);
     expect(res.body.data.dashboard.totalBiens).toBe(0);
     expect(res.body.data.dashboard.valeurTotale).toBe(0);
   });
 
-  test('paramètre status forgé (valeur hors liste blanche) est ignoré — retombe sur le patrimoine global, jamais un filtre arbitraire', async () => {
+  test('paramètre status forgé (valeur hors liste blanche) est ignoré — retombe sur le patrimoine du tenant, jamais un filtre arbitraire', async () => {
     const { admin } = await seedSaleAndRental();
-    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=hebergement_forge').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=hebergement_forge').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
     expect(res.status).toBe(200);
     expect(res.body.data.dashboard.totalBiens).toBe(2);
   });
 
   test('brouillon (statusAdmin non Validée) vente reste dans ?status=vente, jamais côté location', async () => {
     const admin = await makeUser({ role: 'Admin' });
+    await addTenantMember({ tenant: portfolioTenant, user: admin, bootstrap: admin, businessRole: 'Admin' });
     await buildManagedProperty({ status: 'vente', statusAdmin: 'En attente', price: 5000000 });
-    const resVente = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
-    const resLocation = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const resVente = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const resLocation = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
     expect(resVente.body.data.dashboard.totalBiens).toBe(1);
     expect(resLocation.body.data.dashboard.totalBiens).toBe(0);
   });
 
   test('rejeté (statusAdmin=Rejetée) vente reste dans ?status=vente, jamais côté location', async () => {
     const admin = await makeUser({ role: 'Admin' });
+    await addTenantMember({ tenant: portfolioTenant, user: admin, bootstrap: admin, businessRole: 'Admin' });
     await buildManagedProperty({ status: 'vente', statusAdmin: 'Rejetée', price: 5000000 });
-    const resVente = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
-    const resLocation = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const resVente = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const resLocation = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
     expect(resVente.body.data.dashboard.totalBiens).toBe(1);
     expect(resLocation.body.data.dashboard.totalBiens).toBe(0);
   });
 
   test('publié (isPublished=true) location reste dans ?status=location, jamais côté vente', async () => {
     const admin = await makeUser({ role: 'Admin' });
+    await addTenantMember({ tenant: portfolioTenant, user: admin, bootstrap: admin, businessRole: 'Admin' });
     await buildManagedProperty({ status: 'location', isPublished: true, price: 7000000 });
-    const resVente = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(admin._id)}`);
-    const resLocation = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const resVente = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
+    const resLocation = await request(app).get('/api/property-asset/portfolio/dashboard?status=location').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(admin._id)}`);
     expect(resVente.body.data.dashboard.totalBiens).toBe(0);
     expect(resLocation.body.data.dashboard.totalBiens).toBe(1);
   });
 
-  test('propriétaire scope + status combinés : ne voit que ses propres biens du bon univers métier', async () => {
+  test('propriétaire sans membership : le filtre status ne donne pas accès aux KPI tenant', async () => {
     const { owner: saleOwner, property: saleProperty } = await buildManagedProperty({ status: 'vente', price: 80000000 });
     await buildManagedProperty({ status: 'vente', price: 999999 }); // autre propriétaire, ne doit jamais apparaître
-    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('Authorization', `Bearer ${signToken(saleOwner._id)}`);
-    expect(res.status).toBe(200);
-    expect(res.body.data.dashboard.totalBiens).toBe(1);
-    expect(res.body.data.dashboard.valeurTotale).toBe(80000000);
+    const res = await request(app).get('/api/property-asset/portfolio/dashboard?status=vente').set('X-Platform-Tenant-Id', String(portfolioTenant._id)).set('Authorization', `Bearer ${signToken(saleOwner._id)}`);
+    expect(res.status).toBe(403);
     void saleProperty;
   });
 });

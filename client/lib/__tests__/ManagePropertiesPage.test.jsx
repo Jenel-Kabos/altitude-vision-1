@@ -1,3 +1,4 @@
+vi.mock('../context/PlatformTenantRuntimeContext', () => ({ usePlatformTenantRuntime: () => ({ selectedTenantId: 'tenant-test', tenantReady: true }) }));
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ManagePropertiesPage from '../pages/dashboard/ManagePropertiesPage';
 import {

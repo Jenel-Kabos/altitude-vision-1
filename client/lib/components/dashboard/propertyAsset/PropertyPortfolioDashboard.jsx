@@ -1,43 +1,39 @@
 "use client";
 
-// GL-ASSET-UX-1 — Phase 8 : Dashboard Patrimoine. Rendu pur du payload déjà
-// agrégé par propertyAssetPortfolioService.getPortfolioDashboard
-// (server, réutilise exclusivement les services par-bien de GL-ASSET-1) —
-// aucun calcul supplémentaire ici. Le backend scope automatiquement le
-// portefeuille (tout le patrimoine pour le staff, uniquement ses propres
-// biens pour un propriétaire) — le composant est identique pour les deux
-// audiences.
+// Patrimoine du tenant actif : le serveur reste autorité du périmètre et des calculs.
 import React, { useEffect, useState } from "react";
+import { usePlatformTenantRuntime } from "../../../context/PlatformTenantRuntimeContext";
 import { getPortfolioDashboard } from "../../../services/propertyAssetService";
 import { DashboardCard, DashboardState } from "../DashboardUI";
 
 const fmtFcfa = (n) => `${Number(n || 0).toLocaleString("fr-FR")} FCFA`;
 const fmtPct = (n) => (n === null || n === undefined ? "—" : `${Number(n).toFixed(1)}%`);
 
-// HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — `status` ('vente'|'location',
-// optionnel) restreint l'agrégation à un seul univers métier. Sans lui
-// (comportement historique inchangé), le patrimoine global reste affiché tel
-// quel — seuls les montages sur /dashboard/sales et /dashboard/rentals
-// passent désormais une valeur, pour ne jamais mélanger les deux domaines.
 const PropertyPortfolioDashboard = ({ status } = {}) => {
-  const [dashboard, setDashboard] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { selectedTenantId, tenantLoading } = usePlatformTenantRuntime();
+  const scopeKey = selectedTenantId && !tenantLoading ? `${selectedTenantId}:${status || 'all'}` : null;
+  const [state, setState] = useState({ scopeKey: null, dashboard: null, loading: true, error: false });
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    setState({ scopeKey, dashboard: null, loading: Boolean(scopeKey), error: false });
+    if (!scopeKey) return () => { cancelled = true; };
     (async () => {
       try {
-        const data = await getPortfolioDashboard(status);
-        if (!cancelled) setDashboard(data);
-      } finally {
-        if (!cancelled) setLoading(false);
+        const dashboard = await getPortfolioDashboard(status);
+        if (!cancelled) setState({ scopeKey, dashboard, loading: false, error: false });
+      } catch {
+        if (!cancelled) setState({ scopeKey, dashboard: null, loading: false, error: true });
       }
     })();
     return () => { cancelled = true; };
-  }, [status]);
+  }, [scopeKey, status]);
 
-  if (loading) return <DashboardState type="loading" title="Chargement du dashboard patrimoine…" />;
+  if (!scopeKey) return null;
+  // Scope matching also suppresses old values during the render before effects run.
+  if (state.scopeKey !== scopeKey || state.loading) return <DashboardState type="loading" title="Chargement du dashboard patrimoine…" />;
+  if (state.error) return <DashboardState type="error" title="Erreur lors du chargement du patrimoine." />;
+  const { dashboard } = state;
   if (!dashboard) return null;
 
   return (

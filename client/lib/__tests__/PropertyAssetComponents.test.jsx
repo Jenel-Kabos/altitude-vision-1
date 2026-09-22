@@ -1,3 +1,4 @@
+vi.mock('../context/PlatformTenantRuntimeContext', () => ({ usePlatformTenantRuntime: () => ({ selectedTenantId: 'tenant-test', tenantReady: true }) }));
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AssetLifecycleCard from '../components/dashboard/propertyAsset/AssetLifecycleCard';
 import PropertyAlertsPanel from '../components/dashboard/propertyAsset/PropertyAlertsPanel';

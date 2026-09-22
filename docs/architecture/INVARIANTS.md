@@ -47,6 +47,24 @@ them; sprint reports are historical, this file is current.
 - New code prefers direct `Property.tenant` isolation.
 - Cross-tenant IDs on `Property`, `Transaction`, `Contrat` fail closed.
 
+### Tenant portfolio KPI and display sets
+
+- `/api/property-asset/portfolio/dashboard` requires the same canonical tenant,
+  immobilier module and membership-role guards as `/api/properties/portfolio`.
+  `Property.tenant` must equal the resolved tenant; global roles, ownership alone
+  and PlatformOperator identity do not replace tenant membership on this surface.
+  Null-tenant legacy properties are excluded, without data reassignment.
+- Patrimonial KPI retain tenant assets across publication and occupancy states
+  (including occupied/unpublished, draft and archived assets), with optional
+  `status=vente|location` filtering. Physical type and publication are not authority.
+  The list remains the existing eligible-publication projection, with specialized
+  accommodation/hotel projection and deduplication. Occupancy KPI must not inherit
+  the list's `availability=Disponible` restriction. No new soft-delete semantics.
+- The existing executive platform report explicitly opts into platform-wide
+  aggregation; tenant HTTP callers cannot select that mode.
+- Without a selected frontend tenant, portfolio requests remain gated. Scope
+  changes hide old values immediately and invalidate outstanding responses.
+
 ## 4. Contrat domain
 
 - `Contrat` remains **polymorphic** (`type ∈ {location, vente}`), one Mongo

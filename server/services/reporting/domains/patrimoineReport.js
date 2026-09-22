@@ -9,7 +9,7 @@ const MarketPriceReference = require('../../../models/MarketPriceReference');
 
 async function getPatrimoineReport({ period = 'month' } = {}) {
   const [portfolio, marketRows] = await Promise.all([
-    getPortfolioDashboard({}), // pas de ownerId = portefeuille global (vue Direction)
+    getPortfolioDashboard({ platformWide: true }), // reporting plateforme explicite, jamais le dashboard tenant
     MarketPriceReference.aggregate(buildMarketHistoryPipeline({ period, filters: {} })),
   ]);
   return {

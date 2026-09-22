@@ -14,13 +14,20 @@ const CYCLE_LABELS = {
   inspection: 'Inspection', travaux: 'Travaux', vendu: 'Vendu', archive: 'Archivé',
 };
 
-// HOTFIX-PROPERTY-SALE-RENT-SEPARATION-1 — `status` optionnel restreint le
-// portefeuille agrégé à un seul univers métier ('vente' ou 'location').
-// Sans lui (comportement historique inchangé, ex. patrimoineReport.js),
-// l'agrégation reste globale (tout le patrimoine, tous statuts confondus) —
-// jamais un comportement par défaut différent pour les appelants existants.
-async function getPortfolioDashboard({ ownerId, status } = {}) {
+// Patrimonial business set: tenant assets, optionally limited to sale/rental.
+// Publication, physical type and availability do not exclude owned assets:
+// occupied/unpublished properties still contribute to patrimonial occupancy.
+async function getPortfolioDashboard({ tenantId, ownerId, status, platformWide = false } = {}) {
+  // Only the existing platform executive report opts into global aggregation.
+  // HTTP tenant portfolio callers must supply the middleware-resolved tenant.
+  if (!tenantId && !platformWide) {
+    const error = new Error('Contexte tenant requis.');
+    error.code = 'TENANT_CONTEXT_REQUIRED';
+    error.statusCode = 403;
+    throw error;
+  }
   const filter = {
+    ...(tenantId ? { tenant: tenantId } : {}),
     ...(ownerId ? { owner: ownerId } : {}),
     ...(status ? { status } : {}),
   };

@@ -39,8 +39,12 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   // est la valeur stable exposée par PlatformTenantRuntimeContext ; `null`
   // signifie "Vue plateforme (unscoped)" et est traité comme une clé
   // distincte à part entière.
-  const { selectedTenantId } = usePlatformTenantRuntime();
+  const { selectedTenantId, tenantLoading } = usePlatformTenantRuntime();
+  const tenantFetchReady = Boolean(selectedTenantId) && !tenantLoading;
+  const [propertiesScope, setPropertiesScope] = useState(null);
   const tenantScopeKey = selectedTenantId || 'platform';
+  const activeTenantScopeRef = useRef(tenantScopeKey);
+  activeTenantScopeRef.current = tenantScopeKey;
   const canAddProperty = ['Admin', 'CommunityManager', 'Collaborateur', 'GestionnaireImmobilier'].includes(user?.role);
   // Sprint 0 (architecture Altimmo) — pré-filtre lu depuis l'URL
   // (?status=vente|location|hebergement), posé par les liens dédiés du
@@ -111,12 +115,13 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
     // Purge immédiate : aucune ligne du tenant précédent ne doit rester
     // affichée pendant qu'un nouveau fetch est en cours.
     setProperties([]);
-    setLoading(true);
+    setLoading(tenantFetchReady);
+    if (!tenantFetchReady) return;
     getAllProperties({ portfolio: true })
       .then((res) => { if (propertiesEpochRef.current === epoch) setProperties(res); })
       .catch(() => { if (propertiesEpochRef.current === epoch) showNotif('Erreur lors du chargement des biens.', 'error'); })
-      .finally(() => { if (propertiesEpochRef.current === epoch) setLoading(false); });
-  }, [tenantScopeKey]);
+      .finally(() => { if (propertiesEpochRef.current === epoch) { setPropertiesScope(tenantScopeKey); setLoading(false); } });
+  }, [tenantScopeKey, tenantFetchReady]);
 
   useEffect(() => {
     const moduleKey = section === 'vente' ? 'sales' : section === 'location' ? 'rentals' : null;
@@ -125,10 +130,11 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
     // confidentialité visuelle « Contexte : Tenant B / KPIs : Tenant A ».
     setAnalytics(null);
     const epoch = ++analyticsEpochRef.current;
+    if (!tenantFetchReady) return;
     getDashboardAnalytics(moduleKey)
       .then((data) => { if (analyticsEpochRef.current === epoch) setAnalytics(data); })
       .catch(() => { if (analyticsEpochRef.current === epoch) setAnalytics({ kpis: {} }); });
-  }, [section, tenantScopeKey]);
+  }, [section, tenantScopeKey, tenantFetchReady]);
 
   useEffect(() => {
     let list = statusFilter ? properties.filter((p) => p.status === statusFilter) : properties;
@@ -145,6 +151,8 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
   }, [searchTerm, properties, statusFilter]);
 
   const fetchProperties = async () => {
+    if (!tenantFetchReady || activeTenantScopeRef.current !== tenantScopeKey) return;
+    const epoch = ++propertiesEpochRef.current;
     setLoading(true);
     try {
       const res = await getAllProperties({ portfolio: true });
@@ -152,11 +160,13 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
       // ci-dessous (searchTerm + statusFilter) — ne pas le fixer ici en
       // parallèle, sous peine de courte-circuiter le filtre ?status= au
       // premier rendu après chargement (Sprint 0).
+      if (propertiesEpochRef.current !== epoch) return;
       setProperties(res);
     } catch {
+      if (propertiesEpochRef.current !== epoch) return;
       showNotif("Erreur lors du chargement des biens.", "error");
     } finally {
-      setLoading(false);
+      if (propertiesEpochRef.current === epoch) { setPropertiesScope(tenantScopeKey); setLoading(false); }
     }
   };
 
@@ -619,7 +629,14 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
           </>} />;
   };
 
-  if (loading) return (
+  if (!tenantFetchReady) return (
+    <div className="mx-auto max-w-xl rounded-xl border border-amber-300 bg-amber-50 p-6 text-center text-amber-950">
+      <h1 className="text-lg font-bold">Sélectionnez un tenant à administrer</h1>
+      <p className="mt-2 text-sm">Les modules du dashboard restent en attente afin qu’aucune requête tenant-scoped ne parte sans contexte valide.</p>
+    </div>
+  );
+
+  if (loading || propertiesScope !== tenantScopeKey) return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-indigo-50 flex items-center justify-center">
       <div className="text-center">
         <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />

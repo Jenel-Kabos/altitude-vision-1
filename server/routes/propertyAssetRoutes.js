@@ -12,6 +12,9 @@
 const express = require('express');
 const auth = require('../controllers/authController');
 const { requireCapability } = require('../middleware/capabilityMiddleware');
+const { requireTenantScope } = require('../middleware/tenantContext');
+const { requireTenantModule } = require('../middleware/tenantModuleGate');
+const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 const ctrl = require('../controllers/propertyAssetController');
 
 const router = express.Router();
@@ -19,7 +22,8 @@ router.use(auth.protect);
 
 // GL-ASSET-UX-1 — doit être déclarée AVANT '/:id/...' pour que 'portfolio'
 // ne soit jamais capturé comme un identifiant de bien.
-router.get('/portfolio/dashboard', ctrl.getPortfolioDashboard);
+router.get('/portfolio/dashboard', requireTenantScope, requireTenantModule('immobilier'),
+  requireTenantMembershipRole('Admin', 'GestionnaireImmobilier', 'Collaborateur'), ctrl.getPortfolioDashboard);
 
 router.get('/:id/lifecycle', ctrl.getLifecycle);
 router.post('/:id/transition', requireCapability('properties.update'), ctrl.transition);

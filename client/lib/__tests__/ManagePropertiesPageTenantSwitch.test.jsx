@@ -46,7 +46,7 @@ const listA = [{ _id: 'p-a', title: 'Bien Altitude', status: 'vente', price: 150
 const listB = [{ _id: 'p-b1', title: 'Bien Mila 1', status: 'vente', price: 80000000, address: {} }];
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   mockSelectedTenantId = 'tenant-A';
   getPortfolioDashboard.mockResolvedValue(null);
 });
@@ -129,7 +129,7 @@ describe('ManagePropertiesPage — refetch on tenant switch (Rentals)', () => {
 });
 
 describe('ManagePropertiesPage — platform view + error/empty isolation', () => {
-  test('FE-ISO-13 · FE-ISO-14: tenant ↔ platform triggers distinct fetches', async () => {
+  test('FE-ISO-13 · FE-ISO-14: platform selection purges state without tenant fetches', async () => {
     propertyService.getAllProperties.mockResolvedValueOnce(listA);
     analyticsService.getDashboardAnalytics.mockResolvedValueOnce(kpisA);
     const { rerender } = render(<ManagePropertiesPage section="vente" />);
@@ -140,7 +140,9 @@ describe('ManagePropertiesPage — platform view + error/empty isolation', () =>
     propertyService.getAllProperties.mockResolvedValueOnce([...listA, ...listB]);
     analyticsService.getDashboardAnalytics.mockResolvedValueOnce({ kpis: { active: 6, published: 4 } });
     rerender(<ManagePropertiesPage section="vente" />);
-    await waitFor(() => expect(analyticsService.getDashboardAnalytics).toHaveBeenCalledTimes(2));
+    expect(analyticsService.getDashboardAnalytics).toHaveBeenCalledTimes(1);
+    expect(propertyService.getAllProperties).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Bien Altitude')).not.toBeInTheDocument();
   });
 
   test('FE-ISO-12 (error state): a switch to an empty tenant clears the previous KPIs before any response', async () => {
@@ -162,5 +164,52 @@ describe('ManagePropertiesPage — platform view + error/empty isolation', () =>
     // Resolve B empty
     await act(async () => { resolveB([]); resolveAnalyticsB({ kpis: {} }); });
     expect(screen.queryByText('Bien Altitude')).not.toBeInTheDocument();
+  });
+});
+
+describe('FE-TENANT portfolio lifecycle', () => {
+  const payload = (name, value) => ({ totalBiens: 1, valeurTotale: value, valeurParType: { [name]: value }, biensVacants: 1, biensOccupes: 0 });
+  beforeEach(() => {
+    propertyService.getAllProperties.mockResolvedValue([]);
+    analyticsService.getDashboardAnalytics.mockResolvedValue({ kpis: {} });
+  });
+  test.each([null, 'location', 'vente', 'hebergement'])('FE-TENANT-02/03 platform sends no tenant request for %s', async (section) => {
+    mockSelectedTenantId = null;
+    render(<ManagePropertiesPage section={section} />);
+    await act(async () => {});
+    expect(propertyService.getAllProperties).not.toHaveBeenCalled();
+    expect(getPortfolioDashboard).not.toHaveBeenCalled();
+    expect(analyticsService.getDashboardAnalytics).not.toHaveBeenCalled();
+    expect(screen.getByText('Sélectionnez un tenant à administrer')).toBeInTheDocument();
+  });
+  test('FE-TENANT-04/05/08 A values purge and B loads without page reload', async () => {
+    getPortfolioDashboard.mockResolvedValueOnce(payload('TYPE-A', 100000));
+    const { rerender } = render(<ManagePropertiesPage section="location" />);
+    expect(await screen.findByText('TYPE-A')).toBeInTheDocument();
+    let resolveB;
+    getPortfolioDashboard.mockImplementationOnce(() => new Promise(r => { resolveB = r; }));
+    mockSelectedTenantId = 'tenant-B';
+    rerender(<ManagePropertiesPage section="location" />);
+    expect(screen.queryByText('TYPE-A')).not.toBeInTheDocument();
+    await waitFor(() => expect(getPortfolioDashboard).toHaveBeenCalledTimes(2));
+    await act(async () => resolveB(payload('TYPE-B', 200000)));
+    expect(screen.getByText('TYPE-B')).toBeInTheDocument();
+  });
+  test('FE-TENANT-06/07 late A cannot overwrite B; platform purges B', async () => {
+    let resolveA;
+    getPortfolioDashboard.mockImplementationOnce(() => new Promise(r => { resolveA = r; }));
+    const { rerender } = render(<ManagePropertiesPage section="location" />);
+    await waitFor(() => expect(getPortfolioDashboard).toHaveBeenCalledTimes(1));
+    mockSelectedTenantId = 'tenant-B';
+    getPortfolioDashboard.mockResolvedValueOnce(payload('TYPE-B', 200000));
+    rerender(<ManagePropertiesPage section="location" />);
+    expect(await screen.findByText('TYPE-B')).toBeInTheDocument();
+    await act(async () => resolveA(payload('TYPE-A', 100000)));
+    expect(screen.queryByText('TYPE-A')).not.toBeInTheDocument();
+    expect(screen.getByText('TYPE-B')).toBeInTheDocument();
+    mockSelectedTenantId = null;
+    rerender(<ManagePropertiesPage section="location" />);
+    expect(screen.queryByText('TYPE-B')).not.toBeInTheDocument();
+    expect(getPortfolioDashboard).toHaveBeenCalledTimes(2);
   });
 });
