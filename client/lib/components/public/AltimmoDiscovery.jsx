@@ -34,10 +34,10 @@ const formatPrice = (price) => (
     : null
 );
 
-function PropertyVisual({ image, title, showImage }) {
+function PropertyVisual({ image, title }) {
   const [failed, setFailed] = useState(false);
 
-  if (!showImage || !image || failed) {
+  if (!image || failed) {
     return (
       <div className={styles.fallback} aria-hidden="true">
         <span>Sélection Altimmo</span>
@@ -49,12 +49,12 @@ function PropertyVisual({ image, title, showImage }) {
   return <img className={styles.propertyImage} src={image} alt={title} loading="lazy" onError={() => setFailed(true)} />;
 }
 
-function PropertyContent({ property, showImage }) {
+function PropertyContent({ property }) {
   const price = formatPrice(property.price);
 
   return (
     <article className={styles.propertyCard} data-testid="altimmo-property">
-      <div className={styles.visual}><PropertyVisual image={property.image} title={property.title} showImage={showImage} /></div>
+      <div className={styles.visual}><PropertyVisual image={property.image} title={property.title} /></div>
       <div className={styles.propertyBody}>
         <div className={styles.propertyMeta}>
           {property.type && <span>{property.type}</span>}
@@ -71,9 +71,9 @@ function PropertyContent({ property, showImage }) {
   );
 }
 
-function PropertyPreview({ property, showImage }) {
-  if (!property._id) return <PropertyContent property={property} showImage={showImage} />;
-  return <Link className={styles.propertyLink} href={`/immobilier/property/${property._id}`}><PropertyContent property={property} showImage={showImage} /></Link>;
+function PropertyPreview({ property }) {
+  if (!property._id) return <PropertyContent property={property} />;
+  return <Link className={styles.propertyLink} href={`/immobilier/property/${property._id}`}><PropertyContent property={property} /></Link>;
 }
 
 export default function AltimmoDiscovery() {
@@ -130,9 +130,10 @@ export default function AltimmoDiscovery() {
               <figcaption>Habiter, investir, séjourner.</figcaption>
             </MotionImageReveal>
           )}
-          {state === 'success' && items.map((property, index) => <PropertyPreview property={property} showImage={index < 2} key={property._id || `${property.title}-${index}`} />)}
+          {state === 'success' && items.map((property, index) => <PropertyPreview property={property} key={property._id || `${property.title}-${index}`} />)}
         </div>
         <div className={styles.commercialLinks}>
+          <Link className={styles.catalogLink} href="/immobilier/annonces">Voir nos annonces <span aria-hidden="true">→</span></Link>
           <Link href="/immobilier">Découvrir Altimmo <span aria-hidden="true">→</span></Link>
           <Link href="/properties/submit">Confier mon bien <span aria-hidden="true">↗</span></Link>
         </div>

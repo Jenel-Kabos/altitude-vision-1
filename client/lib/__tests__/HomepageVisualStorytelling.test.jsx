@@ -53,16 +53,16 @@ describe('WEB-VISUAL-01 — système photographique authentique de la homepage',
     expect(within(orientation).getByRole('link', { name: /Découvrir Mila Events/i })).toHaveAttribute('href', '/evenementiel');
   });
 
-  test('07/08/15 : rend au maximum deux photos publiques, lazy-loaded, sans média externe non approuvé ni carousel', async () => {
+  test('07/08/15 : rend les trois photos Altimmo valides, lazy-loaded, sans média externe non approuvé ni carousel', async () => {
     render(<HomePageNext />);
     const altimmo = screen.getByTestId('altimmo-discovery');
     const images = await within(altimmo).findAllByRole('img');
 
-    expect(images).toHaveLength(2);
+    expect(images).toHaveLength(3);
     images.forEach((image) => {
       expect(image).toHaveAttribute('loading', 'lazy');
       expect(image.getAttribute('src')).toMatch(/^https:\/\/res\.cloudinary\.com\//);
-      expect(image).toHaveAccessibleName(/Bien public [12]/);
+      expect(image).toHaveAccessibleName(/Bien public [123]/);
     });
     expect(within(altimmo).queryByRole('region', { name: /carousel|diaporama/i })).not.toBeInTheDocument();
   });

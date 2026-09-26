@@ -53,6 +53,23 @@ describe('WEB-05 — découverte Altimmo sur la homepage', () => {
     expect(image).toHaveAttribute('src', 'https://res.cloudinary.com/altimmo/image/upload/villa.jpg');
   });
 
+  test('HOTFIX-01 : affiche les images valides des trois biens, y compris le troisième', async () => {
+    searchAltimmo.mockResolvedValue({
+      properties: [
+        property({ _id: 'bien-1', title: 'Villa', images: ['https://cdn.example.com/villa.jpg'] }),
+        property({ _id: 'bien-2', title: 'Appartement', images: ['https://cdn.example.com/appartement.jpg'] }),
+        property({ _id: 'bien-3', title: 'Bureau à louer', images: ['https://cdn.example.com/bureau.jpg'] }),
+      ],
+      total: 3,
+    });
+    render(<AltimmoDiscovery />);
+
+    expect(await screen.findByRole('img', { name: 'Villa' })).toHaveAttribute('src', 'https://cdn.example.com/villa.jpg');
+    expect(screen.getByRole('img', { name: 'Appartement' })).toHaveAttribute('src', 'https://cdn.example.com/appartement.jpg');
+    expect(screen.getByRole('img', { name: 'Bureau à louer' })).toHaveAttribute('src', 'https://cdn.example.com/bureau.jpg');
+    expect(within(screen.getByText('Bureau à louer').closest('[data-testid="altimmo-property"]')).queryByText('Sélection Altimmo')).not.toBeInTheDocument();
+  });
+
   test.each([
     ['aucune image', []],
     ['une valeur vide', ['']],
@@ -78,6 +95,14 @@ describe('WEB-05 — découverte Altimmo sur la homepage', () => {
     expect(unlinkedCard).not.toBeNull();
     expect(unlinkedCard.closest('a')).toBeNull();
     expect(document.querySelector('a[href="#"]')).toBeNull();
+  });
+
+  test('HOTFIX-02 : expose le catalogue comme CTA principal et conserve les deux actions existantes', async () => {
+    render(<AltimmoDiscovery />);
+
+    expect(await screen.findByRole('link', { name: /Voir nos annonces/i })).toHaveAttribute('href', '/immobilier/annonces');
+    expect(screen.getByRole('link', { name: /Découvrir Altimmo/i })).toHaveAttribute('href', '/immobilier');
+    expect(screen.getByRole('link', { name: /Confier mon bien/i })).toHaveAttribute('href', '/properties/submit');
   });
 
   test.each([

@@ -83,8 +83,13 @@
 
 .commercialLinks { display:flex; flex-wrap:wrap; gap:1rem 1.5rem; justify-content:flex-end; margin-top:2rem; }
 .commercialLinks a { color:#f7f3ea; font-size:.78rem; font-weight:700; letter-spacing:.1em; min-height:2.75rem; display:inline-flex; align-items:center; gap:.5rem; text-decoration:none; text-transform:uppercase; }
-.commercialLinks a:first-child { background:#ae8540; color:#17201e; padding:.65rem 1rem; }
+.commercialLinks .catalogLink { background:#ae8540; color:#17201e; padding:.65rem 1rem; }
 .commercialLinks a:focus-visible { outline:3px solid #f7f3ea; outline-offset:3px; }
+
+@media (max-width: 47.99rem) {
+  .commercialLinks { justify-content:flex-start; }
+  .commercialLinks .catalogLink { flex-basis:100%; justify-content:space-between; }
+}
 
 @keyframes pulse {
   0%, 100% { opacity: .35; transform: scale(.85); }
