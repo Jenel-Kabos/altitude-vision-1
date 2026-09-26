@@ -4,7 +4,7 @@
 // Altimmo). Page d'entrée du domaine "Séjourner" (hébergement meublé),
 // remplace le lien générique "Toutes les annonces" par une navigation
 // publique par catégorie. Réutilise entièrement le listing existant
-// (AltimmoAnnonces, filtres ?status=&type= déjà supportés) — aucune
+// (AltimmoAnnonces, filtres offerType/accommodationType) — aucune
 // nouvelle logique de recherche ici, uniquement des liens.
 
 import Link from "next/link";
@@ -34,7 +34,7 @@ const SejournerLandingPage = () => (
       </h1>
       <p style={{ fontFamily: "'DM Sans', sans-serif", color: "#4B5563", maxWidth: 640, marginBottom: "2.5rem" }}>
         Choisissez une catégorie pour affiner votre recherche, ou consultez{" "}
-        <Link href="/immobilier/annonces?status=hebergement" style={{ color: BLUE, fontWeight: 600 }}>
+        <Link href="/immobilier/annonces?offerType=hebergement" style={{ color: BLUE, fontWeight: 600 }}>
           tous les hébergements
         </Link>.
       </p>
@@ -43,7 +43,7 @@ const SejournerLandingPage = () => (
         {CATEGORIES.map(({ type, label, Icon, description, href }) => (
           <Link
             key={type}
-            href={href || `/immobilier/annonces?status=hebergement&type=${type}`}
+            href={href || `/immobilier/annonces?offerType=hebergement&accommodationType=${type}`}
             style={{
               display: "flex", flexDirection: "column", gap: "0.6rem",
               background: "#FFFFFF", borderRadius: 10, padding: "1.5rem",

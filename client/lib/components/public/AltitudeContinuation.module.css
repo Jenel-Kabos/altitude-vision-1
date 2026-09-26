@@ -1,0 +1,121 @@
+.section {
+  --continuation-ink: #17201e;
+  --continuation-ivory: #f7f3ea;
+  --continuation-brass: #ae8540;
+  background: var(--continuation-ivory);
+  color: var(--continuation-ink);
+  padding: clamp(3.5rem, 7vw, 6rem) 0;
+}
+
+.container {
+  margin: 0 auto;
+  width: min(calc(100% - 2rem), 60rem);
+}
+
+.headingBlock {
+  margin: 0 0 clamp(2rem, 4vw, 3rem);
+  max-width: 38rem;
+}
+
+.eyebrow {
+  color: var(--continuation-brass);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .2em;
+  margin: 0 0 clamp(1rem, 2vw, 1.5rem);
+  text-transform: uppercase;
+}
+
+.headingBlock h2 {
+  color: inherit;
+  font-family: 'Cormorant Garamond', var(--font-cormorant), Georgia, serif;
+  font-size: clamp(1.85rem, 3.8vw, 2.65rem);
+  font-weight: 400;
+  letter-spacing: -.02em;
+  line-height: 1.08;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.headingBlock h2 em {
+  color: var(--continuation-brass);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.destinations {
+  border-top: 1px solid rgba(23, 32, 30, .18);
+}
+
+.destination {
+  align-items: center;
+  border-bottom: 1px solid rgba(23, 32, 30, .18);
+  color: inherit;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto 1fr auto;
+  min-height: 5.5rem;
+  padding: 1.1rem 0;
+  text-decoration: none;
+}
+
+.destinationDot {
+  border-radius: 50%;
+  flex-shrink: 0;
+  height: .55rem;
+  width: .55rem;
+}
+
+.destinationCopy {
+  display: grid;
+  gap: .3rem;
+}
+
+.destinationCopy strong {
+  font-family: 'Cormorant Garamond', var(--font-cormorant), Georgia, serif;
+  font-size: clamp(1.3rem, 2.6vw, 1.6rem);
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.destinationCopy strong small {
+  color: rgba(23, 32, 30, .55);
+  font-family: 'DM Sans', var(--font-dm-sans), sans-serif;
+  font-size: .68rem;
+  font-weight: 500;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.destinationCopy span {
+  color: rgba(23, 32, 30, .62);
+  font-size: .85rem;
+  line-height: 1.5;
+}
+
+.destinationArrow {
+  align-items: center;
+  border: 1px solid rgba(23, 32, 30, .3);
+  border-radius: 50%;
+  display: flex;
+  height: 2.5rem;
+  justify-content: center;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+  width: 2.5rem;
+}
+
+.destination:hover .destinationArrow,
+.destination:focus-visible .destinationArrow {
+  background: var(--continuation-brass);
+  border-color: var(--continuation-brass);
+  color: var(--continuation-ivory);
+}
+
+.destination:focus-visible {
+  outline: 2px solid var(--continuation-brass);
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .destinationArrow { transition: none; }
+}

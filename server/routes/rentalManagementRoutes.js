@@ -20,6 +20,7 @@ const { resolveTenantForUser } = require('../services/platformTenant/tenantConte
 const { requireTenantScope } = require('../middleware/tenantContext');
 const { requireTenantModule } = require('../middleware/tenantModuleGate');
 const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
+const { requireTenantMembershipRoleOrPlatformCapability } = require('../middleware/tenantMembershipRoleOrPlatformCapability');
 
 const router = express.Router();
 router.use(auth.protect);
@@ -53,7 +54,35 @@ router.use(requireTenantModule('location'));
 const GL_READ = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
 const GL_MANAGE = ['Admin', 'GestionnaireImmobilier'];
 
-router.get('/onboarding/options', requireTenantMembershipRole(...GL_MANAGE), ctrl.onboardingOptions);
+// PLATFORM-SUPER-ADMIN OPTION-3 SLICE-3 (2026-09-22) — composition helpers.
+// SCOPE STRICTEMENT LIMITÉ aux routes R1 (READ) et R2 (RentalManagement-only
+// state) après audit. Les routes R4 (publication, mark-*, notice, exit
+// validation, resolveRequest, onboarding create) mutent Property/Contrat/
+// RealEstateReservation et RESTENT sur requireTenantMembershipRole strict —
+// elles nécessitent une slice future avec composition de capabilities
+// (platform.rentals.manage + platform.properties.manage, etc.). Voir §CAP.
+const rentalReadAuthority = requireTenantMembershipRoleOrPlatformCapability({
+  tenantRoles: GL_READ,
+  platformCapabilities: ['platform.rentals.read', 'platform.rentals.manage'],
+});
+const rentalManageAuthority = requireTenantMembershipRoleOrPlatformCapability({
+  tenantRoles: GL_MANAGE,
+  platformCapabilities: ['platform.rentals.manage'],
+});
+// /onboarding/options est un READ mais son autorité tenant historique est
+// GL_MANAGE (les options n'ont de sens que pour un membre qui pourra
+// exécuter l'onboarding lui-même) — RM-14 le prouve. On préserve cette
+// sémantique restrictive côté PATH A et on ajoute PATH B avec platform.rentals.read
+// pour permettre à l'opérateur de consulter les options en Vue tenant.
+const rentalOnboardingOptionsAuthority = requireTenantMembershipRoleOrPlatformCapability({
+  tenantRoles: GL_MANAGE,
+  platformCapabilities: ['platform.rentals.read', 'platform.rentals.manage'],
+});
+
+router.get('/onboarding/options', rentalOnboardingOptionsAuthority, ctrl.onboardingOptions);
+// POST /onboarding MUTATES Property (activateExisting) — R4 : conservé strict
+// tenant authority (pas de PATH B). Une slice future dédiée devra composer
+// platform.rentals.manage + platform.properties.manage.
 router.post('/onboarding', requireTenantMembershipRole(...GL_MANAGE), ctrl.onboard);
 
 router.param('id', async (req, res, next, rentalId) => {
@@ -81,10 +110,22 @@ router.param('id', async (req, res, next, rentalId) => {
     // du dossier suffit à elle seule, exactement comme le reste du domaine
     // Property/GL — jamais bloquée par l'absence de contexte tenant.
     if (rental.owner && String(rental.owner) === String(req.user._id || req.user.id)) return next();
+    // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-3 (2026-09-22) — un PlatformOperator
+    // qui a sélectionné un tenant via X-Platform-Tenant-Id ne peut PAS accéder
+    // à une ressource dont l'attribution tenant est `null` (legacy non
+    // attribuée) : le fail-open historique
+    // `assertResourceTenantOrUnattributed` est motivé par l'ownership self-
+    // service (Proprietaire sans OrgMembership) et n'a pas de sens pour un
+    // opérateur plateforme qui n'a jamais eu de rapport ownership avec la
+    // ressource. On refuse fail-closed avant même que le middleware
+    // d'autorité ne s'exécute — la frontière tenant est protégée.
+    if (req.isPlatformOperatorContext && rental.tenant == null) {
+      return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
+    }
     // Un dossier dont le propriétaire n'a lui-même aucune attribution
     // tenant traçable (données antérieures à PlatformTenant) n'a aucune
-    // frontière tenant à faire respecter — voir
-    // assertResourceTenantOrUnattributed.
+    // frontière tenant à faire respecter pour l'utilisateur owner/staff
+    // légitime — voir assertResourceTenantOrUnattributed.
     // PLATFORM-ADMIN-CERT-1 — voir accommodationController.js pour la même justification.
     const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
     const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
@@ -95,13 +136,24 @@ router.param('id', async (req, res, next, rentalId) => {
   }
 });
 
-router.get('/stats', requireTenantMembershipRole(...GL_READ), ctrl.stats);
-router.get('/', requireTenantMembershipRole(...GL_READ), ctrl.list);
-router.post('/', requireTenantMembershipRole(...GL_MANAGE), ctrl.create);
-router.get('/:id', requireTenantMembershipRole(...GL_READ), ctrl.getOne);
-router.patch('/:id', requireTenantMembershipRole(...GL_MANAGE), ctrl.update);
-router.post('/:id/deactivate', requireTenantMembershipRole(...GL_MANAGE), ctrl.deactivate);
-router.get('/:id/history', requireTenantMembershipRole(...GL_READ), ctrl.history);
+// R1 READS — safe under platform.rentals.read (aggregates only, no Property/
+// Contrat/Transaction/Financial writes).
+router.get('/stats', rentalReadAuthority, ctrl.stats);
+router.get('/', rentalReadAuthority, ctrl.list);
+router.post('/', rentalManageAuthority, ctrl.create);
+router.get('/:id', rentalReadAuthority, ctrl.getOne);
+// R2 PURE STATE — update touches only RentalManagement fields (verified L333-341).
+router.patch('/:id', rentalManageAuthority, ctrl.update);
+// R2 — deactivate reads blocking Contrat (READ ONLY) + Property.exists then
+// writes only RentalManagement — never mutates Contrat/Property/Financial.
+router.post('/:id/deactivate', rentalManageAuthority, ctrl.deactivate);
+router.get('/:id/history', rentalReadAuthority, ctrl.history);
+// R4 ADJACENT-DOMAIN — mutate Property (isPublished/availability/status/
+// lifecycle) and/or Contrat.etatsDesLieux / RealEstateReservation. Left on
+// strict tenant authority. Enabling PlatformOperator for these routes
+// requires a composed multi-capability slice (platform.rentals.manage +
+// platform.properties.manage, potentially + platform.contracts.manage
+// which does not yet exist).
 router.post('/:id/publish', requireTenantMembershipRole(...GL_MANAGE), ctrl.publish);
 router.post('/:id/suspend-listing', requireTenantMembershipRole(...GL_MANAGE), ctrl.suspend);
 router.post('/:id/mark-rented', requireTenantMembershipRole(...GL_MANAGE), ctrl.markRented);

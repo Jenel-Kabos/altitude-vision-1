@@ -1,0 +1,85 @@
+.section {
+  --method-ink: #17201e;
+  --method-ivory: #f7f3ea;
+  --method-brass: #ae8540;
+  background: var(--method-ivory);
+  color: var(--method-ink);
+  padding: clamp(2.5rem, 4vw, 3.75rem) 0;
+}
+
+.container {
+  align-items: start;
+  display: grid;
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+  margin: 0 auto;
+  width: min(calc(100% - 2rem), 76rem);
+}
+
+.headingBlock {
+  max-width: 34rem;
+}
+
+.eyebrow {
+  color: var(--method-brass);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .2em;
+  margin: 0 0 clamp(1rem, 2vw, 1.5rem);
+  text-transform: uppercase;
+}
+
+.headingBlock h2 {
+  color: inherit;
+  font-family: 'Cormorant Garamond', var(--font-cormorant), Georgia, serif;
+  font-size: clamp(1.85rem, 3.8vw, 2.75rem);
+  font-weight: 400;
+  letter-spacing: -.02em;
+  line-height: 1.08;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.headingBlock h2 em {
+  color: var(--method-brass);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.points {
+  border-top: 1px solid rgba(23, 32, 30, .18);
+  display: grid;
+  gap: clamp(1.1rem, 2.5vw, 1.6rem);
+  list-style: none;
+  margin: 0;
+  padding: clamp(1.25rem, 2.5vw, 1.75rem) 0 0;
+}
+
+.point {
+  align-items: baseline;
+  display: flex;
+  gap: .9rem;
+}
+
+.pointNumber {
+  color: var(--method-brass);
+  flex-shrink: 0;
+  font-family: Georgia, serif;
+  font-size: .72rem;
+}
+
+.pointLabel {
+  color: rgba(23, 32, 30, .82);
+  font-size: .95rem;
+  line-height: 1.5;
+}
+
+@media (min-width: 48rem) {
+  .container {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, .9fr);
+    width: min(calc(100% - 5rem), 76rem);
+  }
+}
+
+@media (min-width: 64rem) {
+  .container { column-gap: clamp(4rem, 7vw, 6rem); }
+}

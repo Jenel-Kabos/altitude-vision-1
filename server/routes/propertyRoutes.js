@@ -38,8 +38,32 @@ const { createPropertyMobile } = require('../controllers/propertyMobileControlle
 const { requireTenantScope, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 const { requireTenantModule } = require('../middleware/tenantModuleGate');
 const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
+const { requireTenantMembershipRoleOrPlatformCapability } = require('../middleware/tenantMembershipRoleOrPlatformCapability');
 const { resolveTenantMembershipIfPresent } = require('../middleware/resolveTenantMembershipIfPresent');
 const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
+
+// PLATFORM-SUPER-ADMIN OPTION-3 SLICE-2 (2026-09-22) — helpers réutilisables
+// pour composer autorité tenant OU capability plateforme sur le domaine
+// properties. tenantRoles varie selon l'endpoint ; platformCapabilities suit
+// la convention read (portfolio, moderation queue) vs manage (create, edit,
+// moderation transitions). Le core requireTenantMembershipRole demeure
+// disponible pour les routes qui doivent rester strictement tenant-only.
+const propertyPortfolioReadAuthority = requireTenantMembershipRoleOrPlatformCapability({
+  tenantRoles: ['Admin', 'GestionnaireImmobilier', 'Collaborateur'],
+  platformCapabilities: ['platform.properties.read', 'platform.properties.manage'],
+});
+const propertyPortfolioManageAuthority = requireTenantMembershipRoleOrPlatformCapability({
+  tenantRoles: ['Admin', 'GestionnaireImmobilier', 'Collaborateur'],
+  platformCapabilities: ['platform.properties.manage'],
+});
+const propertyModerationReadAuthority = requireTenantMembershipRoleOrPlatformCapability({
+  tenantRoles: ['Admin'],
+  platformCapabilities: ['platform.properties.read', 'platform.properties.manage'],
+});
+const propertyModerationManageAuthority = requireTenantMembershipRoleOrPlatformCapability({
+  tenantRoles: ['Admin'],
+  platformCapabilities: ['platform.properties.manage'],
+});
 
 // ── Lot E portfolio (unchanged) ─────────────────────────────────────────────
 const GL_PORTFOLIO_READ = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
@@ -48,7 +72,7 @@ router.get(
   authController.protect,
   requireTenantScope,
   requireTenantModule('immobilier'),
-  requireTenantMembershipRole(...GL_PORTFOLIO_READ),
+  propertyPortfolioReadAuthority,
   propertyPortfolioController.list,
 );
 
@@ -67,7 +91,7 @@ router.post(
   authController.protect,
   requireTenantScope,
   requireTenantModule('immobilier'),
-  requireTenantMembershipRole(...GL_PORTFOLIO_CREATE),
+  propertyPortfolioManageAuthority,
   upload.array('images', 10),
   propertyController.createProperty,
 );
@@ -87,7 +111,7 @@ router.get(
   authController.protect,
   requireTenantScope,
   requireTenantModule('immobilier'),
-  requireTenantMembershipRole('Admin'),
+  propertyModerationReadAuthority,
   propertyController.getPendingProperties,
 );
 router.get(
@@ -95,7 +119,7 @@ router.get(
   authController.protect,
   requireTenantScope,
   requireTenantModule('immobilier'),
-  requireTenantMembershipRole('Admin'),
+  propertyModerationReadAuthority,
   propertyController.getPendingPropertiesCount,
 );
 
@@ -133,7 +157,7 @@ router.patch(
   authController.protect,
   requireTenantScope,
   requireTenantModule('immobilier'),
-  requireTenantMembershipRole('Admin'),
+  propertyModerationManageAuthority,
   propertyController.updatePropertyStatus,
 );
 router.delete(
@@ -141,7 +165,7 @@ router.delete(
   authController.protect,
   requireTenantScope,
   requireTenantModule('immobilier'),
-  requireTenantMembershipRole('Admin'),
+  propertyModerationManageAuthority,
   propertyController.adminDeleteProperty,
 );
 

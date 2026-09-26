@@ -35,7 +35,14 @@ async function fixture() {
   const clientA = await User.create({ name: 'Client A', email: `docwla${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client' });
   const clientB = await User.create({ name: 'Client B', email: `docwlb${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client' });
   const { tenant, bootstrap } = await createTenantFixture({ label: 'Documents whitelist', bootstrap: admin });
-  await Promise.all([admin, clientA, clientB].map((user) => addTenantMember({ tenant, user, bootstrap })));
+  // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-8 PHASE-2A — /api/documents READ
+  // migrated to the compositional PATH A gate; `admin` must have an actual
+  // OrgMembership.businessRole='Admin' in this tenant (User.role alone is
+  // no longer authority — §1). Clients keep no businessRole (they aren't
+  // staff), aligning with tenantDocumentFilter's legacy fallback branch
+  // (tenant=null + createdBy/client scope).
+  await addTenantMember({ tenant, user: admin, bootstrap, businessRole: 'Admin' });
+  await Promise.all([clientA, clientB].map((user) => addTenantMember({ tenant, user, bootstrap })));
   await Document.create({ tenant: tenant._id, type: 'Facture', status: 'Envoyé', client: clientA._id, createdBy: admin._id, items: [{ description: 'x', quantity: 1, unitPrice: 100, total: 100 }] });
   await Document.create({ tenant: tenant._id, type: 'Devis', status: 'Brouillon', client: clientB._id, createdBy: admin._id, items: [{ description: 'y', quantity: 1, unitPrice: 200, total: 200 }] });
   return { admin, clientA, clientB, tenant, adminToken: signToken(admin._id) };

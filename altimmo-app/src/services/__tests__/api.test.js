@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import api, {
-  clearValidatedPlatformTenant, deleteToken, getValidatedPlatformTenant, isAccountDisabledError,
+  clearValidatedPlatformTenant, deleteToken, getTenantEpoch, getValidatedPlatformTenant, isAccountDisabledError,
   normalizeApiError, saveToken, setSessionInvalidatedHandler, setValidatedPlatformTenant,
 } from '../api';
 
@@ -123,6 +123,79 @@ describe('intercepteur de réponse — nettoyage de session', () => {
     await expect(responseRejected()({ message: 'Network Error' })).rejects.toBeTruthy();
     expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
     expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+// TENANT-SWITCH-HARDENING P2-1 — matrice TSH-01..TSH-05.
+describe('P2-1 late-response protection — tenant epoch + stale rejection', () => {
+  const requestFulfilled = () => api.interceptors.request.handlers[0].fulfilled;
+  const responseFulfilled = () => api.interceptors.response.handlers[0].fulfilled;
+
+  afterEach(() => clearValidatedPlatformTenant());
+
+  test('TSH-01 setValidatedPlatformTenant incrémente l\'epoch sur changement effectif', () => {
+    const initial = getTenantEpoch();
+    setValidatedPlatformTenant('A');
+    const afterA = getTenantEpoch();
+    setValidatedPlatformTenant('B');
+    const afterB = getTenantEpoch();
+    expect(afterA).toBe(initial + 1);
+    expect(afterB).toBe(afterA + 1);
+  });
+
+  test('TSH-04 re-set du même tenant ne bump PAS l\'epoch (pas de faux positif)', () => {
+    setValidatedPlatformTenant('A');
+    const beforeReset = getTenantEpoch();
+    setValidatedPlatformTenant('A');
+    expect(getTenantEpoch()).toBe(beforeReset);
+  });
+
+  test('clearValidatedPlatformTenant bump l\'epoch uniquement si un tenant était validé', () => {
+    clearValidatedPlatformTenant();
+    const idleEpoch = getTenantEpoch();
+    clearValidatedPlatformTenant();
+    expect(getTenantEpoch()).toBe(idleEpoch);
+    setValidatedPlatformTenant('A');
+    const withTenant = getTenantEpoch();
+    clearValidatedPlatformTenant();
+    expect(getTenantEpoch()).toBe(withTenant + 1);
+  });
+
+  test('TSH-02 réponse Tenant A tardive après switch B → rejetée STALE_TENANT_RESPONSE', async () => {
+    SecureStore.getItemAsync.mockResolvedValueOnce('some-token');
+    setValidatedPlatformTenant('tenant-a');
+    const config = await requestFulfilled()({ headers: {} });
+    expect(config.__tenantEpochAtSend).toBeDefined();
+    expect(config.__tenantAtSend).toBe('tenant-a');
+    setValidatedPlatformTenant('tenant-b');
+    const response = { status: 200, config, data: { leak: 'tenant-a data' } };
+    await expect(responseFulfilled()(response)).rejects.toMatchObject({
+      code: 'STALE_TENANT_RESPONSE',
+      isStaleTenant: true,
+    });
+  });
+
+  test('TSH-05 réponse Tenant A avant switch → livrée normalement', async () => {
+    SecureStore.getItemAsync.mockResolvedValueOnce('some-token');
+    setValidatedPlatformTenant('tenant-a');
+    const config = await requestFulfilled()({ headers: {} });
+    const response = { status: 200, config, data: { ok: true } };
+    // L'intercepteur retourne la réponse synchroniquement quand elle est
+    // fresh (pas de stale) — pas une Promise. On l'invoque directement.
+    expect(responseFulfilled()(response)).toBe(response);
+  });
+
+  test('TSH-03 requête sans tenant validé → aucun snapshot, réponse toujours livrée', async () => {
+    SecureStore.getItemAsync.mockResolvedValueOnce('some-token');
+    clearValidatedPlatformTenant();
+    const config = await requestFulfilled()({ headers: {} });
+    expect(config.__tenantEpochAtSend).toBeUndefined();
+    expect(config.__tenantAtSend).toBeUndefined();
+    // Simuler un switch tenant survenu entre-temps : n'affecte pas les
+    // requêtes hors contexte tenant (publics/globaux).
+    setValidatedPlatformTenant('tenant-b');
+    const response = { status: 200, config, data: { public: true } };
+    expect(responseFulfilled()(response)).toBe(response);
   });
 });
 

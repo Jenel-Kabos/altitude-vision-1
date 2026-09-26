@@ -66,7 +66,10 @@ beforeEach(async () => {
   ownerExt = await makeUser({ role: 'Proprietaire' });
   providerExt = await makeUser({ role: 'Prestataire' });
   opGlobal = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opGlobal._id, actor: bA, reason: 'fixture', capabilities: ['platform.support.read', 'platform.users.manage'] });
+  // PLATFORM-SUPER-ADMIN OPTION-3 : MEMAPI-17 vérifie qu'un PlatformOperator
+  // SANS platform.users.manage reste refusé. La capability platform.support.read
+  // seule ne peut pas administrer les membres — invariant capability-specific.
+  await grantOperator({ userId: opGlobal._id, actor: bA, reason: 'fixture', capabilities: ['platform.support.read'] });
 });
 
 describe('MEMAPI — listing', () => {
@@ -218,7 +221,13 @@ describe('MEMAPI — forgery + authority', () => {
     expect(res.status).toBe(403);
   });
 
-  test('MEMAPI-17: PlatformOperator without membership denied on mutation', async () => {
+  test('MEMAPI-17: PlatformOperator sans platform.users.manage refusé sur mutation (invariant capability-specific)', async () => {
+    // PLATFORM-SUPER-ADMIN OPTION-3 : un PlatformOperator actif MAIS sans la
+    // capability platform.users.manage ne peut jamais muter les membres,
+    // même s'il détient d'autres capabilities plateforme (ici support.read).
+    // Prouve que Option 3 ne dégénère jamais en bypass générique — l'autorité
+    // reste rigoureusement capability-specific. Voir platformMemberAdministration
+    // pour la matrice complète P-MEMBER-01..16.
     const res = await request(app).delete(`/api/members/${(await OrgMembership.findOne({ user: collabA._id, orgUnit: tA.rootOrgUnit }))._id}`)
       .set(bearer(opGlobal, tA._id));
     expect(res.status).toBe(403);

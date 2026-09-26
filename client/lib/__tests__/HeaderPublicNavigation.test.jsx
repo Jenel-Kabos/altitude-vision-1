@@ -23,6 +23,15 @@ vi.mock('../components/messaging/UnreadMessagesBadge', () => ({ default: () => n
 vi.mock('../components/notifications/NotificationBell', () => ({ default: () => null }));
 
 describe('Header — menu déroulant Altimmo', () => {
+  test('WEB01-APP-01 : propose de découvrir l’application, sans téléchargement non vérifié', () => {
+    render(<Header />);
+    fireEvent.click(screen.getByRole('button', { name: /Altimmo/i }));
+    const appLink = screen.getByRole('link', { name: /App Altimmo/i });
+    expect(appLink).toHaveTextContent('Découvrir l’application');
+    expect(appLink).not.toHaveTextContent(/télécharger|app store|play store/i);
+    expect(appLink).toHaveAttribute('href', '/altimmo/application');
+  });
+
   test('propose Immobilier en premier, puis Acheter/Louer/Séjourner/App Altimmo', () => {
     render(<Header />);
     fireEvent.click(screen.getByRole('button', { name: /Altimmo/i }));

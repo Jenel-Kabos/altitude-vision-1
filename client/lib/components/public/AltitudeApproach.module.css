@@ -1,0 +1,168 @@
+.section {
+  --approach-ink: #17201e;
+  --approach-ivory: #f7f3ea;
+  --approach-brass: #ae8540;
+  background: var(--approach-ink);
+  color: var(--approach-ivory);
+  padding: clamp(3.25rem, 6vw, 6rem) 0;
+}
+
+.container {
+  display: grid;
+  gap: clamp(1.5rem, 3.5vw, 3rem);
+  margin: 0 auto;
+  width: min(calc(100% - 2rem), 76rem);
+}
+
+.headingBlock {
+  max-width: 42rem;
+}
+
+.eyebrow {
+  color: var(--approach-brass);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .2em;
+  margin: 0 0 clamp(1rem, 2vw, 1.75rem);
+  text-transform: uppercase;
+}
+
+.headingBlock h2 {
+  color: inherit;
+  font-family: 'Cormorant Garamond', var(--font-cormorant), Georgia, serif;
+  font-size: clamp(2.35rem, 5.6vw, 4.4rem);
+  font-weight: 400;
+  letter-spacing: -.03em;
+  line-height: .98;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.headingBlock h2 em {
+  color: var(--approach-brass);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.lede {
+  color: rgba(247, 243, 234, .74);
+  font-size: clamp(.95rem, 1.5vw, 1.08rem);
+  line-height: 1.7;
+  margin: clamp(1.25rem, 2.5vw, 2rem) 0 0;
+  max-width: 36rem;
+}
+
+.fieldPanel {
+  border-top: 1px solid rgba(247, 243, 234, .22);
+  padding-top: clamp(1.25rem, 2vw, 1.75rem);
+}
+
+.fieldPanelKicker {
+  color: var(--approach-brass);
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  margin: 0 0 .75rem;
+  text-transform: uppercase;
+}
+
+.fieldPanelText {
+  color: rgba(247, 243, 234, .74);
+  font-size: .95rem;
+  line-height: 1.65;
+  margin: 0;
+  max-width: 32rem;
+}
+
+.principles {
+  border-top: 1px solid rgba(247, 243, 234, .22);
+  display: grid;
+  gap: clamp(1rem, 2vw, 1.5rem);
+  list-style: none;
+  margin: 0;
+  padding: clamp(1.25rem, 2.5vw, 2rem) 0 0;
+}
+
+.principle {
+  align-items: baseline;
+  display: flex;
+  gap: 1rem;
+}
+
+.principleNumber {
+  color: var(--approach-brass);
+  font-family: Georgia, serif;
+  font-size: .75rem;
+  flex-shrink: 0;
+}
+
+.principleLabel {
+  font-family: 'Cormorant Garamond', var(--font-cormorant), Georgia, serif;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.footerRow {
+  align-items: flex-start;
+  border-top: 1px solid rgba(247, 243, 234, .22);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding-top: clamp(1.25rem, 2.5vw, 2rem);
+}
+
+.footerRow p {
+  color: rgba(247, 243, 234, .58);
+  font-family: 'Cormorant Garamond', var(--font-cormorant), Georgia, serif;
+  font-size: clamp(1.2rem, 2.2vw, 1.6rem);
+  margin: 0;
+}
+
+.primaryLink {
+  align-items: center;
+  border: 1px solid var(--approach-brass);
+  color: var(--approach-ivory);
+  display: inline-flex;
+  font-size: .73rem;
+  font-weight: 700;
+  gap: 1.25rem;
+  justify-content: space-between;
+  letter-spacing: .08em;
+  min-height: 3.25rem;
+  padding: .85rem 1.15rem;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.primaryLink:hover,
+.primaryLink:focus-visible {
+  background: var(--approach-brass);
+  color: var(--approach-ink);
+}
+
+.primaryLink:focus-visible {
+  outline: 2px solid var(--approach-ivory);
+  outline-offset: 4px;
+}
+
+@media (min-width: 48rem) {
+  .container {
+    grid-template-columns: minmax(0, 1.3fr) minmax(16rem, .7fr);
+    width: min(calc(100% - 5rem), 76rem);
+  }
+
+  .headingBlock { grid-column: 1; }
+  .fieldPanel { align-self: end; border-top: none; border-left: 1px solid rgba(247, 243, 234, .22); grid-column: 2; grid-row: 1; padding-left: clamp(2rem, 4vw, 3rem); padding-top: 0; }
+  .principles { grid-column: 1 / -1; grid-template-columns: repeat(3, 1fr); }
+  .footerRow { align-items: center; flex-direction: row; grid-column: 1 / -1; justify-content: space-between; }
+}
+
+@media (min-width: 64rem) {
+  .container { column-gap: clamp(4rem, 7vw, 7rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryLink { transition: none; }
+}

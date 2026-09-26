@@ -1,6 +1,7 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { sendContactMessage } from '../services/contactService';
 import {
   MapPin, Mail, Phone, Send, Loader2, CheckCircle,
   AlertTriangle, MessageSquare, User, FileText, Navigation,
@@ -26,6 +27,7 @@ const Toast = ({ msg, type, onDone }) => {
 
   return (
     <motion.div
+      role="status"
       initial={{ opacity: 0, y: -48, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -48, scale: 0.96 }}
@@ -44,9 +46,9 @@ const Toast = ({ msg, type, onDone }) => {
 };
 
 // ─── Input Field ──────────────────────────────────────────────
-const Field = ({ label, icon: Icon, accent = BLUE, children }) => (
+const Field = ({ id, label, icon: Icon, accent = BLUE, children }) => (
   <div className="space-y-1.5">
-    <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
+    <label htmlFor={id} className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
       style={{ color: accent, fontFamily: "var(--font-dm-sans), sans-serif" }}>
       <Icon size={12} />
       {label} <span style={{ color: RED }}>*</span>
@@ -88,6 +90,13 @@ const ContactPage = () => {
   const [status,   setStatus]   = useState('idle');
   const [toast,    setToast]    = useState(null);
   const [focused,  setFocused]  = useState(null);
+  const [error, setError] = useState(null);
+  const pendingRef = useRef(false);
+  const errorRef = useRef(null);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   const showToast = (msg, type = 'success') => setToast({ msg, type });
 
@@ -106,22 +115,34 @@ const ContactPage = () => {
     transition: 'all 0.2s',
   });
 
-  const handleSubmit = async () => {
-    if (!formData.name || !formData.email || !formData.subject || !formData.message) {
-      showToast('Veuillez remplir tous les champs obligatoires.', 'error');
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (pendingRef.current) return;
+    const messageData = Object.fromEntries(Object.entries(formData).map(([key, value]) => [key, value.trim()]));
+    setToast(null);
+    if (Object.values(messageData).some(value => !value)) {
+      setError('Veuillez remplir tous les champs obligatoires.');
       return;
     }
+    pendingRef.current = true;
+    setError(null);
     setStatus('sending');
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const response = await sendContactMessage(messageData);
+      if (response?.status !== 'success') {
+        setStatus('error');
+        setError(typeof response?.message === 'string' ? response.message : 'Envoi non confirmé. Veuillez réessayer.');
+        return;
+      }
       setStatus('success');
       showToast('Message envoyé ! Nous vous répondrons très bientôt.');
       setFormData({ name: '', email: '', subject: '', message: '' });
-    } catch {
+    } catch (requestError) {
       setStatus('error');
-      showToast('Une erreur est survenue. Veuillez réessayer.', 'error');
+      const serverMessage = requestError.response?.data?.message;
+      setError(typeof serverMessage === 'string' ? serverMessage : 'Une erreur est survenue. Veuillez réessayer.');
     } finally {
-      setTimeout(() => setStatus('idle'), 2000);
+      pendingRef.current = false;
     }
   };
 
@@ -197,7 +218,9 @@ const ContactPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
           {/* ── Formulaire ───────────────────────────────────── */}
-          <motion.div initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }}
+          <motion.form onSubmit={handleSubmit} aria-labelledby="contact-form-title"
+            aria-busy={status === 'sending'}
+            initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
             className="lg:col-span-3 rounded-3xl p-8 space-y-6"
             style={{ background: '#161B22', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -208,23 +231,25 @@ const ContactPage = () => {
                 style={{ background: `${BLUE}20` }}>
                 <Send size={16} style={{ color: BLUE }} />
               </div>
-              <h2 className="text-xl font-bold text-white"
+              <h2 id="contact-form-title" className="text-xl font-bold text-white"
                 style={{ fontFamily: "var(--font-cormorant), serif" }}>
                 Envoyez-nous un message
               </h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <Field label="Votre nom" icon={User} accent={BLUE}>
-                <input type="text" name="name" value={formData.name} onChange={handleChange}
+              <Field id="contact-name" label="Votre nom" icon={User} accent={BLUE}>
+                <input id="contact-name" type="text" name="name" value={formData.name} onChange={handleChange}
+                  required disabled={status === 'sending'} aria-describedby={error ? 'contact-error' : undefined}
                   placeholder="Jean Dupont"
                   onFocus={() => setFocused('name')} onBlur={() => setFocused(null)}
                   className="w-full px-4 py-3 text-sm text-gray-900 outline-none"
                   style={inputStyle('name')} />
               </Field>
 
-              <Field label="Votre email" icon={Mail} accent={BLUE}>
-                <input type="email" name="email" value={formData.email} onChange={handleChange}
+              <Field id="contact-email" label="Votre email" icon={Mail} accent={BLUE}>
+                <input id="contact-email" type="email" name="email" value={formData.email} onChange={handleChange}
+                  required disabled={status === 'sending'} aria-describedby={error ? 'contact-error' : undefined}
                   placeholder="jean@email.com"
                   onFocus={() => setFocused('email')} onBlur={() => setFocused(null)}
                   className="w-full px-4 py-3 text-sm text-gray-900 outline-none"
@@ -232,16 +257,18 @@ const ContactPage = () => {
               </Field>
             </div>
 
-            <Field label="Sujet" icon={FileText} accent={GOLD}>
-              <input type="text" name="subject" value={formData.subject} onChange={handleChange}
+            <Field id="contact-subject" label="Sujet" icon={FileText} accent={GOLD}>
+              <input id="contact-subject" type="text" name="subject" value={formData.subject} onChange={handleChange}
+                required disabled={status === 'sending'} aria-describedby={error ? 'contact-error' : undefined}
                 placeholder="Ex : Demande de devis pour un événement"
                 onFocus={() => setFocused('subject')} onBlur={() => setFocused(null)}
                 className="w-full px-4 py-3 text-sm text-gray-900 outline-none"
                 style={inputStyle('subject')} />
             </Field>
 
-            <Field label="Votre message" icon={MessageSquare} accent={GOLD}>
-              <textarea name="message" value={formData.message} onChange={handleChange}
+            <Field id="contact-message" label="Votre message" icon={MessageSquare} accent={GOLD}>
+              <textarea id="contact-message" name="message" value={formData.message} onChange={handleChange}
+                required maxLength={2000} disabled={status === 'sending'} aria-describedby={error ? 'contact-error' : undefined}
                 placeholder="Décrivez votre projet ou votre demande en détail…"
                 rows={6}
                 onFocus={() => setFocused('message')} onBlur={() => setFocused(null)}
@@ -249,7 +276,13 @@ const ContactPage = () => {
                 style={inputStyle('message')} />
             </Field>
 
-            <button onClick={handleSubmit} disabled={status === 'sending'}
+            {error && (
+              <p id="contact-error" ref={errorRef} role="alert" tabIndex={-1} className="text-sm text-red-400">
+                {error}
+              </p>
+            )}
+
+            <button type="submit" disabled={status === 'sending'}
               className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl text-white font-semibold text-sm transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: `linear-gradient(135deg, #1A5A8A, ${BLUE})`,
@@ -262,7 +295,7 @@ const ContactPage = () => {
                 <><Send size={16} /> Envoyer le message</>
               )}
             </button>
-          </motion.div>
+          </motion.form>
 
           {/* ── Infos + Carte ─────────────────────────────────── */}
           <div className="lg:col-span-2 flex flex-col gap-5">

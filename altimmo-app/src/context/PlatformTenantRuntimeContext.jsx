@@ -3,6 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth } from './AuthContext';
 import { getMyOperatorStatus, listTenants } from '../services/platformTenantService';
 import { clearValidatedPlatformTenant, setValidatedPlatformTenant } from '../services/api';
+import { cache } from '../services/cacheService';
+import { reconnectSocketForTenantChange } from '../services/socketService';
 
 // SYNC-2A — même contrat que client/lib/context/PlatformTenantRuntimeContext.jsx
 // (AUTH-1.1), adapté aux primitives Mobile (SecureStore au lieu de
@@ -90,6 +92,8 @@ export function PlatformTenantRuntimeProvider({ children }) {
   const selectTenant = useCallback((tenantId) => {
     const userId = userIdOf(user);
     const validId = tenantId && state.tenants.some((tenant) => String(tenant._id) === String(tenantId)) ? String(tenantId) : null;
+    const previousId = state.selectedTenantId;
+    const changed = String(previousId || '') !== String(validId || '');
     if (validId) {
       writePersistedSelection(userId, validId);
       setValidatedPlatformTenant(validId);
@@ -97,8 +101,22 @@ export function PlatformTenantRuntimeProvider({ children }) {
       writePersistedSelection(null, null);
       clearValidatedPlatformTenant();
     }
+    // TENANT-SWITCH-HARDENING P2-1 + P2-2 (2026-09-25) — Sur un changement
+    // effectif du tenant sélectionné :
+    //   (a) cache mémoire tenant-scopé purgé (annonces, carte, publicités,
+    //       recommandations, visites) — aucune donnée A ne peut être
+    //       présentée sous B via cacheService ;
+    //   (b) socket WebSocket ré-authentifiée sous le nouveau tenant — sans
+    //       cela, la socket ouverte reste bloquée sur l'ancien handshake
+    //       platformTenantId (voir reconnectSocketForTenantChange).
+    // P2-1 axios stale-response guard (api.js) reste actif pour toute
+    // requête pending au moment du switch, indépendamment de ce clear.
+    if (changed) {
+      cache.clear();
+      reconnectSocketForTenantChange().catch(() => { /* échec de reconnexion : voir gestion offline documentée */ });
+    }
     setState((current) => ({ ...current, selectedTenantId: validId }));
-  }, [state.tenants, user]);
+  }, [state.tenants, state.selectedTenantId, user]);
 
   const value = useMemo(() => ({
     tenantLoading: authLoading || state.loading,

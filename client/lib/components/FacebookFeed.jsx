@@ -1,184 +1,138 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Image from 'next/image';
-import { motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ExternalLink, Loader2, Newspaper, AlertCircle } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
+import { MotionImageReveal, MotionReveal, MotionStagger, MotionStaggerItem } from "./public/PublicMotion";
+import styles from "./FacebookFeed.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://altitude-vision.onrender.com/api";
+const FACEBOOK_URL = "https://www.facebook.com/profile.php?id=61558493665509";
+const INSTAGRAM_URL = "https://www.instagram.com/immoaltitudevision/";
+const MAX_POSTS = 3;
+const REQUEST_TIMEOUT_MS = 5000;
+
+const UNIVERSES = [
+  { name: "Altimmo", description: "Immobilier & hébergement", tone: "altimmo" },
+  { name: "Altcom", description: "Communication & création", tone: "altcom" },
+  { name: "Mila Events", description: "Événementiel & expériences", tone: "mila" },
+];
+
+const isPublicPost = (post) => {
+  const status = String(post?.status || "").toLowerCase();
+  const visibility = String(post?.visibility || "").toLowerCase();
+  return !["draft", "private", "unpublished", "rejected"].includes(status)
+    && !["private", "tenant", "admin"].includes(visibility);
+};
+
+const formatDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+};
+
+const excerpt = (text, max = 170) => {
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max).trim()}…` : text;
+};
+
+function EditorialHeader() {
+  return (
+    <MotionReveal className={styles.header} testId="motion-publications">
+      <p className={styles.eyebrow}>Altitude Vision — En mouvement</p>
+      <h2 id="publications-title">En ce moment chez Altitude Vision.</h2>
+      <p className={styles.lede}>Projets, coulisses, conseils et actualités&nbsp;: suivez ce qui anime nos trois univers.</p>
+    </MotionReveal>
+  );
+}
+
+function EditorialFallback() {
+  return (
+    <MotionReveal className={styles.fallback} testId="publications-fallback">
+      <p className={styles.fallbackCopy}>Retrouvez nos actualités, nos coulisses et les projets de nos trois univers sur nos réseaux.</p>
+      <div className={styles.universes}>
+        {UNIVERSES.map((universe) => (
+          <div className={`${styles.universe} ${styles[universe.tone]}`} key={universe.name}>
+            <strong>{universe.name}</strong>
+            <span>{universe.description}</span>
+          </div>
+        ))}
+      </div>
+      <div className={styles.fallbackActions}>
+        <Link className={styles.primaryLink} href="/actualites">Découvrir nos actualités <ArrowRight aria-hidden="true" size={16} /></Link>
+        <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer">Nous suivre sur Facebook <ExternalLink aria-hidden="true" size={14} /></a>
+        <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer">Nous suivre sur Instagram <ExternalLink aria-hidden="true" size={14} /></a>
+      </div>
+    </MotionReveal>
+  );
+}
+
+function PublicationCard({ post }) {
+  const message = excerpt(post.message);
+  const date = formatDate(post.date_publication);
+  const label = post.page_name || "Altitude Vision";
+
+  return (
+    <MotionStaggerItem as="article" className={styles.card} data-testid="publication-card">
+      {post.image ? (
+        <MotionImageReveal className={styles.media}>
+          <Image src={post.image} alt={message || `Publication de ${label}`} fill sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 33vw" className={styles.image} />
+        </MotionImageReveal>
+      ) : (
+        <div className={styles.mediaFallback} data-testid="publication-image-fallback" aria-hidden="true"><span>Altitude Vision</span></div>
+      )}
+      <div className={styles.cardBody}>
+        <div className={styles.meta}>
+          {post.page_name && <span>{post.page_name}</span>}
+          {date && <time dateTime={post.date_publication}>{date}</time>}
+        </div>
+        {message && <p>{message}</p>}
+        {post.permalink && <a href={post.permalink} target="_blank" rel="noopener noreferrer">Voir la publication <ExternalLink aria-hidden="true" size={14} /></a>}
+      </div>
+    </MotionStaggerItem>
+  );
+}
 
 const FacebookFeed = () => {
-  const [posts,     setPosts]     = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError,  setHasError]  = useState(false);
+  const [state, setState] = useState("loading");
+  const [posts, setPosts] = useState([]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     const fetchPosts = async () => {
       try {
-        const res  = await fetch(`${API_URL}/facebook-posts/recent`);
-        const data = await res.json();
-        if (data.success) setPosts(data.data);
-        else setHasError(true);
+        const response = await fetch(`${API_URL}/facebook-posts/recent`, { signal: controller.signal });
+        if (!response.ok) throw new Error("Publications request failed");
+        const payload = await response.json();
+        if (!payload?.success || !Array.isArray(payload.data)) throw new Error("Invalid publications response");
+        const publicPosts = payload.data.filter(isPublicPost).slice(0, MAX_POSTS);
+        setPosts(publicPosts);
+        setState(publicPosts.length ? "success" : "fallback");
       } catch {
-        setHasError(true);
+        setState("fallback");
       } finally {
-        setIsLoading(false);
+        window.clearTimeout(timeoutId);
       }
     };
     fetchPosts();
+    return () => { window.clearTimeout(timeoutId); controller.abort(); };
   }, []);
 
-  const formatDate = (dateStr) =>
-    new Date(dateStr).toLocaleDateString("fr-FR", {
-      day: "numeric", month: "long", year: "numeric",
-    });
-
-  const truncate = (text, max = 120) => {
-    if (!text) return "";
-    return text.length > max ? text.slice(0, max) + "…" : text;
-  };
-
   return (
-    <section className="py-16 sm:py-20 relative bg-surface">
-
-      {/* Ligne séparation */}
-      <div className="absolute top-0 left-0 right-0 h-px"
-        style={{ background: 'linear-gradient(to right, transparent, rgba(46,123,181,0.15), transparent)' }} />
-
-      <div className="container mx-auto px-4 sm:px-6 max-w-6xl">
-
-        {/* En-tête */}
-        <div className="text-center mb-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <p className="text-xs font-bold uppercase tracking-widest mb-2 text-gold font-body">
-              Actualités
-            </p>
-            <h2 className="font-display-alt font-light text-ink text-[clamp(1.8rem,4vw,3.5rem)] leading-tight mb-3">
-              Nos Dernières Publications
-            </h2>
-            <div className="h-px w-20 mx-auto rounded-full"
-              style={{ background: 'linear-gradient(to right, transparent, #C8960C, transparent)' }} />
-          </motion.div>
-        </div>
-
-        {/* Loading */}
-        {isLoading && (
-          <div className="flex justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-gold" />
-          </div>
-        )}
-
-        {/* Erreur */}
-        {!isLoading && hasError && (
-          <div className="text-center py-12 rounded-2xl border border-dashed border-gray-200 bg-white">
-            <AlertCircle className="w-8 h-8 mx-auto mb-3 text-gray-300" />
-            <p className="text-sm text-ink-soft font-body">
-              Publications temporairement indisponibles
-            </p>
-          </div>
-        )}
-
-        {/* Grille de posts */}
-        {!isLoading && !hasError && posts.length > 0 && (
+    <section aria-labelledby="publications-title" className={styles.section} data-testid="publications-editorial">
+      <div className={styles.container}>
+        <EditorialHeader />
+        {state === "loading" && <div className={styles.loading} role="status" aria-label="Chargement des publications"><span /><span /><span /></div>}
+        {state === "success" && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-              {posts.slice(0, 6).map((post, index) => (
-                <motion.article
-                  key={post._id}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: index * 0.08 }}
-                  className="group overflow-hidden rounded-2xl border border-gray-100 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-gray-200"
-                >
-                  {/* Image */}
-                  {post.image && (
-                    <div className="relative h-48 overflow-hidden">
-                      <Image
-                        src={post.image}
-                        alt={post.message?.substring(0, 80) || 'Publication Facebook'}
-                        fill
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                        className="object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                    </div>
-                  )}
-
-                  {/* Contenu */}
-                  <div className="p-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      {/* Badge Facebook */}
-                      <div className="w-6 h-6 rounded-full bg-[#1877F2] flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                        <span className="text-white text-xs font-bold">f</span>
-                      </div>
-                      <span className="text-xs font-medium truncate text-ink-soft font-body">
-                        {post.page_name}
-                      </span>
-                      <span className="text-xs ml-auto whitespace-nowrap text-ink-faint font-body">
-                        {formatDate(post.date_publication)}
-                      </span>
-                    </div>
-
-                    <p className="text-sm leading-relaxed mb-4 text-ink-mid font-body">
-                      {truncate(post.message)}
-                    </p>
-
-                    {post.permalink && (
-                      <a
-                        href={post.permalink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-gold hover:text-gold-dark transition-colors font-body"
-                        aria-label={`Voir la publication de ${post.page_name} sur Facebook`}
-                      >
-                        Voir sur Facebook
-                        <ExternalLink className="w-3 h-3" aria-hidden="true" />
-                      </a>
-                    )}
-                  </div>
-                </motion.article>
-              ))}
-            </div>
-
-            {/* CTA */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="text-center mt-10"
-            >
-              <Link
-                href="/actualites"
-                className="inline-flex items-center gap-2 font-semibold px-8 py-3.5 rounded-full bg-gold hover:bg-gold-light text-dark transition-all duration-300 hover:-translate-y-0.5 font-body text-sm"
-                style={{ boxShadow: '0 4px 20px rgba(200,150,12,0.22)' }}
-              >
-                Voir toutes les actualités
-                <ArrowRight className="w-4 h-4" aria-hidden="true" />
-              </Link>
-            </motion.div>
+            <MotionStagger className={styles.grid}>{posts.map((post) => <PublicationCard key={post._id || post.facebook_id} post={post} />)}</MotionStagger>
+            <MotionReveal className={styles.newsAction}><Link href="/actualites">Découvrir toutes nos actualités <ArrowRight aria-hidden="true" size={16} /></Link></MotionReveal>
           </>
         )}
-
-        {/* Aucun post */}
-        {!isLoading && !hasError && posts.length === 0 && (
-          <div className="text-center py-16 rounded-2xl border border-dashed border-gold/20 bg-gold-subtle">
-            <Newspaper className="w-10 h-10 mx-auto mb-3 text-gold/30" />
-            <p className="font-medium text-ink-soft mb-1 font-body">
-              Aucune actualité disponible
-            </p>
-            <p className="text-sm text-ink-faint font-body">
-              Les publications apparaîtront ici automatiquement
-            </p>
-          </div>
-        )}
+        {state === "fallback" && <EditorialFallback />}
       </div>
     </section>
   );

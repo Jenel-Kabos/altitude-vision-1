@@ -18,8 +18,31 @@ export const setSessionInvalidatedHandler = (handler) => {
 // courant (voir PlatformTenantRuntimeContext.jsx). Jamais une valeur brute
 // lue directement d'un stockage persistant.
 let _validatedPlatformTenantId = null;
-export const setValidatedPlatformTenant = (tenantId) => { _validatedPlatformTenantId = tenantId || null; };
-export const clearValidatedPlatformTenant = () => { _validatedPlatformTenantId = null; };
+
+// TENANT-SWITCH-HARDENING P2-1 (2026-09-25) — Late-response protection.
+// Chaque changement effectif du tenant validé incrémente une génération
+// (`_tenantEpoch`). L'intercepteur de requête colle un snapshot de cette
+// génération sur le config, et l'intercepteur de réponse rejette toute
+// réponse dont la génération diverge de la valeur courante. Une réponse
+// obtenue sous Tenant A ne peut donc plus repeupler l'interface après un
+// switch vers Tenant B — indépendamment de tout refetch au niveau écran.
+// Backend inchangé : c'est un renforcement client uniquement.
+let _tenantEpoch = 0;
+export const getTenantEpoch = () => _tenantEpoch;
+
+export const setValidatedPlatformTenant = (tenantId) => {
+  const next = tenantId || null;
+  if (_validatedPlatformTenantId !== next) {
+    _validatedPlatformTenantId = next;
+    _tenantEpoch += 1;
+  }
+};
+export const clearValidatedPlatformTenant = () => {
+  if (_validatedPlatformTenantId !== null) {
+    _validatedPlatformTenantId = null;
+    _tenantEpoch += 1;
+  }
+};
 export const getValidatedPlatformTenant = () => _validatedPlatformTenantId;
 
 // SYNC-2A — codes structurés distinguant un compte devenu inutilisable
@@ -63,14 +86,41 @@ api.interceptors.request.use(
   async (config) => {
     const token = await getToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
-    if (_validatedPlatformTenantId) config.headers['X-Platform-Tenant-Id'] = _validatedPlatformTenantId;
+    if (_validatedPlatformTenantId) {
+      config.headers['X-Platform-Tenant-Id'] = _validatedPlatformTenantId;
+      // Snapshot pour la détection stale-response — voir P2-1.
+      config.__tenantAtSend = _validatedPlatformTenantId;
+      config.__tenantEpochAtSend = _tenantEpoch;
+    }
     return config;
   },
   (error) => Promise.reject(error),
 );
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // TENANT-SWITCH-HARDENING P2-1 — Si la génération tenant a changé entre
+    // le départ et l'arrivée de la réponse, la réponse est considérée
+    // périmée (« stale ») : elle ne doit jamais être livrée à l'écran
+    // courant, qui affiche désormais le contexte d'un autre tenant.
+    const cfg = response?.config;
+    if (cfg && cfg.__tenantEpochAtSend !== undefined && cfg.__tenantEpochAtSend !== _tenantEpoch) {
+      const staleError = new Error('Réponse liée à un contexte tenant révolu.');
+      staleError.code = 'STALE_TENANT_RESPONSE';
+      staleError.isStaleTenant = true;
+      staleError.normalized = {
+        code: 'STALE_TENANT_RESPONSE',
+        status: response.status ?? null,
+        message: 'Le contexte tenant a changé pendant la requête.',
+        serverMessage: null,
+        isNetworkError: false,
+        isTimeout: false,
+        retryable: false,
+      };
+      return Promise.reject(staleError);
+    }
+    return response;
+  },
   async (error) => {
     // 401 : session/authentification invalide (token expiré/invalide,
     // tokenVersion révoqué, mot de passe changé) — toujours un nettoyage

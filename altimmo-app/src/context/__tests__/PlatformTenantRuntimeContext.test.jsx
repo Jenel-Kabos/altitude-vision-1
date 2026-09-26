@@ -23,6 +23,24 @@ jest.mock('../../services/api', () => ({
   clearValidatedPlatformTenant: (...args) => mockClearValidatedPlatformTenant(...args),
 }));
 
+const mockCacheClear = jest.fn();
+jest.mock('../../services/cacheService', () => ({
+  cache: {
+    get: jest.fn(() => null),
+    set: jest.fn(),
+    invalidate: jest.fn(),
+    clear: (...args) => mockCacheClear(...args),
+    purgeExpired: jest.fn(),
+    count: jest.fn(() => 0),
+    countByPrefix: jest.fn(() => 0),
+  },
+}));
+
+const mockReconnectSocketForTenantChange = jest.fn().mockResolvedValue(null);
+jest.mock('../../services/socketService', () => ({
+  reconnectSocketForTenantChange: (...args) => mockReconnectSocketForTenantChange(...args),
+}));
+
 import { PlatformTenantRuntimeProvider, usePlatformTenantRuntime } from '../PlatformTenantRuntimeContext';
 
 function Harness({ onSelect }) {
@@ -131,5 +149,77 @@ describe('PlatformTenantRuntimeProvider', () => {
     mockUser = null;
     rerender(<PlatformTenantRuntimeProvider><Harness /></PlatformTenantRuntimeProvider>);
     await waitFor(() => expect(mockClearValidatedPlatformTenant).toHaveBeenCalled());
+  });
+
+  // TENANT-SWITCH-HARDENING P2-1 + P2-2 — matrice TSH-08..TSH-10.
+  describe('P2-1 + P2-2 tenant switch side-effects', () => {
+    beforeEach(() => {
+      mockCacheClear.mockClear();
+      mockReconnectSocketForTenantChange.mockClear();
+    });
+
+    test('TSH-08 selectTenant B alors que A actif → cache.clear() ET reconnectSocketForTenantChange() appelés', async () => {
+      mockGetMyOperatorStatus.mockResolvedValue({ status: 'active' });
+      mockListTenants.mockResolvedValue([{ _id: 'tenant-a' }, { _id: 'tenant-b' }]);
+      SecureStore.getItemAsync.mockResolvedValue(JSON.stringify({ userId: 'admin-1', tenantId: 'tenant-a' }));
+      let select;
+      const screen = render(
+        <PlatformTenantRuntimeProvider>
+          <Harness onSelect={(fn) => { select = fn; return null; }} />
+        </PlatformTenantRuntimeProvider>,
+      );
+      await waitFor(() => expect(screen.getByTestId('selected').props.children).toBe('tenant-a'));
+      mockCacheClear.mockClear();
+      mockReconnectSocketForTenantChange.mockClear();
+
+      await act(async () => select('tenant-b'));
+
+      expect(screen.getByTestId('selected').props.children).toBe('tenant-b');
+      expect(mockSetValidatedPlatformTenant).toHaveBeenCalledWith('tenant-b');
+      expect(mockCacheClear).toHaveBeenCalledTimes(1);
+      expect(mockReconnectSocketForTenantChange).toHaveBeenCalledTimes(1);
+    });
+
+    test('TSH-09 selectTenant A alors que A déjà actif → cache.clear et socket reconnect NON appelés (pas de changement)', async () => {
+      mockGetMyOperatorStatus.mockResolvedValue({ status: 'active' });
+      mockListTenants.mockResolvedValue([{ _id: 'tenant-a' }]);
+      SecureStore.getItemAsync.mockResolvedValue(JSON.stringify({ userId: 'admin-1', tenantId: 'tenant-a' }));
+      let select;
+      const screen = render(
+        <PlatformTenantRuntimeProvider>
+          <Harness onSelect={(fn) => { select = fn; return null; }} />
+        </PlatformTenantRuntimeProvider>,
+      );
+      await waitFor(() => expect(screen.getByTestId('selected').props.children).toBe('tenant-a'));
+      mockCacheClear.mockClear();
+      mockReconnectSocketForTenantChange.mockClear();
+
+      await act(async () => select('tenant-a'));
+
+      expect(mockCacheClear).not.toHaveBeenCalled();
+      expect(mockReconnectSocketForTenantChange).not.toHaveBeenCalled();
+    });
+
+    test('TSH-10 selectTenant(null) alors que A actif → cache.clear() ET socket reconnect appelés (transition A→none)', async () => {
+      mockGetMyOperatorStatus.mockResolvedValue({ status: 'active' });
+      mockListTenants.mockResolvedValue([{ _id: 'tenant-a' }]);
+      SecureStore.getItemAsync.mockResolvedValue(JSON.stringify({ userId: 'admin-1', tenantId: 'tenant-a' }));
+      let select;
+      const screen = render(
+        <PlatformTenantRuntimeProvider>
+          <Harness onSelect={(fn) => { select = fn; return null; }} />
+        </PlatformTenantRuntimeProvider>,
+      );
+      await waitFor(() => expect(screen.getByTestId('selected').props.children).toBe('tenant-a'));
+      mockCacheClear.mockClear();
+      mockReconnectSocketForTenantChange.mockClear();
+
+      await act(async () => select(null));
+
+      expect(screen.getByTestId('selected').props.children).toBe('');
+      expect(mockClearValidatedPlatformTenant).toHaveBeenCalled();
+      expect(mockCacheClear).toHaveBeenCalledTimes(1);
+      expect(mockReconnectSocketForTenantChange).toHaveBeenCalledTimes(1);
+    });
   });
 });

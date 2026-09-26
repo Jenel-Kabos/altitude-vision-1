@@ -35,8 +35,8 @@ const sections = [
           </div>
           <div className="flex items-start gap-2">
             <Mail className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <a href="mailto:privacy@altitude-vision.com" className="hover:text-blue-600 transition">
-              privacy@altitudevision.agency
+            <a href="mailto:support@altitudevision.agency" className="hover:text-blue-600 transition">
+              support@altitudevision.agency
             </a>
           </div>
           <div className="flex items-start gap-2">
@@ -177,8 +177,8 @@ const sections = [
         </div>
         <p className="font-medium">
           Pour exercer vos droits :{' '}
-          <a href="mailto:privacy@altitudevision.agency" className="text-blue-600 hover:underline">
-            privacy@altitudevision.agency
+          <a href="mailto:support@altitudevision.agency" className="text-blue-600 hover:underline">
+            support@altitudevision.agency
           </a>
         </p>
       </div>
@@ -288,8 +288,8 @@ const sections = [
         <div className="space-y-2">
           <div className="flex items-start gap-2">
             <Mail className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <a href="mailto:privacy@altitudevision.agency" className="hover:text-blue-600 transition">
-              privacy@altitudevision.agency
+            <a href="mailto:support@altitudevision.agency" className="hover:text-blue-600 transition">
+              support@altitudevision.agency
             </a>
           </div>
           <div className="flex items-start gap-2">
@@ -407,11 +407,11 @@ const PolitiqueConfidentialite = () => (
           dans un délai de 30 jours.
         </p>
         <a
-          href="mailto:privacy@altitudevision.agency"
+          href="mailto:support@altitudevision.agency"
           className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg"
         >
           <Mail className="w-5 h-5" />
-          privacy@altitudevision.agency
+          support@altitudevision.agency
         </a>
       </motion.div>
     </div>

@@ -86,6 +86,24 @@ export const leaveHotelRoom = async (hotelId = activeHotelId) => {
   });
 };
 
+// TENANT-SWITCH-HARDENING P2-2 (2026-09-25) — Socket hot re-auth on tenant
+// change. Le handshake WebSocket lit `platformTenantId` UNE FOIS au
+// `io(...)` initial et à chaque `reconnect_attempt`. Un changement de
+// tenant en cours de session ne modifie donc pas la socket ouverte : sans
+// reconnexion, l'ancien contexte tenant reste actif pour les rooms/
+// événements. Cette fonction ferme proprement la socket courante (listeners,
+// activeConversation, activeHotel — voir `disconnectSocket`) puis la
+// rouvre : `connectSocket()` relit alors `getValidatedPlatformTenant()` et
+// forge un nouveau handshake sous le tenant courant, que le serveur
+// revalide.
+// Si aucune socket n'était connectée, l'appel est un no-op sûr — les futurs
+// `connectSocket()` naturels utiliseront de toute façon le tenant validé.
+export const reconnectSocketForTenantChange = async () => {
+  if (!socket) return null;
+  disconnectSocket();
+  return connectSocket();
+};
+
 export const disconnectSocket = () => {
   if (socket && reconnectHandler) {
     socket.io.off('reconnect_attempt', reconnectHandler);

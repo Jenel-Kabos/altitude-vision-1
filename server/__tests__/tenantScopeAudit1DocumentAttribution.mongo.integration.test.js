@@ -49,7 +49,7 @@ afterAll(async () => stopFinancialMongo());
 
 describe('TENANT-SCOPE-AUDIT-2A — documentController : correction confirmée (getDocument)', () => {
   test('GET /api/documents/:id (Admin, tenant unique) réussit désormais pour un document legacy lié à un Proprietaire public-signup sans OrgMembership', async () => {
-    const fixture = await createTenantFixture({ label: 'ScopeAudit2aDoc Solo' });
+    const fixture = await createTenantFixture({ label: 'ScopeAudit2aDoc Solo', withAdminMembership: true });
     const owner = await User.create({
       name: 'Unaffiliated Document Owner', email: `doc-owner-${Date.now()}@example.test`,
       password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true,
@@ -66,8 +66,8 @@ describe('TENANT-SCOPE-AUDIT-2A — documentController : correction confirmée (
   });
 
   test('cross-tenant reste refusé : un document résolu vers un AUTRE tenant reste 404 (non-régression de la frontière stricte)', async () => {
-    const fixtureA = await createTenantFixture({ label: 'ScopeAudit2aDoc CrossA' });
-    const fixtureB = await createTenantFixture({ label: 'ScopeAudit2aDoc CrossB' });
+    const fixtureA = await createTenantFixture({ label: 'ScopeAudit2aDoc CrossA', withAdminMembership: true });
+    const fixtureB = await createTenantFixture({ label: 'ScopeAudit2aDoc CrossB', withAdminMembership: true });
     const ownerB = (await createTenantUser({ tenant: fixtureB.tenant, bootstrap: fixtureB.bootstrap, overrides: { role: 'Proprietaire' } })).user;
     const documentB = await Document.create({
       tenant: null, type: 'Facture', status: 'Brouillon', client: ownerB._id, createdBy: ownerB._id,

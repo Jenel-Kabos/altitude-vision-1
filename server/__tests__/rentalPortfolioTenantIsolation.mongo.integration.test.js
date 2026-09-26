@@ -71,11 +71,37 @@ test('KPI-TENANT-09 no resolvable tenant fails closed', async () => {
 test('KPI-TENANT-10 forged inaccessible tenant header denied', async () => {
   expect((await get(a.bootstrap, b.tenant)).status).toBe(403);
 });
-test('KPI-TENANT-11 PlatformOperator cannot get global portfolio or replace membership', async () => {
+test('KPI-TENANT-11a PlatformOperator without tenant selected is denied (no global portfolio)', async () => {
+  // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-2 : la Vue plateforme (aucun tenant
+  // sélectionné) ne peut JAMAIS accéder à un endpoint tenant-scoped. Le
+  // tenant scope reste obligatoire même pour un PlatformOperator avec la
+  // capability adéquate — Option 3 n'a pas introduit de mode "global".
   await PlatformOperator.create({ user: a.bootstrap._id, status: 'active', capabilities: ['platform.properties.read'], grantedBy: b.bootstrap._id, grantReason: 'Test isolation' });
   await require('../models/OrgMembership').deleteMany({ user: a.bootstrap._id });
   expect((await get(a.bootstrap, null)).status).toBe(403);
+});
+
+test('KPI-TENANT-11b PlatformOperator sans capability requise reste refusé même avec tenant sélectionné', async () => {
+  // Un opérateur actif MAIS sans platform.properties.read ni
+  // platform.properties.manage ne peut pas voir le portfolio, même avec
+  // Tenant A explicitement sélectionné — invariant capability-specific.
+  await PlatformOperator.create({ user: a.bootstrap._id, status: 'active', capabilities: ['platform.tenants.read'], grantedBy: b.bootstrap._id, grantReason: 'Test isolation' });
+  await require('../models/OrgMembership').deleteMany({ user: a.bootstrap._id });
   expect((await get()).status).toBe(403);
+});
+
+test('KPI-TENANT-11c PlatformOperator avec platform.properties.read + tenant sélectionné accède au portfolio scope tenant (Option 3 PATH B)', async () => {
+  // Cas nominal Option 3 : opérateur actif + capability + tenant explicitement
+  // sélectionné → PATH B autorise l'accès au portfolio, STRICTEMENT scopé au
+  // tenant sélectionné (jamais un scope global). Aucun OrgMembership requis.
+  await PlatformOperator.create({ user: a.bootstrap._id, status: 'active', capabilities: ['platform.properties.read'], grantedBy: b.bootstrap._id, grantReason: 'Option 3 SLICE 2 authority' });
+  await require('../models/OrgMembership').deleteMany({ user: a.bootstrap._id });
+  // Un bien A publié : doit être visible via PATH B après sélection de Tenant A.
+  await property(a.tenant);
+  const res = await get(a.bootstrap, a.tenant);
+  expect(res.status).toBe(200);
+  // Preuve d'isolation stricte : un bien Tenant B avec le même owner n'apparaît pas.
+  expect(res.body.data.dashboard.totalBiens).toBe(1);
 });
 test('KPI-TENANT-12 occupied unpublished assets remain in tenant patrimonial KPI', async () => {
   await property(a.tenant, { availability: 'Loué', assetCycle: 'en_location', isPublished: false });

@@ -1,0 +1,112 @@
+.section {
+  --ink: #17201e;
+  --ivory: #f4efe4;
+  background: var(--ivory);
+  color: var(--ink);
+  padding: clamp(4.5rem, 9vw, 8.5rem) 0;
+}
+
+.container {
+  margin: 0 auto;
+  width: min(calc(100% - 2rem), 76rem);
+}
+
+.headingBlock {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 58rem;
+}
+
+.eyebrow {
+  color: #ae8540;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .2em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.headingBlock h2 {
+  font-family: 'Cormorant Garamond', var(--font-cormorant), Georgia, serif;
+  font-size: clamp(3rem, 7vw, 6.5rem);
+  font-weight: 400;
+  letter-spacing: -.04em;
+  line-height: .92;
+  margin: 0;
+}
+
+.headingBlock > p:last-child {
+  color: rgba(23, 32, 30, .68);
+  font-size: clamp(.98rem, 1.7vw, 1.15rem);
+  line-height: 1.65;
+  margin: 0;
+  max-width: 41rem;
+}
+
+.composition {
+  display: grid;
+  gap: 1rem;
+  margin-top: clamp(2.75rem, 6vw, 5.5rem);
+}
+
+.universe {
+  background: var(--ink);
+  margin: 0;
+  overflow: hidden;
+  position: relative;
+}
+.universe > a { color:inherit; display:block; height:100%; text-decoration:none; }
+
+.image {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 500ms ease;
+  width: 100%;
+}
+
+.universe:hover .image { transform: scale(1.018); }
+
+.caption {
+  background: linear-gradient(180deg, transparent, rgba(8, 13, 12, .9));
+  bottom: 0;
+  color: #fff8ed;
+  display: grid;
+  gap: .25rem;
+  left: 0;
+  padding: clamp(1rem, 3vw, 1.75rem);
+  position: absolute;
+  right: 0;
+}
+
+.universe strong {
+  font-family: 'Cormorant Garamond', var(--font-cormorant), Georgia, serif;
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.universe span {
+  font-size: .67rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.altimmo { aspect-ratio: 4 / 3; }
+.altcom, .mila { aspect-ratio: 4 / 5; }
+.caption small { color:#f7f3ea; font-size:.68rem; font-weight:700; letter-spacing:.08em; margin-top:.65rem; text-transform:uppercase; }
+.altimmo .caption { border-bottom: 3px solid #d66f32; }
+.altcom .caption { border-bottom: 3px solid #b62e36; }
+.mila .caption { border-bottom: 3px solid #2459a6; }
+.universe a:focus-visible { outline:3px solid #ae8540; outline-offset:-4px; }
+
+@media (min-width: 48rem) {
+  .container { width: min(calc(100% - 5rem), 76rem); }
+  .composition { grid-template-columns: minmax(0, 1.45fr) minmax(13rem, .72fr) minmax(13rem, .72fr); grid-template-rows: minmax(32rem, 56vw); }
+  .altimmo, .altcom, .mila { aspect-ratio: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image { transition: none; }
+}

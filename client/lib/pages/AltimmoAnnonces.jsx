@@ -143,7 +143,13 @@ const AltimmoAnnonces = () => {
     const [draftSearch,       setDraftSearch]       = useState(readParam(searchParams, 'search', 'search', ''));
     const [draftOfferType,    setDraftOfferType]    = useState(readParam(searchParams, 'offerType', 'status', 'tous'));
     const [draftPropertyType, setDraftPropertyType] = useState(readParam(searchParams, 'propertyType', 'type', 'tous'));
-    const [draftAccommodationType, setDraftAccommodationType] = useState(searchParams.get('accommodationType') || 'tous');
+    const [draftAccommodationType, setDraftAccommodationType] = useState(() => {
+        // Anciens liens Séjourner : type désignait la catégorie, uniquement pour l'hébergement.
+        const legacyType = searchParams.get('type');
+        const legacyAccommodationType = draftOfferType === 'hebergement' &&
+            ACCOMMODATION_TYPES.some(({ value }) => value === legacyType) ? legacyType : 'tous';
+        return searchParams.get('accommodationType') || legacyAccommodationType;
+    });
     const [draftCity,         setDraftCity]         = useState(readParam(searchParams, 'city', 'ville', 'Toutes'));
     const [draftArr,          setDraftArr]          = useState(searchParams.get('arrondissement') || 'Tous');
     const [draftPrice,        setDraftPrice]        = useState({

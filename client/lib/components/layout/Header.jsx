@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu, X, LayoutDashboard, Building, LogOut,
   UserCircle, Heart, MessageCircle, UserPlus,
-  LogIn, ChevronDown, Home, Phone, Newspaper, ArrowUpRight, Smartphone,
+  LogIn, ChevronDown, Home, Phone, Newspaper, Smartphone,
   CreditCard, Calendar, Landmark, KeyRound, Palmtree, LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -33,7 +33,7 @@ const NAV_LINKS = [
       { to: '/immobilier/annonces?offerType=vente',      label: 'Acheter',    Icon: Landmark, desc: 'Maisons, appartements, terrains…' },
       { to: '/immobilier/annonces?offerType=location',   label: 'Louer',      Icon: KeyRound, desc: 'Location longue durée avec bail' },
       { to: '/immobilier/sejourner',                     label: 'Séjourner',  Icon: Palmtree, desc: 'Meublés à la nuitée & hôtels' },
-      { to: '/altimmo/application',                      label: 'App Altimmo', Icon: null,    desc: "Télécharger l'app" },
+      { to: '/altimmo/application',                      label: 'App Altimmo', Icon: null,    desc: 'Découvrir l’application' },
     ],
   },
   { to: '/evenementiel',  label: 'Mila Events', Icon: null      },
@@ -117,7 +117,7 @@ const Wordmark = ({ isMobile }) => (
         display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.48rem',
         letterSpacing: '0.4em', color: 'rgba(240,237,232,0.28)', textTransform: 'uppercase', marginTop: '3px',
       }}>
-        Agence Immobilière
+        Trois métiers · Un partenaire
       </span>
     )}
   </Link>
@@ -350,6 +350,7 @@ const Header = () => {
   const router                    = useRouter();
   const unreadCount               = useUnreadCount(pathname, !!user);
   const profileRef                = useRef(null);
+  const mobileToggleRef           = useRef(null);
   const bp                        = useBreakpoint();
 
   useEffect(() => { setMounted(true); }, []);
@@ -390,6 +391,15 @@ const Header = () => {
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const onKeyDown = event => {
+      if (event.key === 'Escape') { setMobile(false); mobileToggleRef.current?.focus(); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [mobileOpen]);
 
   const handleLogout = async () => {
@@ -481,7 +491,7 @@ const Header = () => {
           )}
 
           {!isDesktop && (
-            <button onClick={() => setMobile(!mobileOpen)} className="header-icon-btn"
+            <button ref={mobileToggleRef} onClick={() => setMobile(!mobileOpen)} className="header-icon-btn"
               style={{ padding: '10px', borderRadius: '4px', background: mobileOpen ? 'rgba(240,237,232,0.06)' : 'none', border: 'none', color: '#F0EDE8', cursor: 'pointer', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
               aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'} aria-expanded={mobileOpen}>
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}

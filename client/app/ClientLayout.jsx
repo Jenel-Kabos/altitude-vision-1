@@ -4,6 +4,25 @@ import { usePathname } from 'next/navigation';
 import Header from '@/lib/components/layout/Header';
 import Footer from '@/lib/components/layout/Footer';
 import CookieBanner from '@/lib/components/CookieBanner';
+import { PublicSite } from '@/lib/components/public/PublicPrimitives';
+
+export const isPublicSitePath = (pathname = '') => {
+  if (pathname === '/immobilier/dossiers' || pathname.startsWith('/properties/submit') || pathname.startsWith('/properties/edit')) return false;
+  return pathname === '/' ||
+    pathname === '/home' ||
+    pathname === '/contact' ||
+    pathname === '/mentions-legales' ||
+    pathname === '/politique-confidentialite' ||
+    pathname === '/trouve-ta-commission' ||
+    pathname === '/actualites' || pathname.startsWith('/actualites/') ||
+    pathname === '/immobilier' || pathname.startsWith('/immobilier/') ||
+    pathname === '/altimmo' || pathname.startsWith('/altimmo/') ||
+    pathname === '/communication' || pathname.startsWith('/communication/') ||
+    pathname === '/altcom' || pathname.startsWith('/altcom/') ||
+    pathname === '/evenementiel' || pathname.startsWith('/evenementiel/') ||
+    pathname === '/mila-events' || pathname.startsWith('/mila-events/') ||
+    pathname === '/properties' || pathname.startsWith('/properties/');
+};
 
 export default function ClientLayout({ children }) {
   const pathname = usePathname();
@@ -25,6 +44,14 @@ export default function ClientLayout({ children }) {
     pathname.startsWith('/mes-hebergements') ||
     pathname.startsWith('/mon-espace-proprietaire');
 
+  const content = (
+    <>
+      {!noHeaderFooter && <Header />}
+      <main id="main-content">{children}</main>
+      {!noHeaderFooter && <Footer />}
+    </>
+  );
+
   return (
     <>
       <a
@@ -33,9 +60,7 @@ export default function ClientLayout({ children }) {
       >
         Aller au contenu principal
       </a>
-      {!noHeaderFooter && <Header />}
-      <main id="main-content">{children}</main>
-      {!noHeaderFooter && <Footer />}
+      {isPublicSitePath(pathname) ? <PublicSite>{content}</PublicSite> : content}
       <CookieBanner />
     </>
   );

@@ -3,6 +3,25 @@ const Document = require('../models/Document');
 const Transaction = require('../models/Transaction');
 const Property = require('../models/Property');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { deletePrivateAsset } = require('../services/storage/secureStorageService');
+
+// PLATFORM-SUPER-ADMIN OPTION-3 SLICE-8 (2026-09-24) — champ Financial Core
+// (businessOperationKey) : jamais fabricable/mutable côté PATH B PlatformOperator.
+// PATH A staff conserve sa capacité historique (aucun changement de sémantique).
+// Ce champ est la clé d'idempotence de finalizeRealEstateTransaction : un
+// opérateur ne peut ni le forger sur un CREATE, ni le muter sur un PATCH.
+// Le staff tenant reste libre côté PATH A (le Financial Core l'assigne
+// côté serveur lors de sa finalisation authentique).
+function isPlatformOperatorWriteAttempt(req) {
+  return Boolean(req?.isPlatformOperatorContext);
+}
+function rejectImmutableForPlatformOperator(req, res) {
+  return res.status(422).json({
+    status: 'fail',
+    code: 'DOCUMENT_FIELD_IMMUTABLE_FOR_PLATFORM_OPERATOR',
+    message: 'Ce champ ne peut pas être défini ou modifié via platform.documents.manage.',
+  });
+}
 
 // TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traite une
 // attribution `unresolved` comme un échec (404). Pour un `Document` lié à
@@ -159,6 +178,11 @@ exports.buildDocumentFilter = buildDocumentFilter;
 // --- CREATE A NEW DOCUMENT ---
 exports.createDocument = async (req, res) => {
   try {
+    // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-8 — PATH B ne peut pas forger la
+    // clé d'idempotence Financial Core sur un CREATE. Rejet 422 explicite.
+    if (isPlatformOperatorWriteAttempt(req) && req.body && Object.prototype.hasOwnProperty.call(req.body, 'businessOperationKey')) {
+      return rejectImmutableForPlatformOperator(req, res);
+    }
     const docData = { ...req.body, tenant: tenantId(req), createdBy: req.user.id };
     delete docData.privateAsset;
     const attribution = await resolveResourceTenant({ resourceType: 'Document', resource: docData });
@@ -218,8 +242,20 @@ exports.getDocument = async (req, res) => {
 // --- UPDATE A DOCUMENT ---
 exports.updateDocument = async (req, res) => {
   try {
+    // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-8 — PATH B ne peut pas muter la
+    // clé d'idempotence Financial Core sur un PATCH. Rejet 422 explicite.
+    if (isPlatformOperatorWriteAttempt(req) && req.body && Object.prototype.hasOwnProperty.call(req.body, 'businessOperationKey')) {
+      return rejectImmutableForPlatformOperator(req, res);
+    }
     const existing = await Document.findById(req.params.id);
     if (!existing) return res.status(404).json({ status: 'fail', message: 'No document found with that ID' });
+    // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-8 — fail-closed pour PATH B sur
+    // document legacy tenant:null (l'ownership self-service qui motive le
+    // fail-open de assertResourceTenantOrUnattributed n'est jamais légitime
+    // pour un opérateur plateforme). Miroir du guard Phase 2A.1 sur Contrat.
+    if (isPlatformOperatorWriteAttempt(req) && !existing.tenant) {
+      return res.status(404).json({ status: 'fail', code: 'TENANT_RESOURCE_NOT_FOUND', message: 'Ressource introuvable dans ce contexte tenant.' });
+    }
     await assertResourceTenant({ resourceType: 'Document', resource: existing, tenantId: tenantId(req) });
     const docData = { ...req.body };
     delete docData.tenant;
@@ -259,7 +295,7 @@ exports.updateDocument = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(400).json({ status: 'fail', message: error.message });
+    res.status(error.statusCode || 400).json({ status: error.statusCode ? 'fail' : 'error', code: error.code, message: error.message });
   }
 };
 
@@ -271,6 +307,12 @@ exports.deleteDocument = async (req, res) => {
 
         if (!document) {
             return res.status(404).json({ status: 'fail', message: 'No document found with that ID' });
+        }
+        // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-8 — voir updateDocument. Un
+        // opérateur plateforme ne bénéficie jamais du fail-open unresolved
+        // pour un document tenant:null.
+        if (isPlatformOperatorWriteAttempt(req) && !document.tenant) {
+            return res.status(404).json({ status: 'fail', code: 'TENANT_RESOURCE_NOT_FOUND', message: 'Ressource introuvable dans ce contexte tenant.' });
         }
         await assertResourceTenant({ resourceType: 'Document', resource: document, tenantId: tenantId(req) });
 
@@ -287,11 +329,26 @@ exports.deleteDocument = async (req, res) => {
 
         await Document.findByIdAndDelete(req.params.id);
 
+        // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-8 — best-effort Cloudinary
+        // cleanup. Mongo delete est source de vérité et a déjà réussi; si le
+        // storage delete échoue (réseau, asset absent, permission), on log
+        // silencieusement et on retourne 204 quand même — l'orphelin est le
+        // pire cas, jamais un échec de suppression métier. Aucune nouvelle
+        // classe de failure introduite par ce sprint.
+        if (document.privateAsset) {
+            try {
+                const assetLike = document.privateAsset.toObject ? document.privateAsset.toObject() : document.privateAsset;
+                await deletePrivateAsset(assetLike);
+            } catch {
+                // Silencieux volontairement — orphelin acceptable, échec 204 non.
+            }
+        }
+
         res.status(204).json({
             status: 'success',
             data: null,
         });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(error.statusCode || 500).json({ status: error.statusCode ? 'fail' : 'error', code: error.code, message: error.message });
     }
 };

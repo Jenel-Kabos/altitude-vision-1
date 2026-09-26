@@ -21,7 +21,7 @@ const SECTIONS = [
     content: [
       { type: 'text', value: 'Altitude-Vision — Société d\'expertise multidisciplinaire' },
       { type: 'contact', icon: 'location-outline', value: 'Brazzaville, République du Congo' },
-      { type: 'contact', icon: 'mail-outline', value: 'privacy@altitude-vision.com', email: 'mailto:privacy@altitude-vision.com' },
+      { type: 'contact', icon: 'mail-outline', value: 'support@altitudevision.agency', email: 'mailto:support@altitudevision.agency' },
       { type: 'contact', icon: 'call-outline', value: '+242 06 800 21 51', tel: 'tel:+24206800215' },
     ],
   },
@@ -98,7 +98,7 @@ const SECTIONS = [
         'Droit d\'opposition : vous opposer à certains traitements',
         'Droit à la portabilité : récupérer vos données',
       ]},
-      { type: 'contact', icon: 'mail-outline', value: 'privacy@altitude-vision.com', email: 'mailto:privacy@altitude-vision.com' },
+      { type: 'contact', icon: 'mail-outline', value: 'support@altitudevision.agency', email: 'mailto:support@altitudevision.agency' },
     ],
   },
   {
@@ -144,7 +144,7 @@ const SECTIONS = [
     title: 'Contact & réclamations',
     content: [
       { type: 'text', value: 'Pour toute question ou réclamation relative à vos données :' },
-      { type: 'contact', icon: 'mail-outline', value: 'privacy@altitude-vision.com', email: 'mailto:privacy@altitude-vision.com' },
+      { type: 'contact', icon: 'mail-outline', value: 'support@altitudevision.agency', email: 'mailto:support@altitudevision.agency' },
       { type: 'contact', icon: 'call-outline', value: '+242 06 800 21 51', tel: 'tel:+24206800215' },
       { type: 'text', value: 'Délai de réponse : 30 jours maximum.' },
     ],
@@ -292,10 +292,10 @@ export default function PolitiqueConfidentialiteScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.ctaBtn, { backgroundColor: colors.gold }]}
-            onPress={() => Linking.openURL('mailto:privacy@altitude-vision.com')}
+            onPress={() => Linking.openURL('mailto:support@altitudevision.agency')}
           >
             <Ionicons name="mail" size={18} color="#fff" />
-            <Text style={styles.ctaBtnText}>privacy@altitude-vision.com</Text>
+            <Text style={styles.ctaBtnText}>support@altitudevision.agency</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

@@ -15,6 +15,7 @@ const { requireCapability } = require('../middleware/capabilityMiddleware');
 const { requireTenantScope } = require('../middleware/tenantContext');
 const { requireTenantModule } = require('../middleware/tenantModuleGate');
 const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
+const { requireTenantMembershipRoleOrPlatformCapability } = require('../middleware/tenantMembershipRoleOrPlatformCapability');
 const ctrl = require('../controllers/propertyAssetController');
 
 const router = express.Router();
@@ -22,8 +23,15 @@ router.use(auth.protect);
 
 // GL-ASSET-UX-1 — doit être déclarée AVANT '/:id/...' pour que 'portfolio'
 // ne soit jamais capturé comme un identifiant de bien.
+// PLATFORM-SUPER-ADMIN OPTION-3 SLICE-2 (2026-09-22) — accepte aussi un
+// PlatformOperator actif avec platform.properties.read (ou manage) une fois
+// un tenant explicitement sélectionné. Le tenant scope reste strict via
+// requireTenantScope + requireTenantModule + service tenantId-mandatory.
 router.get('/portfolio/dashboard', requireTenantScope, requireTenantModule('immobilier'),
-  requireTenantMembershipRole('Admin', 'GestionnaireImmobilier', 'Collaborateur'), ctrl.getPortfolioDashboard);
+  requireTenantMembershipRoleOrPlatformCapability({
+    tenantRoles: ['Admin', 'GestionnaireImmobilier', 'Collaborateur'],
+    platformCapabilities: ['platform.properties.read', 'platform.properties.manage'],
+  }), ctrl.getPortfolioDashboard);
 
 router.get('/:id/lifecycle', ctrl.getLifecycle);
 router.post('/:id/transition', requireCapability('properties.update'), ctrl.transition);

@@ -29,6 +29,7 @@ import {
   joinHotelRoom,
   leaveConversation,
   leaveHotelRoom,
+  reconnectSocketForTenantChange,
 } from '../socketService';
 
 describe('socketService', () => {
@@ -173,6 +174,37 @@ describe('socketService', () => {
       disconnectSocket();
       const result = await leaveHotelRoom('hotel-1');
       expect(result).toEqual({ ok: false });
+    });
+  });
+
+  // TENANT-SWITCH-HARDENING P2-2 — matrice TSH-06..TSH-07.
+  describe('P2-2 reconnectSocketForTenantChange — socket hot re-auth', () => {
+    test('TSH-06 sans socket connectée → no-op safe (retourne null, ne crée pas de socket)', async () => {
+      // Aucun connect préalable
+      getToken.mockResolvedValue('test-token');
+      const result = await reconnectSocketForTenantChange();
+      expect(result).toBeNull();
+      expect(mockIo).not.toHaveBeenCalled();
+    });
+
+    test('TSH-07 avec socket A connectée → disconnect complet + reconnect avec tenant B au handshake', async () => {
+      getToken.mockResolvedValue('test-token');
+      getValidatedPlatformTenant.mockReturnValue('tenant-a');
+      await connectSocket();
+      expect(mockIo).toHaveBeenCalledTimes(1);
+      expect(mockIo.mock.calls[0][1].auth).toEqual({ token: 'test-token', platformTenantId: 'tenant-a' });
+
+      // Tenant switch — le validated tenant est maintenant B
+      getValidatedPlatformTenant.mockReturnValue('tenant-b');
+      const reconnected = await reconnectSocketForTenantChange();
+
+      // disconnectSocket + reconnectSocket => 2 appels io()
+      expect(mockSocket.disconnect).toHaveBeenCalled();
+      expect(mockSocket.removeAllListeners).toHaveBeenCalled();
+      expect(mockIo).toHaveBeenCalledTimes(2);
+      // Le nouveau handshake porte tenant-b, jamais tenant-a
+      expect(mockIo.mock.calls[1][1].auth).toEqual({ token: 'test-token', platformTenantId: 'tenant-b' });
+      expect(reconnected).toBe(mockSocket);
     });
   });
 });
