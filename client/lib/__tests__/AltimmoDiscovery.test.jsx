@@ -70,6 +70,23 @@ describe('WEB-05 — découverte Altimmo sur la homepage', () => {
     expect(within(screen.getByText('Bureau à louer').closest('[data-testid="altimmo-property"]')).queryByText('Sélection Altimmo')).not.toBeInTheDocument();
   });
 
+  test('HOTFIX-03 : applique le même traitement structurel aux deux cartes secondaires', async () => {
+    searchAltimmo.mockResolvedValue({
+      properties: [
+        property({ _id: 'bien-1', title: 'Mila Hotel' }),
+        property({ _id: 'bien-2', title: 'Villa meublée' }),
+        property({ _id: 'bien-3', title: 'Bureau à louer' }),
+      ],
+      total: 3,
+    });
+    render(<AltimmoDiscovery />);
+
+    const cards = await screen.findAllByTestId('altimmo-property');
+    expect(cards[0]).toHaveAttribute('data-layout', 'featured');
+    expect(cards[1]).toHaveAttribute('data-layout', 'secondary');
+    expect(cards[2]).toHaveAttribute('data-layout', 'secondary');
+  });
+
   test.each([
     ['aucune image', []],
     ['une valeur vide', ['']],

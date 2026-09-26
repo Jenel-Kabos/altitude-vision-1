@@ -57,12 +57,7 @@
   .resultsSuccess { grid-template-columns: minmax(0, 1.55fr) minmax(15rem, .75fr); }
   .resultsSuccess > :first-child { grid-row: span 2; }
   .resultsSuccess > :first-child .visual { aspect-ratio: 4 / 3; }
-  .resultsSuccess > :nth-child(2) .visual { aspect-ratio: 4 / 3; }
-  .resultsSuccess > :nth-child(3) .visual { aspect-ratio: 16 / 5; }
-  .resultsSuccess > :nth-child(3) .propertyCard { grid-template-columns: minmax(7.5rem, .75fr) minmax(0, 1.25fr); grid-template-rows: 1fr; }
-  .resultsSuccess > :nth-child(3) .propertyBody { align-self: center; padding: 1rem 1.15rem; }
-  .resultsSuccess > :nth-child(3) .propertyBody h3 { font-size: 1.35rem; margin: .55rem 0 .8rem; }
-  .resultsSuccess > :nth-child(3) .fallbackMark { font-size: 3.5rem; }
+  .propertyCard[data-layout='secondary'] .visual { aspect-ratio: 4 / 3; }
 }
 
 @media (max-width: 47.99rem) {

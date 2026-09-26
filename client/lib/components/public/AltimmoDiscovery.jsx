@@ -49,11 +49,11 @@ function PropertyVisual({ image, title }) {
   return <img className={styles.propertyImage} src={image} alt={title} loading="lazy" onError={() => setFailed(true)} />;
 }
 
-function PropertyContent({ property }) {
+function PropertyContent({ property, layout }) {
   const price = formatPrice(property.price);
 
   return (
-    <article className={styles.propertyCard} data-testid="altimmo-property">
+    <article className={styles.propertyCard} data-layout={layout} data-testid="altimmo-property">
       <div className={styles.visual}><PropertyVisual image={property.image} title={property.title} /></div>
       <div className={styles.propertyBody}>
         <div className={styles.propertyMeta}>
@@ -71,9 +71,9 @@ function PropertyContent({ property }) {
   );
 }
 
-function PropertyPreview({ property }) {
-  if (!property._id) return <PropertyContent property={property} />;
-  return <Link className={styles.propertyLink} href={`/immobilier/property/${property._id}`}><PropertyContent property={property} /></Link>;
+function PropertyPreview({ property, layout }) {
+  if (!property._id) return <PropertyContent property={property} layout={layout} />;
+  return <Link className={styles.propertyLink} href={`/immobilier/property/${property._id}`}><PropertyContent property={property} layout={layout} /></Link>;
 }
 
 export default function AltimmoDiscovery() {
@@ -130,7 +130,13 @@ export default function AltimmoDiscovery() {
               <figcaption>Habiter, investir, séjourner.</figcaption>
             </MotionImageReveal>
           )}
-          {state === 'success' && items.map((property, index) => <PropertyPreview property={property} key={property._id || `${property.title}-${index}`} />)}
+          {state === 'success' && items.map((property, index) => (
+            <PropertyPreview
+              property={property}
+              layout={index === 0 ? 'featured' : 'secondary'}
+              key={property._id || `${property.title}-${index}`}
+            />
+          ))}
         </div>
         <div className={styles.commercialLinks}>
           <Link className={styles.catalogLink} href="/immobilier/annonces">Voir nos annonces <span aria-hidden="true">→</span></Link>
