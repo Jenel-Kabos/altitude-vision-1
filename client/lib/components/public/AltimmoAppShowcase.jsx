@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { BedDouble, MapPinned, Search } from 'lucide-react';
 import { MotionImageReveal, MotionReveal, MotionStagger, MotionStaggerItem } from './PublicMotion';
 import styles from './AltimmoAppShowcase.module.css';
 
@@ -9,16 +10,19 @@ const capabilities = [
     number: '01',
     title: 'Découvrir',
     copy: 'Des biens sélectionnés pour acheter, louer ou séjourner.',
+    Icon: Search,
   },
   {
     number: '02',
     title: 'Localiser',
     copy: 'Explorez les opportunités immobilières directement sur la carte.',
+    Icon: MapPinned,
   },
   {
     number: '03',
     title: 'Gérer / Réserver',
     copy: 'Retrouvez les détails d’un bien ou réservez une expérience d’hébergement.',
+    Icon: BedDouble,
   },
 ];
 
@@ -51,7 +55,7 @@ const devices = [
 
 export default function AltimmoAppShowcase() {
   return (
-    <section className={styles.section} data-testid="altimmo-app-showcase" aria-labelledby="altimmo-app-title">
+    <section className={styles.section} data-surface="ivory" data-testid="altimmo-app-showcase" aria-labelledby="altimmo-app-title">
       <div className={styles.container}>
         <div className={styles.editorial}>
           <MotionReveal as="header" className={styles.headingBlock} testId="motion-altimmo-app-heading">
@@ -66,7 +70,9 @@ export default function AltimmoAppShowcase() {
               />
               <p className={styles.eyebrow}>Altimmo — L’application</p>
             </div>
-            <h2 id="altimmo-app-title">L’immobilier,<br />{' '}désormais dans votre poche.</h2>
+            <h2 id="altimmo-app-title">
+              L’immobilier,<br />{' '}désormais dans <span data-accent="brass">votre poche.</span>
+            </h2>
             <p className={styles.lede}>
               Recherchez un bien, situez les opportunités et accédez aux expériences
               Altimmo depuis une application pensée pour l’immobilier au quotidien.
@@ -76,8 +82,9 @@ export default function AltimmoAppShowcase() {
           <MotionStagger as="ol" className={styles.capabilities} aria-label="Fonctionnalités de l’application Altimmo">
             {capabilities.map((capability) => (
               <MotionStaggerItem as="li" className={styles.capability} key={capability.number}>
-                <span className={styles.number}>{capability.number}</span>
+                <span className={styles.capabilityIcon} aria-hidden="true"><capability.Icon size={20} strokeWidth={1.6} /></span>
                 <div>
+                  <p className={styles.number}>{capability.number}</p>
                   <h3>{capability.title}</h3>
                   <p>{capability.copy}</p>
                 </div>
@@ -103,7 +110,9 @@ export default function AltimmoAppShowcase() {
               delay={index * 0.08}
               key={device.src}
             >
-              <div className={styles.deviceFrame}>
+              <div className={styles.deviceFrame} data-device-model="samsung-galaxy-s25-ultra">
+                <span className={styles.camera} data-device-camera="punch-hole" aria-hidden="true" />
+                <span className={styles.sideKeys} aria-hidden="true" />
                 <img
                   src={device.src}
                   alt={device.alt}

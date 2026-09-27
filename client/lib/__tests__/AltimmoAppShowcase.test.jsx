@@ -31,4 +31,14 @@ describe('ALTIMMO APP SHOWCASE — produit mobile réel', () => {
       .toHaveAttribute('href', '/immobilier/annonces');
     expect(section).not.toHaveTextContent(/App Store|Google Play/i);
   });
+
+  test('conserve le fond ivoire et présente les captures dans trois coques Samsung Galaxy S25 Ultra', () => {
+    render(<AltimmoAppShowcase />);
+
+    const section = screen.getByTestId('altimmo-app-showcase');
+    expect(section).toHaveAttribute('data-surface', 'ivory');
+    expect(within(section).getByText('votre poche.')).toHaveAttribute('data-accent', 'brass');
+    expect(section.querySelectorAll('[data-device-model="samsung-galaxy-s25-ultra"]')).toHaveLength(3);
+    expect(section.querySelectorAll('[data-device-camera="punch-hole"]')).toHaveLength(3);
+  });
 });
