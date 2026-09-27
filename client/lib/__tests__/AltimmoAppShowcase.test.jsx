@@ -41,4 +41,15 @@ describe('ALTIMMO APP SHOWCASE — produit mobile réel', () => {
     expect(section.querySelectorAll('[data-device-model="samsung-galaxy-s25-ultra"]')).toHaveLength(3);
     expect(section.querySelectorAll('[data-device-camera="punch-hole"]')).toHaveLength(3);
   });
+
+  test('met en scène les trois S25 Ultra avec une profondeur et des orientations distinctes', () => {
+    render(<AltimmoAppShowcase />);
+
+    const section = screen.getByTestId('altimmo-app-showcase');
+    expect(section.querySelector('[data-device-perspective="hero"]')).toBeInTheDocument();
+    expect(section.querySelector('[data-device-perspective="left"]')).toBeInTheDocument();
+    expect(section.querySelector('[data-device-perspective="right"]')).toBeInTheDocument();
+    expect(section.querySelectorAll('[data-device-edge="titanium"]')).toHaveLength(3);
+    expect(section.querySelectorAll('[data-device-reflection="glass"]')).toHaveLength(3);
+  });
 });

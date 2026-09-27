@@ -29,6 +29,7 @@ const capabilities = [
 const devices = [
   {
     className: 'primaryDevice',
+    perspective: 'hero',
     src: '/images/altimmo-app/altimmo-home.webp',
     alt: 'Écran d’accueil Altimmo avec la recherche et les biens recommandés',
     caption: 'Accueil / Annonces',
@@ -37,6 +38,7 @@ const devices = [
   },
   {
     className: 'mapDevice',
+    perspective: 'left',
     src: '/images/altimmo-app/altimmo-map.webp',
     alt: 'Carte Altimmo des biens à Brazzaville avec le quartier Moungali sélectionné',
     caption: 'Carte des biens',
@@ -45,6 +47,7 @@ const devices = [
   },
   {
     className: 'hotelDevice',
+    perspective: 'right',
     src: '/images/altimmo-app/altimmo-mila-hotel.webp',
     alt: 'Fiche Mila Hotel dans l’application Altimmo avec le choix d’une chambre',
     caption: 'Mila Hotel',
@@ -107,19 +110,24 @@ export default function AltimmoAppShowcase() {
             <MotionImageReveal
               as="figure"
               className={`${styles.device} ${styles[device.className]}`}
+              data-device-perspective={device.perspective}
               delay={index * 0.08}
               key={device.src}
             >
-              <div className={styles.deviceFrame} data-device-model="samsung-galaxy-s25-ultra">
-                <span className={styles.camera} data-device-camera="punch-hole" aria-hidden="true" />
+              <div className={styles.deviceBody}>
+                <span className={styles.deviceEdge} data-device-edge="titanium" aria-hidden="true" />
                 <span className={styles.sideKeys} aria-hidden="true" />
-                <img
-                  src={device.src}
-                  alt={device.alt}
-                  width={device.width}
-                  height={device.height}
-                  loading="lazy"
-                />
+                <div className={styles.deviceFrame} data-device-model="samsung-galaxy-s25-ultra">
+                  <span className={styles.camera} data-device-camera="punch-hole" aria-hidden="true" />
+                  <img
+                    src={device.src}
+                    alt={device.alt}
+                    width={device.width}
+                    height={device.height}
+                    loading="lazy"
+                  />
+                  <span className={styles.reflection} data-device-reflection="glass" aria-hidden="true" />
+                </div>
               </div>
               <figcaption>{device.caption}</figcaption>
             </MotionImageReveal>

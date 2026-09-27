@@ -176,7 +176,34 @@
   width: 88%;
 }
 
-.device { margin: 0; position: absolute; transform-origin: center bottom; }
+.device { margin: 0; position: absolute; }
+
+.deviceBody {
+  --device-turn: 0deg;
+  --device-pitch: 0deg;
+  --device-roll: 0deg;
+  --edge-left: .35rem;
+  --edge-right: -.72rem;
+  filter: drop-shadow(1.15rem 1.65rem 1.2rem rgba(23, 32, 30, .2));
+  position: relative;
+  transform: perspective(76rem) rotateX(var(--device-pitch)) rotateY(var(--device-turn)) rotateZ(var(--device-roll));
+  transform-origin: center bottom;
+  transform-style: preserve-3d;
+  transition: transform 500ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.deviceEdge {
+  background: linear-gradient(90deg, #090b0b 0%, #555b58 12%, #121615 31%, #858b87 50%, #171b1a 72%, #070909 100%);
+  border: 1px solid rgba(15, 18, 17, .86);
+  border-radius: 1.65rem;
+  bottom: -.46rem;
+  box-shadow: .9rem 1.55rem 2.4rem rgba(23, 32, 30, .28);
+  left: var(--edge-left);
+  position: absolute;
+  right: var(--edge-right);
+  top: .28rem;
+  transform: translateZ(-1.05rem);
+}
 
 .deviceFrame {
   background: #151918;
@@ -186,6 +213,7 @@
   overflow: hidden;
   padding: .14rem;
   position: relative;
+  transform: translateZ(.08rem);
 }
 
 .deviceFrame img { border-radius: 1.12rem; display: block; height: auto; width: 100%; }
@@ -209,9 +237,21 @@
   border-radius: 0 .15rem .15rem 0;
   height: 4.6rem;
   position: absolute;
-  right: -.43rem;
+  right: -.86rem;
   top: 21%;
-  width: .18rem;
+  transform: translateZ(-.3rem);
+  width: .26rem;
+  z-index: 4;
+}
+
+.reflection {
+  background: linear-gradient(112deg, rgba(255, 255, 255, .16) 0%, rgba(255, 255, 255, .04) 18%, transparent 36%, transparent 72%, rgba(255, 255, 255, .06) 100%);
+  border-radius: 1.12rem;
+  inset: .14rem;
+  opacity: .24;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
 }
 
 .device figcaption {
@@ -225,8 +265,16 @@
 }
 
 .primaryDevice { left: 31%; top: 0; width: min(45%, 20rem); z-index: 4; }
-.mapDevice { left: 1%; top: 6.75rem; transform: rotate(-3deg); width: min(37%, 16rem); z-index: 2; }
-.hotelDevice { right: 0; top: 5.2rem; transform: rotate(3deg); width: min(36%, 15.75rem); z-index: 3; }
+.primaryDevice .deviceBody { --device-turn: -9deg; --device-pitch: 1.5deg; --device-roll: -.6deg; }
+.mapDevice { left: 0; top: 6.75rem; width: min(38%, 16.25rem); z-index: 2; }
+.mapDevice .deviceBody { --device-turn: 18deg; --device-pitch: 1deg; --device-roll: -3.5deg; --edge-left: -.72rem; --edge-right: .35rem; }
+.mapDevice .sideKeys { left: -.82rem; right: auto; transform: rotateY(180deg) translateZ(-.3rem); }
+.hotelDevice { right: 0; top: 5.1rem; width: min(37%, 16rem); z-index: 3; }
+.hotelDevice .deviceBody { --device-turn: -17deg; --device-pitch: 1deg; --device-roll: 3.5deg; }
+
+@media (hover: hover) {
+  .device:hover .deviceBody { transform: perspective(76rem) rotateX(0deg) rotateY(0deg) rotateZ(0deg) translateY(-.35rem); }
+}
 
 @media (min-width: 64rem) {
   .container { grid-template-columns: minmax(22rem, .72fr) minmax(35rem, 1.28fr); }
@@ -259,10 +307,13 @@
   }
   .devices::before { height: 25rem; left: -8rem; top: 5rem; width: 35rem; }
   .devices::after { bottom: -.5rem; left: 5%; width: 90%; }
-  .device { position: static; transform: none; }
+  .device { position: static; }
   .primaryDevice { grid-column: 1 / -1; width: min(75vw, 19rem); }
   .mapDevice,
   .hotelDevice { width: min(43vw, 10.5rem); }
+  .primaryDevice .deviceBody { --device-turn: -4deg; --device-pitch: 1deg; --device-roll: -.25deg; }
+  .mapDevice .deviceBody { --device-turn: 8deg; --device-pitch: 0deg; --device-roll: -2deg; }
+  .hotelDevice .deviceBody { --device-turn: -8deg; --device-pitch: 0deg; --device-roll: 2deg; }
   .device figcaption { font-size: .52rem; letter-spacing: .1em; }
   .actions { align-items: stretch; flex-direction: column; }
   .primaryCta { justify-content: space-between; width: 100%; }
@@ -271,7 +322,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .capability,
-  .primaryCta { transition: none; }
+  .primaryCta,
+  .deviceBody { transition: none; }
   .capability:hover,
   .primaryCta:hover { transform: none; }
 }
