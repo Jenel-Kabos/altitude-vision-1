@@ -17,6 +17,11 @@ import {
   Cookie,
   ChevronDown,
   Server,
+  Smartphone,
+  Trash2,
+  Bell,
+  Camera,
+  MessageCircle,
 } from 'lucide-react';
 
 const sections = [
@@ -253,11 +258,187 @@ const sections = [
             <span className="text-gray-500">cloudinary.com</span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-gray-900">Google Analytics</span>
+            <span className="font-medium text-gray-900">Google Analytics (site web)</span>
             <span className="text-gray-500">analytics.google.com</span>
           </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-gray-900">Sentry (rapports de crash mobile)</span>
+            <span className="text-gray-500">sentry.io</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-gray-900">Expo Push / Expo Updates (mobile)</span>
+            <span className="text-gray-500">expo.dev</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-gray-900">Google Sign-In / Google Maps (mobile)</span>
+            <span className="text-gray-500">google.com</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-gray-900">Zoho Mail (emails transactionnels)</span>
+            <span className="text-gray-500">zoho.com</span>
+          </div>
         </div>
-        <p className="text-sm">Tous nos sous-traitants sont soumis à des engagements contractuels de confidentialité.</p>
+        <p className="text-sm">Tous nos sous-traitants sont soumis à des engagements contractuels de confidentialité. Ils reçoivent uniquement les données nécessaires à la fourniture de la fonctionnalité qui les concerne.</p>
+      </div>
+    ),
+  },
+  {
+    id: 'application-mobile',
+    icon: Smartphone,
+    title: 'Application mobile Altimmo',
+    content: (
+      <div className="space-y-4 text-gray-600">
+        <p>
+          L'application mobile <strong>Altimmo</strong> (Android/iOS) partage
+          les mêmes principes que le site web, avec quelques traitements
+          spécifiques :
+        </p>
+        <div className="space-y-3">
+          <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">
+            <p className="font-medium text-gray-900 flex items-center gap-2">
+              <Bell className="w-4 h-4 text-blue-600" /> Notifications push
+            </p>
+            <p className="text-sm mt-1">
+              Un identifiant push (Expo Push Token) est enregistré côté
+              serveur pour vous envoyer des notifications concernant vos
+              annonces, visites, réservations ou messages. Le jeton est
+              supprimé à la déconnexion ou lorsque vous supprimez votre
+              compte.
+            </p>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">
+            <p className="font-medium text-gray-900 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-blue-600" /> Localisation
+            </p>
+            <p className="text-sm mt-1">
+              La localisation approximative peut être utilisée pour
+              recentrer la carte des annonces autour de vous. La
+              localisation précise n'est demandée que lorsque vous
+              publiez une annonce et souhaitez capturer les coordonnées
+              GPS du bien concerné. Aucun suivi de position en arrière-plan.
+            </p>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">
+            <p className="font-medium text-gray-900 flex items-center gap-2">
+              <Camera className="w-4 h-4 text-blue-600" /> Photos et documents
+            </p>
+            <p className="text-sm mt-1">
+              L'appareil photo et l'accès aux images sont utilisés pour
+              votre photo de profil et les photos de vos annonces et
+              dossiers. Les fichiers sont hébergés par Cloudinary.
+            </p>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">
+            <p className="font-medium text-gray-900 flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-blue-600" /> Messagerie
+            </p>
+            <p className="text-sm mt-1">
+              Les messages échangés dans la messagerie interne sont
+              stockés sur nos serveurs pour permettre leur consultation
+              par les participants. Ils ne sont pas partagés avec des
+              tiers.
+            </p>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">
+            <p className="font-medium text-gray-900">
+              Diagnostics et rapports de crash
+            </p>
+            <p className="text-sm mt-1">
+              L'application mobile envoie des rapports de crash et
+              journaux de diagnostic à Sentry (service tiers) pour nous
+              permettre de corriger les erreurs. Ces rapports peuvent
+              contenir des métadonnées techniques sur l'appareil.
+            </p>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">
+            <p className="font-medium text-gray-900">
+              Mises à jour et carte
+            </p>
+            <p className="text-sm mt-1">
+              Expo Updates fournit les mises à jour de l'application.
+              Le SDK Google Maps affiche la carte des annonces. Google
+              Sign-In est proposé comme alternative à l'inscription par
+              email.
+            </p>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: 'suppression',
+    icon: Trash2,
+    title: 'Suppression de votre compte',
+    content: (
+      <div className="space-y-4 text-gray-600">
+        <p>
+          Vous pouvez à tout moment demander la suppression de votre
+          compte Altimmo :
+        </p>
+        <ol className="list-decimal ml-5 space-y-2">
+          <li>
+            <strong>Depuis l'application mobile</strong> — onglet Profil,
+            en bas de l'écran, section &laquo;&nbsp;Zone sensible&nbsp;&raquo;,
+            bouton <em>Supprimer mon compte</em>. Une double
+            confirmation vous est demandée avant traitement.
+          </li>
+          <li>
+            <strong>Depuis le site web</strong> — page publique{' '}
+            <Link href="/supprimer-mon-compte" className="text-blue-600 hover:underline">
+              /supprimer-mon-compte
+            </Link>
+            {' '}qui décrit la procédure et vous permet de contacter le
+            support.
+          </li>
+          <li>
+            <strong>Par email</strong> —{' '}
+            <a
+              href="mailto:support@altitudevision.agency"
+              className="text-blue-600 hover:underline"
+            >
+              support@altitudevision.agency
+            </a>
+            . Une vérification d'identité peut être demandée.
+          </li>
+        </ol>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">
+          <p className="font-medium text-gray-900 mb-1">
+            Effets de la suppression
+          </p>
+          <p className="text-sm">
+            Vos données personnelles (nom, email, téléphone, photo de
+            profil, biographie, identifiants d'authentification, jeton
+            push) sont effacées ou remplacées par des valeurs anonymes.
+            Vos sessions actives sont immédiatement invalidées.
+          </p>
+        </div>
+        <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+          <p className="font-medium text-amber-900 mb-1">
+            Données conservées ou anonymisées
+          </p>
+          <p className="text-sm text-amber-900">
+            Certaines données métier peuvent être conservées ou
+            anonymisées lorsque cela est nécessaire à l'intégrité des
+            transactions, obligations applicables ou litiges&nbsp;:
+            documents financiers (transactions, contrats, factures,
+            paiements) et messages échangés dans la messagerie interne
+            (l'auteur est anonymisé, le contenu reste visible aux
+            autres participants). Aucune durée précise n'est fixée par
+            cette politique&nbsp;: elle dépend des obligations locales
+            applicables.
+          </p>
+        </div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">
+          <p className="font-medium text-gray-900 mb-1">
+            Cas particulier
+          </p>
+          <p className="text-sm">
+            Si vous êtes seul administrateur actif d'une organisation
+            (agence, société) sur la plateforme, la suppression est
+            refusée pour éviter de la laisser sans responsable&nbsp;:
+            transférez d'abord l'administration à un autre membre.
+          </p>
+        </div>
       </div>
     ),
   },

@@ -91,6 +91,18 @@ module.exports = {
         'android.permission.READ_MEDIA_IMAGES',
         'android.permission.READ_EXTERNAL_STORAGE',
       ],
+
+      // GOOGLE-PLAY-P0-3 — Permissions injectées par les modules Expo
+      // natifs (expo-audio, react-native-modal…) mais qu'aucun code
+      // applicatif n'utilise. Les bloquer explicitement évite qu'elles
+      // apparaissent dans la fiche Play et déclenchent une revue
+      // supplémentaire. À réévaluer si l'app introduit un jour de
+      // l'enregistrement audio, du lock-screen media control, ou un
+      // overlay.
+      blockedPermissions: [
+        'android.permission.RECORD_AUDIO',
+        'android.permission.SYSTEM_ALERT_WINDOW',
+      ],
     },
 
     plugins: [

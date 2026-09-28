@@ -61,13 +61,33 @@ const SECTIONS = [
     content: [
       { type: 'text', value: 'Nous ne vendons jamais vos données. Elles peuvent être partagées avec :' },
       { type: 'bullets', items: [
-        'Cloudinary (stockage images)',
+        'Cloudinary (stockage des photos et documents)',
         'Render (hébergement serveur)',
-        'Netlify (hébergement site)',
+        'Netlify (hébergement du site web)',
         'MongoDB Atlas (base de données)',
+        'Expo Push et Expo Updates (notifications et mises à jour de l\'application)',
+        'Sentry (rapports de crash mobile)',
+        'Google Sign-In et Google Maps SDK (connexion et carte)',
+        'Zoho Mail (emails transactionnels)',
         'Autorités compétentes sur réquisition judiciaire',
       ]},
-      { type: 'text', value: 'Aucun transfert à des tiers à des fins commerciales sans votre consentement.' },
+      { type: 'text', value: 'Chaque prestataire ne reçoit que les données strictement nécessaires à sa fonction. Aucun transfert à des tiers à des fins commerciales sans votre consentement.' },
+    ],
+  },
+  {
+    id: 'application-mobile',
+    icon: 'phone-portrait-outline',
+    title: 'Traitements spécifiques à l\'application',
+    content: [
+      { type: 'text', value: 'L\'application Altimmo utilise certaines fonctions de votre appareil, uniquement lorsque nécessaire :' },
+      { type: 'bullets', items: [
+        'Notifications push : un identifiant Expo Push est enregistré côté serveur pour vous adresser des notifications ; supprimé à la déconnexion ou à la suppression du compte.',
+        'Localisation : approximative pour recentrer la carte ; précise uniquement lorsque vous capturez les coordonnées GPS d\'un bien que vous publiez. Aucun suivi en arrière-plan.',
+        'Photos et fichiers : appareil photo et galerie utilisés pour votre photo de profil, vos annonces et vos documents. Stockage via Cloudinary.',
+        'Messagerie : les messages échangés dans la messagerie interne sont stockés sur nos serveurs pour permettre leur consultation par les participants.',
+        'Rapports de crash : envoyés à Sentry pour corriger les erreurs de l\'application, peuvent contenir des métadonnées techniques sur l\'appareil.',
+        'Mises à jour : Expo Updates fournit les mises à jour de l\'application.',
+      ]},
     ],
   },
   {
@@ -127,6 +147,23 @@ const SECTIONS = [
         'Cookies analytiques (Google Analytics) : mesure d\'audience, chargés avec votre consentement uniquement',
       ]},
       { type: 'text', value: 'Vous pouvez gérer vos préférences via la bannière de cookies ou votre navigateur.' },
+    ],
+  },
+  {
+    id: 'suppression',
+    icon: 'trash-outline',
+    title: 'Suppression de votre compte',
+    content: [
+      { type: 'text', value: 'Vous pouvez à tout moment demander la suppression de votre compte :' },
+      { type: 'bullets', items: [
+        'Depuis cette application : onglet Profil → section Zone sensible → « Supprimer mon compte » (double confirmation).',
+        'Depuis le site web : page publique altitudevision.agency/supprimer-mon-compte.',
+        'Par email : support@altitudevision.agency (une vérification d\'identité peut être demandée).',
+      ]},
+      { type: 'text', value: 'Effets de la suppression : votre nom, email, téléphone, photo de profil, biographie, identifiants d\'authentification et jeton push sont effacés ou remplacés par des valeurs anonymes ; toutes vos sessions actives sont invalidées.' },
+      { type: 'text', value: 'Données conservées ou anonymisées : certaines données métier peuvent devoir être conservées ou anonymisées lorsque cela est nécessaire à l\'intégrité des transactions, obligations applicables ou litiges — notamment les documents financiers (transactions, contrats, factures, paiements) et les messages échangés (l\'auteur est alors anonymisé, le contenu reste visible aux autres participants).' },
+      { type: 'text', value: 'Cas particulier : si vous êtes seul administrateur actif d\'une organisation sur la plateforme, la suppression est refusée. Transférez d\'abord l\'administration à un autre membre.' },
+      { type: 'contact', icon: 'mail-outline', value: 'support@altitudevision.agency', email: 'mailto:support@altitudevision.agency' },
     ],
   },
   {

@@ -146,6 +146,64 @@ export default function ProfilScreen({ navigation }) {
     ]);
   }, [logout]);
 
+  // GOOGLE-PLAY-P0-1 — Suppression self-service du compte.
+  // Double confirmation (Google Play recommande d'éviter les tap accidentels)
+  // + libellé conforme (pas de promesse de suppression totale immédiate :
+  // certaines données métier peuvent être conservées ou anonymisées).
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const performAccountDeletion = useCallback(async () => {
+    if (deletingAccount) return;
+    setDeletingAccount(true);
+    try {
+      await api.delete('/users/me');
+      Alert.alert(
+        'Compte supprimé',
+        'Votre compte a été supprimé. Vous allez être déconnecté.',
+        [{ text: 'OK', onPress: logout }],
+      );
+    } catch (err) {
+      const code = err?.response?.data?.code;
+      const message = err?.response?.data?.message;
+      if (code === 'LAST_TENANT_ADMIN_ACCOUNT_DELETION_BLOCKED') {
+        Alert.alert(
+          'Suppression bloquée',
+          message || 'Vous êtes seul administrateur actif d\'une organisation. Transférez l\'administration avant de supprimer votre compte.',
+        );
+      } else {
+        Alert.alert(
+          'Erreur',
+          message || 'Impossible de supprimer le compte. Contactez support@altitudevision.agency.',
+        );
+      }
+    } finally {
+      setDeletingAccount(false);
+    }
+  }, [deletingAccount, logout]);
+
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(
+      'Supprimer mon compte',
+      "Cette action supprime ou anonymise les données personnelles associées à votre compte. Certaines données métier (transactions, contrats, factures, messages échangés) peuvent être conservées ou anonymisées pour préserver l'intégrité du service et répondre à d'éventuelles obligations applicables.\n\nSouhaitez-vous continuer ?",
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Continuer',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Confirmation finale',
+              "Cette action est irréversible. Voulez-vous vraiment supprimer votre compte ?",
+              [
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Supprimer mon compte', style: 'destructive', onPress: performAccountDeletion },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  }, [performAccountDeletion]);
+
   const THEME_OPTIONS = [
     { value: 'light',  label: 'Clair',   icon: 'sunny-outline' },
     { value: 'system', label: 'Système', icon: 'phone-portrait-outline' },
@@ -433,7 +491,7 @@ export default function ProfilScreen({ navigation }) {
           </View>
         </Animated.View>
 
-        {/* ─── Déconnexion ───────────────────────────────────── */}
+        {/* ─── Déconnexion + Suppression de compte ────────────── */}
         <Animated.View
           entering={FadeInDown.delay(340).springify().damping(18)}
           style={styles.dangerZone}
@@ -444,6 +502,13 @@ export default function ProfilScreen({ navigation }) {
               label="Se déconnecter"
               danger
               onPress={handleLogout}
+              styles={styles} c={c}
+            />
+            <MenuRow
+              icon="trash-outline"
+              label={deletingAccount ? 'Suppression en cours…' : 'Supprimer mon compte'}
+              danger
+              onPress={deletingAccount ? undefined : handleDeleteAccount}
               styles={styles} c={c}
             />
           </View>

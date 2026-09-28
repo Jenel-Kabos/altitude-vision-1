@@ -45,6 +45,12 @@ router.patch('/complete-profile',                         userController.complet
 // ✅ Enregistrer le token Expo Push (appelé par le mobile au démarrage)
 router.patch('/push-token',                               userController.savePushToken);
 
+// 🔴 GOOGLE-PLAY-P0-1 — Suppression self-service du compte de
+//    l'utilisateur authentifié. L'autorité provient EXCLUSIVEMENT de
+//    req.user (posé par `protect`). Aucun paramètre d'identité n'est
+//    accepté depuis le client — voir accountSelfDeletionService.js.
+router.delete('/me',                                      userController.deleteMyAccount);
+
 /* =======================================
    👑 ROUTES ADMIN UNIQUEMENT
 ======================================= */

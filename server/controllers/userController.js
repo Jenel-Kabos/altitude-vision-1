@@ -1,4 +1,5 @@
 // server/controllers/userController.js
+const accountSelfDeletionService = require('../services/accountSelfDeletionService');
 const User       = require('../models/User');
 const sendEmail  = require('../utils/email');
 const { destroyFromCloudinary, uploadToCloudinary } = require('../config/cloudinary');
@@ -693,5 +694,65 @@ exports.savePushToken = async (req, res) => {
     } catch (error) {
         console.error('❌ Erreur savePushToken:', error.message);
         res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+// ======================================================
+// 🔴 GOOGLE-PLAY-P0-1 — Suppression self-service du compte
+// ======================================================
+/**
+ * @description Suppression self-service du compte de l'utilisateur
+ *              authentifié. NE JAMAIS accepter un userId depuis body/params :
+ *              l'autorité provient exclusivement de `req.user` (vérifié par
+ *              authMiddleware.protect). Cf. accountSelfDeletionService.js
+ *              pour la stratégie (soft-delete + anonymisation).
+ * @route  DELETE /api/users/me
+ * @access Protected (auth JWT + compte actif)
+ */
+exports.deleteMyAccount = async (req, res) => {
+    try {
+        const result = await accountSelfDeletionService.deleteMyAccount({
+            authenticatedUserId: req.user._id,
+            reason: 'account_self_deletion',
+        });
+
+        // Audit (best effort — n'échoue jamais la réponse)
+        try {
+            logAction({
+                action: 'Compte supprimé (self-service)',
+                description: `Compte utilisateur ${req.user._id} supprimé à la demande de l'utilisateur`,
+                module: 'Utilisateurs',
+                typeAction: 'SUPPRESSION',
+                auteur: buildAuteur(req.user),
+                cible: { id: String(req.user._id), type: 'User', nom: 'Utilisateur supprimé' },
+                req,
+            });
+        } catch (_) { /* audit non bloquant */ }
+
+        return res.status(200).json({
+            status: 'success',
+            message: result.alreadyDeleted
+                ? 'Compte déjà supprimé.'
+                : 'Votre compte a été supprimé.',
+            data: {
+                userId: result.userId,
+                revokedMembershipsCount: result.revokedMembershipsCount,
+                alreadyDeleted: result.alreadyDeleted,
+            },
+        });
+    } catch (error) {
+        if (error?.name === 'AccountSelfDeletionError') {
+            return res.status(error.statusCode || 409).json({
+                status: 'fail',
+                code: error.code,
+                message: error.message,
+                ...(error.details ? { details: error.details } : {}),
+            });
+        }
+        console.error('❌ Erreur deleteMyAccount:', error);
+        return res.status(500).json({
+            status: 'error',
+            message: 'Erreur serveur lors de la suppression du compte.',
+        });
     }
 };
