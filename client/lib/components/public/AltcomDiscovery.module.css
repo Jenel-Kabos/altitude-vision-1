@@ -11,20 +11,25 @@
 .container {
   display: grid;
   gap: clamp(2.5rem, 6vw, 5.5rem);
+  grid-template-areas: 'identity' 'manifesto' 'heading' 'expertises' 'footer';
+  grid-template-columns: minmax(0, 1fr);
   margin: 0 auto;
   width: min(calc(100% - 2rem), 76rem);
 }
 
 .headingBlock {
+  grid-area: heading;
   max-width: 58rem;
 }
+
+.identity { grid-area: identity; }
 
 .eyebrow {
   color: var(--altcom-red);
   font-size: .72rem;
   font-weight: 700;
   letter-spacing: .2em;
-  margin: 0 0 clamp(1.5rem, 3vw, 2.5rem);
+  margin: 0;
   text-transform: uppercase;
 }
 
@@ -55,6 +60,7 @@
 .manifesto {
   background: var(--altcom-red);
   color: #fff8ed;
+  grid-area: manifesto;
   margin: 0;
   min-height: 22rem;
   overflow: hidden;
@@ -106,6 +112,7 @@
 
 .expertises {
   border-top: 1px solid rgba(23, 32, 30, .22);
+  grid-area: expertises;
 }
 
 .expertiseLink {
@@ -173,6 +180,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  grid-area: footer;
 }
 
 .footerRow p {
@@ -200,14 +208,17 @@
 
 @media (min-width: 48rem) {
   .container {
+    grid-template-areas: 'identity manifesto' 'heading manifesto' 'expertises manifesto' 'footer footer';
     grid-template-columns: minmax(0, 1.35fr) minmax(16rem, .65fr);
+    row-gap: clamp(1.5rem, 3vw, 2.5rem);
     width: min(calc(100% - 5rem), 76rem);
   }
 
-  .headingBlock { align-self: center; }
-  .manifesto { grid-column: 2; grid-row: 1 / span 2; min-height: 36rem; }
-  .expertises { grid-column: 1; }
-  .footerRow { align-items: center; flex-direction: row; grid-column: 1 / -1; justify-content: space-between; }
+  .identity { align-self: end; grid-area: identity; }
+  .headingBlock { grid-area: heading; }
+  .manifesto { grid-area: manifesto; min-height: 36rem; }
+  .expertises { grid-area: expertises; }
+  .footerRow { align-items: center; flex-direction: row; grid-area: footer; justify-content: space-between; }
 }
 
 @media (min-width: 64rem) {
@@ -223,3 +234,5 @@
 .commercialLinks { display:flex; flex-wrap:wrap; gap:.75rem 1.25rem; align-items:center; }
 .secondaryLink { color:#17201e; font-size:.72rem; font-weight:700; letter-spacing:.1em; min-height:2.75rem; display:inline-flex; align-items:center; gap:.4rem; text-decoration:none; text-transform:uppercase; }
 .secondaryLink:focus-visible { outline:3px solid #b62e36; outline-offset:3px; }
+  grid-area: manifesto;
+  grid-area: footer;

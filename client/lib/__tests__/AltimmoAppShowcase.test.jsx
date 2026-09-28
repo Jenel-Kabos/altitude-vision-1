@@ -32,17 +32,17 @@ describe('ALTIMMO APP SHOWCASE — produit mobile réel', () => {
     expect(section).not.toHaveTextContent(/App Store|Google Play/i);
   });
 
-  test('conserve le fond ivoire et présente les captures dans trois coques Samsung Galaxy S25 Ultra', () => {
+  test('conserve le fond ivoire et présente les captures dans trois coques Samsung Galaxy S23 Ultra', () => {
     render(<AltimmoAppShowcase />);
 
     const section = screen.getByTestId('altimmo-app-showcase');
     expect(section).toHaveAttribute('data-surface', 'ivory');
     expect(within(section).getByText('votre poche.')).toHaveAttribute('data-accent', 'brass');
-    expect(section.querySelectorAll('[data-device-model="samsung-galaxy-s25-ultra"]')).toHaveLength(3);
+    expect(section.querySelectorAll('[data-device-model="samsung-galaxy-s23-ultra"]')).toHaveLength(3);
     expect(section.querySelectorAll('[data-device-camera="punch-hole"]')).toHaveLength(3);
   });
 
-  test('met en scène les trois S25 Ultra avec une profondeur et des orientations distinctes', () => {
+  test('met en scène les trois S23 Ultra avec une profondeur et des commandes physiques distinctes', () => {
     render(<AltimmoAppShowcase />);
 
     const section = screen.getByTestId('altimmo-app-showcase');
@@ -51,5 +51,7 @@ describe('ALTIMMO APP SHOWCASE — produit mobile réel', () => {
     expect(section.querySelector('[data-device-perspective="right"]')).toBeInTheDocument();
     expect(section.querySelectorAll('[data-device-edge="titanium"]')).toHaveLength(3);
     expect(section.querySelectorAll('[data-device-reflection="glass"]')).toHaveLength(3);
+    expect(section.querySelectorAll('[data-device-button="volume"]')).toHaveLength(3);
+    expect(section.querySelectorAll('[data-device-button="power"]')).toHaveLength(3);
   });
 });

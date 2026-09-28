@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { PublicContainer, PublicEyebrow, PublicSectionHeading } from './PublicPrimitives';
 import EditorialMedia from './EditorialMedia';
-import { MotionImageReveal, MotionStagger, MotionStaggerItem } from './PublicMotion';
+import { MotionImageReveal, MotionReveal, MotionStagger, MotionStaggerItem } from './PublicMotion';
 import { editorialMedia } from '../../content/editorialMedia';
 import styles from './PublicFoundation.module.css';
 
@@ -10,8 +10,15 @@ export default function HeroEcosystem() {
   return <section className={styles.hero} data-testid="hero-commercial" aria-labelledby="hero-ecosystem-title">
     <PublicContainer>
       <div className={styles.heroGrid}>
-        <MotionStagger as="div" testId="motion-hero" trigger="mount">
-          <MotionStaggerItem><PublicEyebrow>Altitude Vision · Brazzaville</PublicEyebrow></MotionStaggerItem>
+        <MotionReveal className={styles.heroIdentity} trigger="mount">
+          <PublicEyebrow>Altitude Vision · Brazzaville</PublicEyebrow>
+        </MotionReveal>
+        <MotionImageReveal as="div" className={styles.heroComposition} delay={0.18} testId="hero-editorial-media" trigger="mount">
+          <figure className={`${styles.heroMedia} ${styles.heroMediaMain}`}><EditorialMedia className={styles.heroImage} eager media={editorialMedia.realisationsAltimmo} /><figcaption>Altimmo <span>Immobilier</span></figcaption></figure>
+          <figure className={styles.heroMedia}><EditorialMedia className={styles.heroImage} eager media={editorialMedia.realisationsAltcom} /><figcaption>Altcom <span>Communication</span></figcaption></figure>
+          <figure className={styles.heroMedia}><EditorialMedia className={styles.heroImage} eager media={editorialMedia.realisationsMila} /><figcaption>Mila Events <span>Événementiel</span></figcaption></figure>
+        </MotionImageReveal>
+        <MotionStagger as="div" className={styles.heroNarrative} testId="motion-hero" trigger="mount">
           <MotionStaggerItem><PublicSectionHeading as="h1" onDark lead="Trois expertises. Un seul partenaire pour faire avancer vos projets.">
             <span id="hero-ecosystem-title" className={styles.heroQuestions}>
               <span>Un bien à trouver&nbsp;?</span>
@@ -25,11 +32,6 @@ export default function HeroEcosystem() {
             <Link className={`${styles.button} ${styles.buttonSecondary}`} href="/contact">Parler de mon projet</Link>
           </MotionStaggerItem>
         </MotionStagger>
-        <MotionImageReveal as="div" className={styles.heroComposition} delay={0.18} testId="hero-editorial-media" trigger="mount">
-          <figure className={`${styles.heroMedia} ${styles.heroMediaMain}`}><EditorialMedia className={styles.heroImage} eager media={editorialMedia.realisationsAltimmo} /><figcaption>Altimmo <span>Immobilier</span></figcaption></figure>
-          <figure className={styles.heroMedia}><EditorialMedia className={styles.heroImage} eager media={editorialMedia.realisationsAltcom} /><figcaption>Altcom <span>Communication</span></figcaption></figure>
-          <figure className={styles.heroMedia}><EditorialMedia className={styles.heroImage} eager media={editorialMedia.realisationsMila} /><figcaption>Mila Events <span>Événementiel</span></figcaption></figure>
-        </MotionImageReveal>
       </div>
     </PublicContainer>
   </section>;

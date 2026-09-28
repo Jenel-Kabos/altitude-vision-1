@@ -14,12 +14,8 @@ export default function MilaEventsDiscovery() {
   return (
     <section className={styles.section} data-testid="mila-events-discovery" aria-labelledby="mila-events-discovery-title">
       <div className={styles.container}>
-        <MotionReveal className={styles.headingBlock} testId="motion-mila">
+        <MotionReveal className={styles.identity} testId="motion-mila">
           <p className={styles.eyebrow}>Mila Events — Événementiel</p>
-          <h2 id="mila-events-discovery-title">
-            Vos moments méritent{' '}
-            <em>une mise en scène inoubliable.</em>
-          </h2>
         </MotionReveal>
 
         <MotionImageReveal as="figure" className={styles.media} delay={0.08} testId="mila-editorial-media">
@@ -29,6 +25,13 @@ export default function MilaEventsDiscovery() {
             <small>Photographie éditoriale temporaire</small>
           </figcaption>
         </MotionImageReveal>
+
+        <MotionReveal className={styles.headingBlock}>
+          <h2 id="mila-events-discovery-title">
+            Vos moments méritent{' '}
+            <em>une mise en scène inoubliable.</em>
+          </h2>
+        </MotionReveal>
 
         <div className={styles.story}>
           <p className={styles.intro}>

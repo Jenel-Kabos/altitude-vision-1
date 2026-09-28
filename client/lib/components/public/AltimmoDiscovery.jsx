@@ -97,8 +97,39 @@ export default function AltimmoDiscovery() {
   return (
     <section className={styles.section} data-testid="altimmo-discovery" aria-labelledby="altimmo-discovery-title">
       <div className={styles.container}>
-        <MotionReveal as="header" className={styles.intro} testId="motion-altimmo">
+        <MotionReveal className={styles.identity} testId="motion-altimmo">
           <p className={styles.eyebrow}>Altimmo — Immobilier</p>
+        </MotionReveal>
+
+        <div className={styles.mediaStory} data-story-media>
+          <div className={styles.proofHeader}>
+            <p>{hasFeaturedProperties ? 'Une sélection disponible' : 'Explorez nos opportunités immobilières'}</p>
+            <span>{hasFeaturedProperties ? 'Biens récents' : 'L’univers Altimmo'}</span>
+          </div>
+          <div className={`${styles.results} ${state === 'success' ? styles.resultsSuccess : ''}`}>
+            {state === 'loading' && <p className={styles.state} aria-live="polite"><span className={styles.loadingDot} aria-hidden="true" />Chargement des opportunités Altimmo…</p>}
+            {(state === 'empty' || state === 'error') && <p className={styles.state} aria-live="polite">Découvrez les biens proposés par Altimmo ou explorez l’ensemble de nos annonces.</p>}
+            {(state === 'empty' || state === 'error') && (
+              <MotionImageReveal as="figure" className={styles.editorialFallback}>
+                <EditorialMedia
+                  className={styles.editorialFallbackImage}
+                  media={editorialMedia.altimmoFallback}
+                  testId="altimmo-editorial-fallback"
+                />
+                <figcaption>Habiter, investir, séjourner.</figcaption>
+              </MotionImageReveal>
+            )}
+            {state === 'success' && items.map((property, index) => (
+              <PropertyPreview
+                property={property}
+                layout={index === 0 ? 'featured' : 'secondary'}
+                key={property._id || `${property.title}-${index}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <MotionReveal as="header" className={styles.intro}>
           <h2 id="altimmo-discovery-title">Le bon lieu peut changer un projet de vie.</h2>
           <p className={styles.lede}>Trouvez un bien à acheter, à louer ou pour séjourner — ou confiez-nous le vôtre.</p>
         </MotionReveal>
@@ -113,31 +144,6 @@ export default function AltimmoDiscovery() {
           ))}
         </MotionStagger>
 
-        <div className={styles.proofHeader}>
-          <p>{hasFeaturedProperties ? 'Une sélection disponible' : 'Explorez nos opportunités immobilières'}</p>
-          <span>{hasFeaturedProperties ? 'Biens récents' : 'L’univers Altimmo'}</span>
-        </div>
-        <div className={`${styles.results} ${state === 'success' ? styles.resultsSuccess : ''}`}>
-          {state === 'loading' && <p className={styles.state} aria-live="polite"><span className={styles.loadingDot} aria-hidden="true" />Chargement des opportunités Altimmo…</p>}
-          {(state === 'empty' || state === 'error') && <p className={styles.state} aria-live="polite">Découvrez les biens proposés par Altimmo ou explorez l’ensemble de nos annonces.</p>}
-          {(state === 'empty' || state === 'error') && (
-            <MotionImageReveal as="figure" className={styles.editorialFallback}>
-              <EditorialMedia
-                className={styles.editorialFallbackImage}
-                media={editorialMedia.altimmoFallback}
-                testId="altimmo-editorial-fallback"
-              />
-              <figcaption>Habiter, investir, séjourner.</figcaption>
-            </MotionImageReveal>
-          )}
-          {state === 'success' && items.map((property, index) => (
-            <PropertyPreview
-              property={property}
-              layout={index === 0 ? 'featured' : 'secondary'}
-              key={property._id || `${property.title}-${index}`}
-            />
-          ))}
-        </div>
         <div className={styles.commercialLinks}>
           <Link className={styles.catalogLink} href="/immobilier/annonces">Voir nos annonces <span aria-hidden="true">→</span></Link>
           <Link href="/immobilier">Découvrir Altimmo <span aria-hidden="true">→</span></Link>

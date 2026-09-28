@@ -29,15 +29,8 @@ export default function AltcomDiscovery() {
   return (
     <section className={styles.section} data-testid="altcom-discovery" aria-labelledby="altcom-discovery-title">
       <div className={styles.container}>
-        <MotionReveal className={styles.headingBlock} testId="motion-altcom">
+        <MotionReveal className={styles.identity} testId="motion-altcom">
           <p className={styles.eyebrow}>Altcom — Communication</p>
-          <h2 id="altcom-discovery-title">
-            Votre entreprise mérite une communication<br />
-            <em>à la hauteur de ses ambitions.</em>
-          </h2>
-          <p className={styles.intro}>
-            Stratégie, image, contenu et communication digitale&nbsp;: Altcom transforme vos idées en une expression claire et cohérente.
-          </p>
         </MotionReveal>
 
         <MotionImageReveal as="figure" className={styles.manifesto} testId="altcom-editorial-media">
@@ -48,6 +41,16 @@ export default function AltcomDiscovery() {
             <span className={styles.manifestoWord}>altcom</span>
           </figcaption>
         </MotionImageReveal>
+
+        <MotionReveal className={styles.headingBlock}>
+          <h2 id="altcom-discovery-title">
+            Votre entreprise mérite une communication<br />
+            <em>à la hauteur de ses ambitions.</em>
+          </h2>
+          <p className={styles.intro}>
+            Stratégie, image, contenu et communication digitale&nbsp;: Altcom transforme vos idées en une expression claire et cohérente.
+          </p>
+        </MotionReveal>
 
         <MotionStagger as="nav" className={styles.expertises} aria-label="Expertises Altcom">
           {expertiseLinks.map((expertise) => (

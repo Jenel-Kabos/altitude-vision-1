@@ -116,8 +116,11 @@ export default function AltimmoAppShowcase() {
             >
               <div className={styles.deviceBody}>
                 <span className={styles.deviceEdge} data-device-edge="titanium" aria-hidden="true" />
-                <span className={styles.sideKeys} aria-hidden="true" />
-                <div className={styles.deviceFrame} data-device-model="samsung-galaxy-s25-ultra">
+                <span className={styles.sideKeys} aria-hidden="true">
+                  <span className={styles.volumeKey} data-device-button="volume" />
+                  <span className={styles.powerKey} data-device-button="power" />
+                </span>
+                <div className={styles.deviceFrame} data-device-model="samsung-galaxy-s23-ultra">
                   <span className={styles.camera} data-device-camera="punch-hole" aria-hidden="true" />
                   <img
                     src={device.src}
