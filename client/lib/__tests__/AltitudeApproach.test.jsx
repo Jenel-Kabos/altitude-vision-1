@@ -59,7 +59,11 @@ describe('WEB-07 — Altitude Vision, approche parent-brand', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: /vision commune/i })).toBeVisible();
     expect(screen.getByText(/réunit l’immobilier, la communication et l’événementiel/i)).toBeVisible();
-    expect(screen.getByText('Comprendre le besoin')).toBeVisible();
+    // HOME-DESIGN-01 — les trois pôles sont le contenu essentiel de WEB-07
+    // (le processus en trois étapes vit désormais dans WEB-08).
+    ['Altimmo', 'Altcom', 'Mila Events'].forEach((name) => {
+      expect(screen.getByRole('heading', { level: 3, name })).toBeVisible();
+    });
 
     window.IntersectionObserver = originalIO;
   });
@@ -82,7 +86,16 @@ describe('WEB-07 — Altitude Vision, approche parent-brand', () => {
 
     expect(section).not.toHaveTextContent(/\d+\+|\d+\s?%|témoignage|ils nous font confiance|depuis \d{4}|fondée en/i);
     expect(within(section).queryByRole('blockquote')).not.toBeInTheDocument();
-    expect(within(section).queryByRole('img')).not.toBeInTheDocument();
+    // HOME-DESIGN-01 — seules les trois photographies éditoriales locales des
+    // pôles sont autorisées (jamais de logo client ni de média externe).
+    const images = within(section).getAllByRole('img');
+    expect(images).toHaveLength(3);
+    images.forEach((image) => {
+      expect(image.getAttribute('src')).toMatch(/^\/images\/editorial-temp\/.+\.webp$/);
+      expect(image.getAttribute('alt')).toBeTruthy();
+      expect(image).toHaveAttribute('loading', 'lazy');
+      expect(image.getAttribute('alt')).not.toMatch(/logo|client|partenaire/i);
+    });
   });
 
   test('WEB07-11 : ne recrée pas la grille générique "Trois pôles, une seule vision"', () => {
@@ -126,10 +139,58 @@ describe('WEB-07 — Altitude Vision, approche parent-brand', () => {
     expect(screen.queryByText(/200\+ familles logées/i)).not.toBeInTheDocument();
   });
 
-  test('WEB07-20 : ne crée pas de nouvelle route /a-propos, le CTA cible une route existante', () => {
+  test('WEB07-20 : ne crée pas de nouvelle route /a-propos, les CTA ciblent des routes existantes', () => {
     renderHomepage();
     const section = screen.getByTestId('web07-about');
-    const cta = within(section).getByRole('link', { name: /Nous contacter/i });
-    expect(cta).toHaveAttribute('href', '/contact');
+    // HOME-DESIGN-01 — chaque carte pôle mène à la route publique existante.
+    expect(within(section).getByRole('link', { name: /Découvrir Altimmo/i })).toHaveAttribute('href', '/immobilier');
+    expect(within(section).getByRole('link', { name: /Découvrir Altcom/i })).toHaveAttribute('href', '/communication');
+    expect(within(section).getByRole('link', { name: /Découvrir Mila Events/i })).toHaveAttribute('href', '/evenementiel');
+    within(section).getAllByRole('link').forEach((link) => {
+      expect(link).not.toHaveAttribute('href', '/a-propos');
+    });
+    // La conclusion commerciale unique de la séquence reste CommercialFinalCta
+    // (après la réassurance) : aucun autre lien /contact entre WEB-07 et elle.
+    const finalCta = screen.getByTestId('commercial-final-cta');
+    expect(within(finalCta).getByRole('link', { name: /Parler de mon projet/i })).toHaveAttribute('href', '/contact');
+    ['web07-about', 'web08-credibility', 'web11-trust'].forEach((id) => {
+      within(screen.getByTestId(id)).queryAllByRole('link').forEach((link) => {
+        expect(link).not.toHaveAttribute('href', '/contact');
+      });
+    });
+  });
+
+  test('WEB07-22 : aucune déclaration CSS orpheline dans les modules publics (elle invaliderait la règle suivante du bundle)', () => {
+    // HOME-DESIGN-01 — deux déclarations hors règle en fin de
+    // AltcomDiscovery.module.css fusionnaient, une fois bundlées, avec le
+    // sélecteur suivant (`.AltitudeApproach_section`) : le fond sombre et
+    // les variables de WEB-07 étaient silencieusement ignorés en production.
+    const dir = path.resolve(__dirname, '../components/public');
+    const orphans = [];
+    fs.readdirSync(dir).filter((file) => file.endsWith('.module.css')).forEach((file) => {
+      const css = fs.readFileSync(path.join(dir, file), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      let depth = 0;
+      let buffer = '';
+      for (const char of css) {
+        if (char === '{') { depth += 1; buffer = ''; } else if (char === '}') { depth -= 1; buffer = ''; } else if (depth === 0) {
+          buffer += char;
+          if (char === ';' && /^[a-z-]+\s*:/.test(buffer.trim())) orphans.push(`${file}: ${buffer.trim()}`);
+          if (char === ';') buffer = '';
+        }
+      }
+    });
+    expect(orphans).toEqual([]);
+  });
+
+  test('WEB07-21 : aucune répétition — le processus n\'apparaît pas dans WEB-07, une seule fois dans WEB-08', () => {
+    renderHomepage();
+    const approach = screen.getByTestId('web07-about');
+    const method = screen.getByTestId('web08-credibility');
+    ['Comprendre votre besoin', 'Coordonner les expertises', 'Réaliser votre projet'].forEach((label) => {
+      expect(approach).not.toHaveTextContent(label);
+      expect(within(method).getAllByText(label)).toHaveLength(1);
+      expect(screen.getAllByText(label)).toHaveLength(1);
+    });
+    expect(approach).not.toHaveTextContent(/Notre manière de faire|Terrain & coordination/);
   });
 });

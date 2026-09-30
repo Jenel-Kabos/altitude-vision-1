@@ -119,12 +119,28 @@ describe('WEB-08 — méthode/crédibilité parent-brand', () => {
     expect(section).not.toHaveTextContent(/Mila Events/i);
   });
 
-  test('WEB08-22 : ne recrée pas les trois principes exacts de WEB-07', () => {
+  test('WEB08-22 : le processus n\'est présenté qu\'une seule fois sur la homepage (aucune répétition avec WEB-07)', () => {
+    // HOME-DESIGN-01 — les trois étapes vivent uniquement dans WEB-08 ; WEB-07
+    // (mocké ici) présente les pôles. L'absence d'étape dans le vrai WEB-07 est
+    // vérifiée par WEB07-21 (AltitudeApproach.test.jsx, composants réels).
     renderHomepage();
     const section = screen.getByTestId('web08-credibility');
-    expect(section).not.toHaveTextContent(/Comprendre le besoin/i);
-    expect(section).not.toHaveTextContent(/Coordonner les expertises/i);
-    expect(section).not.toHaveTextContent(/Transformer l.idée en réalisation/i);
+    const labels = ['Comprendre votre besoin', 'Coordonner les expertises', 'Réaliser votre projet'];
+    labels.forEach((label) => {
+      expect(within(section).getAllByRole('heading', { level: 3, name: label })).toHaveLength(1);
+      expect(screen.getAllByText(label)).toHaveLength(1);
+    });
+  });
+
+  test('WEB08-23 : le processus se termine sans seconde bande commerciale (conclusion unique = CommercialFinalCta)', () => {
+    // HOME-DESIGN-01 clôture — la bande « Vous avez un projet ? » ajoutée ici
+    // doublonnait CommercialFinalCta (même message, même destination /contact)
+    // deux sections plus bas : elle est retirée.
+    renderHomepage();
+    const section = screen.getByTestId('web08-credibility');
+    expect(screen.queryByTestId('web08-cta')).not.toBeInTheDocument();
+    expect(within(section).queryAllByRole('link')).toHaveLength(0);
+    expect(section).not.toHaveTextContent(/Vous avez un projet|Nous contacter|Parlons-en/i);
   });
 
   test('accessibilité : titre H2 sémantique et section identifiable', () => {

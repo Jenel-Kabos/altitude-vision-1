@@ -234,5 +234,3 @@
 .commercialLinks { display:flex; flex-wrap:wrap; gap:.75rem 1.25rem; align-items:center; }
 .secondaryLink { color:#17201e; font-size:.72rem; font-weight:700; letter-spacing:.1em; min-height:2.75rem; display:inline-flex; align-items:center; gap:.4rem; text-decoration:none; text-transform:uppercase; }
 .secondaryLink:focus-visible { outline:3px solid #b62e36; outline-offset:3px; }
-  grid-area: manifesto;
-  grid-area: footer;

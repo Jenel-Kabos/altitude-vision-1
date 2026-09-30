@@ -37,7 +37,9 @@ describe('WEB-VISUAL-02 — photographie éditoriale temporaire', () => {
     await screen.findByAltText('Bien public validé');
 
     const temporaryImages = screen.getAllByRole('img').filter((image) => image.getAttribute('src')?.includes('/images/editorial-temp/'));
-    expect(temporaryImages).toHaveLength(8);
+    // HOME-DESIGN-01 — +3 : les cartes pôles de WEB-07 (Altimmo, Altcom,
+    // Mila Events) réutilisent le même registre éditorial local.
+    expect(temporaryImages).toHaveLength(11);
     temporaryImages.forEach((image) => {
       expect(image.getAttribute('src')).toMatch(/^\/images\/editorial-temp\/[a-z0-9-]+\.webp$/);
       expect(image).toHaveAttribute('width');
