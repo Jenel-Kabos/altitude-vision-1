@@ -40,7 +40,7 @@ const { requireTenantModule } = require('../middleware/tenantModuleGate');
 const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 const { requireTenantMembershipRoleOrPlatformCapability } = require('../middleware/tenantMembershipRoleOrPlatformCapability');
 const { resolveTenantMembershipIfPresent } = require('../middleware/resolveTenantMembershipIfPresent');
-const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
+const { requirePlatformOperatorCapability, requirePlatformOperatorCapabilityWhenPresent } = require('../middleware/platformAuthority');
 
 // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-2 (2026-09-22) — helpers réutilisables
 // pour composer autorité tenant OU capability plateforme sur le domaine
@@ -128,6 +128,7 @@ router.get(
   '/',
   authController.optionalAuth,
   requireTenantScopeForStaffAllowPlatformWide,
+  requirePlatformOperatorCapabilityWhenPresent('platform.properties.read'),
   propertyController.getAllProperties,
 );
 

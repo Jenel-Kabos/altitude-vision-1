@@ -10,9 +10,9 @@
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/platformOperatorController');
-const { requireGlobalAdmin, requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
+const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
 
-router.use(auth.protect, requireGlobalAdmin);
+router.use(auth.protect);
 
 router.get('/me', controller.getMyOperatorStatus);
 

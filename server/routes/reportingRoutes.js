@@ -9,9 +9,17 @@ const controller = require('../controllers/reportingController');
 // (déjà supporté nativement par reportingService.js, jamais un KPI
 // fabriqué pour ce sprint — voir scopeParams dans reportingController.js).
 const { requireTenantScopeAllowPlatformWide } = require('../middleware/tenantContext');
+const { requireTenantBusinessRoleOrPlatformCapability } = require('../middleware/platformAuthority');
 
 const DIRECTION = ['Admin', 'GestionnaireImmobilier'];
-router.use(auth.protect, auth.restrictTo(...DIRECTION), requireTenantScopeAllowPlatformWide);
+router.use(
+  auth.protect,
+  requireTenantScopeAllowPlatformWide,
+  requireTenantBusinessRoleOrPlatformCapability({
+    tenantRoles: DIRECTION,
+    platformCapability: 'platform.reporting.read',
+  }),
+);
 
 router.get('/executive', controller.getExecutive);
 router.get('/domains/:domain', controller.getDomain);

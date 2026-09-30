@@ -43,7 +43,7 @@ async function buildTenantWithProperty(label) {
   const owner = await User.create({ name: `Owner ${label}`, email: `p0e-owner-${label}-${seq}-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   const tenant = await platformTenantService.createTenant({ name: `P0E-${label}-${seq}-${Date.now()}`, actor: admin });
   await Promise.all([
-    organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
+    organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, businessRole: 'Admin', actor: admin }),
     organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
   ]);
   const property = await Property.create({

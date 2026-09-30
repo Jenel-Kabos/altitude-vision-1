@@ -4,12 +4,13 @@ const mongoose = require('mongoose');
 const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
 const { upload } = require('../config/cloudinary');
-const { protect, restrictTo } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 const { requireTenantScope } = require('../middleware/tenantContext');
 const { attachTenantContext } = require('../middleware/tenantContext');
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
 const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
 const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
+const { resolveTenantMembership } = require('../services/tenantMembershipService');
 
 const router = express.Router();
 
@@ -63,12 +64,19 @@ router.delete('/me',                                      userController.deleteM
 // dépôt — attache `req.tenantScopeUserIds` : l'ensemble des utilisateurs
 // réellement membres du tenant actif (ou du tenant explicitement sélectionné
 // par un PlatformOperator). Jamais un correctif isolé par contrôleur.
-router.use(restrictTo('Admin'), attachTenantContext);
+router.use(attachTenantContext);
 
 // Tenant Admin legacy remains tenant-scoped. A PlatformOperator with the
 // explicit users.read capability may use the same resource in platform mode.
 const requireUsersReadScope = async (req, res, next) => {
   if (req.isPlatformOperatorContext) {
+    if (req.tenantContextSource === 'platform_operator_tenant_not_found') {
+      return res.status(403).json({
+        status: 'fail',
+        code: 'PLATFORM_OPERATOR_TENANT_SELECTION_REQUIRED',
+        message: 'Accès refusé : le tenant sélectionné est introuvable.',
+      });
+    }
     req.platformOperator = req.platformOperator || await resolveActiveOperator(req.user?._id || req.user?.id).catch(() => null);
     if (!hasCapability(req.platformOperator, 'platform.users.read')) {
       return res.status(403).json({ status: 'fail', message: 'Capacité platform.users.read requise.' });
@@ -78,7 +86,19 @@ const requireUsersReadScope = async (req, res, next) => {
     if (req.platformTenant) return requireTenantScope(req, res, next);
     return next();
   }
-  return requireTenantScope(req, res, next);
+  return requireTenantScope(req, res, async (error) => {
+    if (error) return next(error);
+    const membership = await resolveTenantMembership(req.user?._id || req.user?.id, req.platformTenant?._id).catch(() => null);
+    if (membership?.ambiguous) {
+      return res.status(403).json({ status: 'fail', code: 'AMBIGUOUS_ACTIVE_TENANT_MEMBERSHIP', message: 'Adhésions actives multiples : accès refusé.' });
+    }
+    if (membership?.businessRole !== 'Admin') {
+      return res.status(403).json({ status: 'fail', message: 'Administration tenant requise.' });
+    }
+    req.tenantMembership = membership.membership;
+    req.tenantBusinessRole = membership.businessRole;
+    return next();
+  });
 };
 
 const requireUsersManageForPlatformOperator = (req, res, next) => {

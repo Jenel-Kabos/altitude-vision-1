@@ -11,7 +11,9 @@
 // Le séparer ainsi évite qu'une future route oublie la garde en réutilisant
 // le service : la garde vit dans un seul routeur, jamais dupliquée.
 const PlatformOperator = require('../../models/PlatformOperator');
+const PlatformAuthorityLock = require('../../models/PlatformAuthorityLock');
 const User = require('../../models/User');
+const mongoose = require('mongoose');
 const { PLATFORM_OPERATOR_CAPABILITIES } = require('../../constants/platformOperatorConstants');
 const { logAction, buildAuteur } = require('../actionLogService');
 
@@ -19,6 +21,109 @@ class PlatformOperatorError extends Error {
   constructor(code, message, statusCode = 400) { super(message); this.name = 'PlatformOperatorError'; this.code = code; this.statusCode = statusCode; }
 }
 const fail = (code, message, statusCode) => { throw new PlatformOperatorError(code, message, statusCode); };
+const VIABILITY_CAPABILITY = 'platform.operators.manage';
+
+async function runInAuthorityTransaction(fn) {
+  let session = null;
+  try { session = await mongoose.connection.startSession(); } catch { session = null; }
+  if (!session) return fn(null);
+  try {
+    let result;
+    await session.withTransaction(async () => { result = await fn(session); });
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
+async function acquireAuthoritySentinelLock(session) {
+  const options = { upsert: true, new: true, setDefaultsOnInsert: true, ...(session ? { session } : {}) };
+  await PlatformAuthorityLock.findOneAndUpdate(
+    { _id: 'platform-authority' },
+    { $inc: { revision: 1 } },
+    options,
+  );
+}
+
+async function countViableOperators({ excludeUserId = null, session = null } = {}) {
+  const operatorQuery = PlatformOperator.find({
+    status: 'active',
+    capabilities: VIABILITY_CAPABILITY,
+    ...(excludeUserId ? { user: { $ne: excludeUserId } } : {}),
+  }).select('user');
+  if (session) operatorQuery.session(session);
+  const operators = await operatorQuery.lean();
+  if (!operators.length) return 0;
+  const userQuery = User.countDocuments({
+    _id: { $in: operators.map((operator) => operator.user) },
+    isActive: true,
+    status: { $nin: ['Suspendu', 'Banni', 'Supprimé'] },
+  });
+  if (session) userQuery.session(session);
+  return userQuery;
+}
+
+async function assertCanRemoveViableOperator(userId, session) {
+  const operatorQuery = PlatformOperator.findOne({ user: userId });
+  if (session) operatorQuery.session(session);
+  const operator = await operatorQuery.lean();
+  if (!operator || operator.status !== 'active' || !operator.capabilities?.includes(VIABILITY_CAPABILITY)) return;
+
+  const userQuery = User.findById(userId).select('_id isActive status');
+  if (session) userQuery.session(session);
+  const user = await userQuery.lean();
+  const currentlyViable = user && user.isActive && !['Suspendu', 'Banni', 'Supprimé'].includes(user.status);
+  if (!currentlyViable) return;
+
+  const others = await countViableOperators({ excludeUserId: userId, session });
+  if (others === 0) {
+    fail('LAST_PLATFORM_OPERATOR', 'Impossible de désactiver le dernier opérateur plateforme viable.', 409);
+  }
+}
+
+async function guardUserViabilityMutation({ userId, operation }) {
+  return runInAuthorityTransaction(async (session) => {
+    await acquireAuthoritySentinelLock(session);
+    await assertCanRemoveViableOperator(userId, session);
+    return operation(session);
+  });
+}
+
+async function assertNoPlatformOperatorForHardDelete(userId, session = null) {
+  const query = PlatformOperator.exists({ user: userId });
+  if (session) query.session(session);
+  if (await query) {
+    fail(
+      'PLATFORM_OPERATOR_HARD_DELETE_REQUIRES_HUMAN_DECISION',
+      "Suppression physique refusée : l'identité possède un historique PlatformOperator à préserver.",
+      409,
+    );
+  }
+}
+
+async function transitionOperatorForUserLifecycle({ userId, status, actor, reason, session = null }) {
+  if (!['suspended', 'revoked'].includes(status)) {
+    fail('PLATFORM_OPERATOR_INVALID_STATUS', 'Transition opérateur invalide.', 422);
+  }
+  const query = PlatformOperator.findOne({ user: userId });
+  if (session) query.session(session);
+  const operator = await query;
+  if (!operator || operator.status === 'revoked') return null;
+  const now = new Date();
+  if (status === 'suspended') {
+    operator.status = 'suspended';
+    operator.suspendedBy = actor?._id || actor?.id || userId;
+    operator.suspendedAt = now;
+    operator.suspensionReason = reason;
+  } else {
+    operator.status = 'revoked';
+    operator.revokedBy = actor?._id || actor?.id || userId;
+    operator.revokedAt = now;
+    operator.revokeReason = reason;
+  }
+  await operator.save({ session });
+  return operator.toObject();
+}
 
 async function audit(event, { actor, targetUserId, reason, before, after, req }) {
   await logAction({
@@ -94,23 +199,35 @@ async function grantOperator({ userId, capabilities = [], actor, reason, req, al
   const targetUser = await User.findOne({ _id: userId, isTechnical: { $ne: true } }).select('_id isActive status');
   if (!targetUser) fail('PLATFORM_OPERATOR_USER_NOT_FOUND', 'Utilisateur cible introuvable.', 404);
 
-  const existing = await PlatformOperator.findOne({ user: userId });
-  const before = existing ? { status: existing.status, capabilities: existing.capabilities } : null;
-
-  const doc = existing || new PlatformOperator({ user: userId });
-  doc.status = 'active';
-  doc.capabilities = [...new Set(capabilities)];
-  doc.grantedBy = actor._id || actor.id;
-  doc.grantedAt = new Date();
-  doc.grantReason = reason.trim();
-  doc.suspendedBy = null;
-  doc.suspendedAt = null;
-  doc.suspensionReason = null;
-  doc.revokedBy = null;
-  doc.revokedAt = null;
-  doc.revokeReason = null;
+  let before;
+  let saved;
   try {
-    await doc.save();
+    saved = await runInAuthorityTransaction(async (session) => {
+      await acquireAuthoritySentinelLock(session);
+      const existingQuery = PlatformOperator.findOne({ user: userId });
+      if (session) existingQuery.session(session);
+      const existing = await existingQuery;
+      before = existing ? { status: existing.status, capabilities: existing.capabilities } : null;
+      const removesViability = existing?.status === 'active'
+        && existing.capabilities?.includes(VIABILITY_CAPABILITY)
+        && !capabilities.includes(VIABILITY_CAPABILITY);
+      if (removesViability) await assertCanRemoveViableOperator(userId, session);
+
+      const doc = existing || new PlatformOperator({ user: userId });
+      doc.status = 'active';
+      doc.capabilities = [...new Set(capabilities)];
+      doc.grantedBy = actor._id || actor.id;
+      doc.grantedAt = new Date();
+      doc.grantReason = reason.trim();
+      doc.suspendedBy = null;
+      doc.suspendedAt = null;
+      doc.suspensionReason = null;
+      doc.revokedBy = null;
+      doc.revokedAt = null;
+      doc.revokeReason = null;
+      await doc.save({ session });
+      return doc.toObject();
+    });
   } catch (error) {
     // PLATFORM-ADMIN-BOOTSTRAP-1 — sous concurrence, deux appels simultanés
     // pour un MÊME utilisateur sans document préexistant peuvent tous deux
@@ -126,8 +243,8 @@ async function grantOperator({ userId, capabilities = [], actor, reason, req, al
     throw error;
   }
 
-  await audit('granted', { actor, targetUserId: userId, reason, before, after: { status: doc.status, capabilities: doc.capabilities }, req });
-  return doc.toObject();
+  await audit('granted', { actor, targetUserId: userId, reason, before, after: { status: saved.status, capabilities: saved.capabilities }, req });
+  return saved;
 }
 
 // SUSPEND — réversible (reactivateOperator), pour un besoin temporaire
@@ -135,24 +252,27 @@ async function grantOperator({ userId, capabilities = [], actor, reason, req, al
 async function suspendOperator({ userId, actor, reason, req }) {
   if (!actor) fail('PLATFORM_OPERATOR_ACTOR_REQUIRED', 'Un acteur authentifié est requis.', 401);
   if (!reason || !reason.trim()) fail('PLATFORM_OPERATOR_REASON_REQUIRED', 'Un motif est requis.', 422);
-  const doc = await PlatformOperator.findOne({ user: userId });
-  if (!doc) fail('PLATFORM_OPERATOR_NOT_FOUND', 'Aucun opérateur trouvé pour cet utilisateur.', 404);
-  if (doc.status === 'revoked') fail('PLATFORM_OPERATOR_REVOKED', 'Cet opérateur a été révoqué ; une nouvelle attribution est requise.', 409);
-  // Un opérateur ne peut jamais se suspendre lui-même via cette route — évite
-  // qu'une session compromise ou une erreur d'interface ne verrouille
-  // silencieusement le seul opérateur actif restant sans acteur distinct
-  // pour constater/annuler l'incident.
-  if (String(doc.user) === String(actor._id || actor.id)) fail('PLATFORM_OPERATOR_SELF_ACTION_FORBIDDEN', 'Un opérateur ne peut pas suspendre sa propre capacité.', 403);
+  let before;
+  const saved = await runInAuthorityTransaction(async (session) => {
+    await acquireAuthoritySentinelLock(session);
+    const query = PlatformOperator.findOne({ user: userId });
+    if (session) query.session(session);
+    const doc = await query;
+    if (!doc) fail('PLATFORM_OPERATOR_NOT_FOUND', 'Aucun opérateur trouvé pour cet utilisateur.', 404);
+    if (doc.status === 'revoked') fail('PLATFORM_OPERATOR_REVOKED', 'Cet opérateur a été révoqué ; une nouvelle attribution est requise.', 409);
+    if (String(doc.user) === String(actor._id || actor.id)) fail('PLATFORM_OPERATOR_SELF_ACTION_FORBIDDEN', 'Un opérateur ne peut pas suspendre sa propre capacité.', 403);
+    await assertCanRemoveViableOperator(userId, session);
+    before = { status: doc.status };
+    doc.status = 'suspended';
+    doc.suspendedBy = actor._id || actor.id;
+    doc.suspendedAt = new Date();
+    doc.suspensionReason = reason.trim();
+    await doc.save({ session });
+    return doc.toObject();
+  });
 
-  const before = { status: doc.status };
-  doc.status = 'suspended';
-  doc.suspendedBy = actor._id || actor.id;
-  doc.suspendedAt = new Date();
-  doc.suspensionReason = reason.trim();
-  await doc.save();
-
-  await audit('suspended', { actor, targetUserId: userId, reason, before, after: { status: doc.status }, req });
-  return doc.toObject();
+  await audit('suspended', { actor, targetUserId: userId, reason, before, after: { status: saved.status }, req });
+  return saved;
 }
 
 async function reactivateOperator({ userId, actor, reason, req }) {
@@ -180,19 +300,26 @@ async function reactivateOperator({ userId, actor, reason, req }) {
 async function revokeOperator({ userId, actor, reason, req }) {
   if (!actor) fail('PLATFORM_OPERATOR_ACTOR_REQUIRED', 'Un acteur authentifié est requis.', 401);
   if (!reason || !reason.trim()) fail('PLATFORM_OPERATOR_REASON_REQUIRED', 'Un motif est requis.', 422);
-  const doc = await PlatformOperator.findOne({ user: userId });
-  if (!doc) fail('PLATFORM_OPERATOR_NOT_FOUND', 'Aucun opérateur trouvé pour cet utilisateur.', 404);
-  if (String(doc.user) === String(actor._id || actor.id)) fail('PLATFORM_OPERATOR_SELF_ACTION_FORBIDDEN', 'Un opérateur ne peut pas révoquer sa propre capacité.', 403);
+  let before;
+  const saved = await runInAuthorityTransaction(async (session) => {
+    await acquireAuthoritySentinelLock(session);
+    const query = PlatformOperator.findOne({ user: userId });
+    if (session) query.session(session);
+    const doc = await query;
+    if (!doc) fail('PLATFORM_OPERATOR_NOT_FOUND', 'Aucun opérateur trouvé pour cet utilisateur.', 404);
+    if (String(doc.user) === String(actor._id || actor.id)) fail('PLATFORM_OPERATOR_SELF_ACTION_FORBIDDEN', 'Un opérateur ne peut pas révoquer sa propre capacité.', 403);
+    await assertCanRemoveViableOperator(userId, session);
+    before = { status: doc.status };
+    doc.status = 'revoked';
+    doc.revokedBy = actor._id || actor.id;
+    doc.revokedAt = new Date();
+    doc.revokeReason = reason.trim();
+    await doc.save({ session });
+    return doc.toObject();
+  });
 
-  const before = { status: doc.status };
-  doc.status = 'revoked';
-  doc.revokedBy = actor._id || actor.id;
-  doc.revokedAt = new Date();
-  doc.revokeReason = reason.trim();
-  await doc.save();
-
-  await audit('revoked', { actor, targetUserId: userId, reason, before, after: { status: doc.status }, req });
-  return doc.toObject();
+  await audit('revoked', { actor, targetUserId: userId, reason, before, after: { status: saved.status }, req });
+  return saved;
 }
 
 async function listOperators() {
@@ -224,4 +351,10 @@ module.exports = {
   reactivateOperator,
   revokeOperator,
   listOperators,
+  countViableOperators,
+  assertCanRemoveViableOperator,
+  acquireAuthoritySentinelLock,
+  guardUserViabilityMutation,
+  assertNoPlatformOperatorForHardDelete,
+  transitionOperatorForUserLifecycle,
 };

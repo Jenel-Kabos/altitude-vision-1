@@ -18,6 +18,11 @@ const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 // resolveTenantForUser), sans importer propertyController.js (éviterait un
 // nouvel edge controller→controller suivi par architecture:check).
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const {
+  guardUserViabilityMutation,
+  assertNoPlatformOperatorForHardDelete,
+  transitionOperatorForUserLifecycle,
+} = require('../services/platformOperator/platformOperatorService');
 
 async function assertAdminPropertyTenantAccess(req, res, property) {
   if (!req.platformTenant) return; // PlatformOperator en mode plateforme (allowPlatformWide) — aucun scope à imposer.
@@ -33,16 +38,23 @@ async function assertAdminPropertyTenantAccess(req, res, property) {
    📊 DASHBOARD ADMIN – STATISTIQUES GLOBALES
 ============================================================ */
 exports.getDashboardStats = catchAsync(async (req, res) => {
+    const tenantUserIds = req.platformTenant ? (req.tenantScopeUserIds || []) : null;
+    const userFilter = tenantUserIds ? { _id: { $in: tenantUserIds } } : {};
+    const propertyFilter = req.platformTenant ? { tenant: req.platformTenant._id } : {};
+    const ownerIds = await userKpiService.getProprietaireUserIds();
+    const scopedOwnerIds = tenantUserIds
+      ? ownerIds.filter((id) => tenantUserIds.some((tenantUserId) => String(tenantUserId) === String(id)))
+      : ownerIds;
     const [totalUsers, kpis, totalProperties, pendingProperties] = await Promise.all([
-        User.countDocuments(),
+        User.countDocuments(userFilter),
         // USER-KPI-1 — remplace l'ancien `User.countDocuments({role:{$in:[...]}})`
         // (voir server/routes/dashboardRoutes.js pour la justification de la
         // règle d'union propriétaire immobilier + exploitant d'établissement).
         userKpiService.getUserKpiSummary(),
-        Property.countDocuments(),
-        Property.countDocuments({ adminStatus: 'pending' }),
+        Property.countDocuments(propertyFilter),
+        Property.countDocuments({ ...propertyFilter, statusAdmin: 'En attente' }),
     ]);
-    const totalOwners = kpis.proprietaires;
+    const totalOwners = req.platformTenant ? scopedOwnerIds.length : kpis.proprietaires;
 
     res.status(200).json({
         status: 'success',
@@ -78,15 +90,19 @@ exports.getConnectedUsers = catchAsync(async (req, res) => {
 });
 
 // 🔹 Bannir un utilisateur
-exports.banUser = catchAsync(async (req, res, next) => {
-    const user = await User.findById(req.params.id);
-    if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
-
-    user.isActive = false;
-    user.status = 'Banni';
-    user.tokenVersion = (user.tokenVersion || 0) + 1;
-
-    await user.save({ validateBeforeSave: false });
+exports.banUser = catchAsync(async (req, res, _next) => {
+    const user = await guardUserViabilityMutation({ userId: req.params.id, operation: async (session) => {
+        const query = User.findById(req.params.id);
+        if (session) query.session(session);
+        const target = await query;
+        if (!target) throw new AppError('Utilisateur non trouvé.', 404);
+        target.isActive = false;
+        target.status = 'Banni';
+        target.tokenVersion = (target.tokenVersion || 0) + 1;
+        await target.save({ session, validateBeforeSave: false });
+        await transitionOperatorForUserLifecycle({ userId: target._id, status: 'suspended', actor: req.user, reason: 'user_account_banned', session });
+        return target;
+    } });
 
     res.status(200).json({
         status: 'success',
@@ -134,7 +150,15 @@ exports.getUser = catchAsync(async (req, res, next) => {
 
 // 🔹 Modifier un utilisateur spécifique
 exports.updateUser = catchAsync(async (req, res, next) => {
-    const forbiddenFields = ['password', 'passwordConfirm', 'tokenInvalidatedAt'];
+    const lifecycleFields = ['isActive', 'status', 'tokenVersion'];
+    if (lifecycleFields.some((field) => Object.prototype.hasOwnProperty.call(req.body, field))) {
+        return res.status(409).json({
+            status: 'fail',
+            code: 'ACCOUNT_LIFECYCLE_ENDPOINT_REQUIRED',
+            message: 'Utilisez les opérations dédiées de suspension, bannissement ou réactivation.',
+        });
+    }
+    const forbiddenFields = ['password', 'passwordConfirm', 'tokenInvalidatedAt', ...lifecycleFields];
     const filteredBody = {};
 
     Object.keys(req.body).forEach((key) => {
@@ -174,15 +198,19 @@ exports.verifyOwner = catchAsync(async (req, res, next) => {
 });
 
 // 🔹 Suspendre un utilisateur
-exports.suspendUser = catchAsync(async (req, res, next) => {
-    const user = await User.findById(req.params.id);
-    if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
-
-    user.isActive = false;
-    user.status = 'Suspendu'; // ✅ Status cohérent avec le frontend
-    user.tokenVersion = (user.tokenVersion || 0) + 1;
-
-    await user.save({ validateBeforeSave: false });
+exports.suspendUser = catchAsync(async (req, res, _next) => {
+    const user = await guardUserViabilityMutation({ userId: req.params.id, operation: async (session) => {
+        const query = User.findById(req.params.id);
+        if (session) query.session(session);
+        const target = await query;
+        if (!target) throw new AppError('Utilisateur non trouvé.', 404);
+        target.isActive = false;
+        target.status = 'Suspendu';
+        target.tokenVersion = (target.tokenVersion || 0) + 1;
+        await target.save({ session, validateBeforeSave: false });
+        await transitionOperatorForUserLifecycle({ userId: target._id, status: 'suspended', actor: req.user, reason: 'user_account_suspended', session });
+        return target;
+    } });
 
     res.status(200).json({
         status: 'success',
@@ -209,12 +237,19 @@ exports.activateUser = catchAsync(async (req, res, next) => {
 });
 
 // 🔹 Supprimer un utilisateur et ses propriétés (Cascade)
-exports.deleteUser = catchAsync(async (req, res, next) => {
-    const user = await User.findById(req.params.id);
-    if (!user) return next(new AppError('Utilisateur non trouvé.', 404));
-
-    await Property.deleteMany({ owner: user._id });
-    await user.deleteOne();
+exports.deleteUser = catchAsync(async (req, res, _next) => {
+    if (String(req.params.id) === String(req.user?._id || req.user?.id)) {
+        return res.status(403).json({ status: 'fail', message: 'Vous ne pouvez pas supprimer votre propre compte.' });
+    }
+    await guardUserViabilityMutation({ userId: req.params.id, operation: async (session) => {
+        const query = User.findById(req.params.id);
+        if (session) query.session(session);
+        const user = await query;
+        if (!user) throw new AppError('Utilisateur non trouvé.', 404);
+        await assertNoPlatformOperatorForHardDelete(user._id, session);
+        await Property.deleteMany({ owner: user._id }, { session });
+        await user.deleteOne({ session });
+    } });
 
     res.status(204).json({
         status: 'success',
@@ -308,9 +343,16 @@ exports.getActivityReport = catchAsync(async (req, res) => {
     const last30days = new Date();
     last30days.setDate(last30days.getDate() - 30);
 
+    const tenantUserIds = req.platformTenant ? (req.tenantScopeUserIds || []) : null;
     const [newUsers, newProperties] = await Promise.all([
-        User.countDocuments({ createdAt: { $gte: last30days } }),
-        Property.countDocuments({ createdAt: { $gte: last30days } }),
+        User.countDocuments({
+            createdAt: { $gte: last30days },
+            ...(tenantUserIds ? { _id: { $in: tenantUserIds } } : {}),
+        }),
+        Property.countDocuments({
+            createdAt: { $gte: last30days },
+            ...(req.platformTenant ? { tenant: req.platformTenant._id } : {}),
+        }),
     ]);
 
     res.status(200).json({

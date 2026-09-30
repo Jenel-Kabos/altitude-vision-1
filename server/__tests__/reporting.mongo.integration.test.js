@@ -140,7 +140,7 @@ describe('HTTP /api/reporting — réservé à la Direction', () => {
   test('200 pour un Admin, avec les 9 domaines', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const { tenant, bootstrap } = await createTenantFixture({ label: 'Reporting HTTP', bootstrap: admin });
-    await addTenantMember({ tenant, user: admin, bootstrap });
+    await addTenantMember({ tenant, user: admin, bootstrap, businessRole: 'Admin' });
     const res = await request(app).get('/api/reporting/executive').set(tenantHeaders(admin, tenant));
     expect(res.status).toBe(200);
     expect(Object.keys(res.body.data.report.domains)).toEqual(DOMAINS);
@@ -149,7 +149,7 @@ describe('HTTP /api/reporting — réservé à la Direction', () => {
   test('GET /domains/:domain renvoie 404 pour un domaine inconnu, 200 pour un domaine valide', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const { tenant, bootstrap } = await createTenantFixture({ label: 'Reporting Domain', bootstrap: admin });
-    await addTenantMember({ tenant, user: admin, bootstrap });
+    await addTenantMember({ tenant, user: admin, bootstrap, businessRole: 'Admin' });
     const headers = tenantHeaders(admin, tenant);
     const unknown = await request(app).get('/api/reporting/domains/inexistant').set(headers);
     expect(unknown.status).toBe(404);
@@ -160,7 +160,7 @@ describe('HTTP /api/reporting — réservé à la Direction', () => {
   test('GET /export/csv et /export/pdf répondent avec les bons Content-Type', async () => {
     const admin = await makeUser({ role: 'Admin' });
     const { tenant, bootstrap } = await createTenantFixture({ label: 'Reporting Export', bootstrap: admin });
-    await addTenantMember({ tenant, user: admin, bootstrap });
+    await addTenantMember({ tenant, user: admin, bootstrap, businessRole: 'Admin' });
     const headers = tenantHeaders(admin, tenant);
     const csvRes = await request(app).get('/api/reporting/export/csv').set(headers);
     expect(csvRes.status).toBe(200);

@@ -553,7 +553,7 @@ const getAllProperties = asyncHandler(async (req, res) => {
   // GL-ARCH-1 : le staff Gestion Locative (Admin/Gestionnaire Immobilier/
   // Collaborateur) a besoin de voir tous les biens gérables, pas seulement
   // ceux déjà publiés/validés — pas uniquement `Admin`.
-  const isAdmin = req.user && STAFF_IMMO.includes(req.user.role);
+  const isAdmin = Boolean(req.isPlatformOperatorContext) || (req.user && STAFF_IMMO.includes(req.user.role));
   const includeDashboardClassification = req.query.dashboardClassification === '1';
   const query = { ...req.query };
   delete query.dashboardClassification;

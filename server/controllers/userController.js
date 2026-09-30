@@ -8,7 +8,12 @@ const { COLLAB_ROLES, ROLE_LABELS } = require('../utils/roles');
 const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
-const { getOperatorByUserId } = require('../services/platformOperator/platformOperatorService');
+const {
+    getOperatorByUserId,
+    guardUserViabilityMutation,
+    assertNoPlatformOperatorForHardDelete,
+    transitionOperatorForUserLifecycle,
+} = require('../services/platformOperator/platformOperatorService');
 const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 const { getEffectiveCapabilities } = require('../utils/iamArchitecture'); // RBAC-3 — refresh identité /me
 
@@ -239,6 +244,14 @@ exports.getUser = async (req, res) => {
 // ======================================================
 exports.updateUser = async (req, res) => {
     try {
+        const lifecycleFields = ['isActive', 'status', 'tokenVersion'];
+        if (lifecycleFields.some((field) => Object.prototype.hasOwnProperty.call(req.body, field))) {
+            return res.status(409).json({
+                status: 'fail',
+                code: 'ACCOUNT_LIFECYCLE_ENDPOINT_REQUIRED',
+                message: 'Utilisez les opérations dédiées de suspension, bannissement ou réactivation.',
+            });
+        }
         const allowedFields = ['name', 'email', 'role'];
         const updates = {};
         Object.keys(req.body).forEach(key => {
@@ -294,10 +307,24 @@ exports.verifyOwner = async (req, res, next) => {
 // ======================================================
 exports.suspendUser = async (req, res, next) => {
     try {
-        const user = await User.findById(req.params.id);
-        if (!user) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
-
-        await user.suspend(); // invalide tokenVersion → déconnecte immédiatement
+        if (String(req.params.id) === String(req.user?._id || req.user?.id)) {
+            return res.status(403).json({
+                status: 'fail',
+                code: 'SELF_ACTION_FORBIDDEN',
+                message: 'Vous ne pouvez pas suspendre votre propre compte depuis l’administration globale.',
+            });
+        }
+        await guardUserViabilityMutation({ userId: req.params.id, operation: async (session) => {
+            const query = User.findById(req.params.id);
+            if (session) query.session(session);
+            const user = await query;
+            if (!user) throw Object.assign(new Error('Utilisateur introuvable.'), { statusCode: 404 });
+            user.status = 'Suspendu';
+            user.isActive = false;
+            user.tokenVersion = (user.tokenVersion || 0) + 1;
+            await user.save({ session, validateBeforeSave: false });
+            await transitionOperatorForUserLifecycle({ userId: user._id, status: 'suspended', actor: req.user, reason: 'user_account_suspended', session });
+        } });
 
         const updated = await User.findById(req.params.id).select('-password');
         res.status(200).json({ status: 'success', message: '⚠️ Compte suspendu avec succès.', data: { user: updated } });
@@ -320,6 +347,7 @@ exports.suspendUser = async (req, res, next) => {
         });
     } catch (error) {
         console.error('Erreur suspendUser:', error);
+        if (error?.statusCode) return res.status(error.statusCode).json({ status: 'fail', code: error.code, message: error.message });
         next(error);
     }
 };
@@ -381,7 +409,10 @@ exports.deleteUser = async (req, res) => {
             }
         }
 
-        await User.findByIdAndDelete(req.params.id);
+        await guardUserViabilityMutation({ userId: req.params.id, operation: async (session) => {
+            await assertNoPlatformOperatorForHardDelete(req.params.id, session);
+            await User.deleteOne({ _id: req.params.id }, { session });
+        } });
         await destroyFromCloudinary(target.photo);
 
         res.status(204).send();
@@ -396,6 +427,7 @@ exports.deleteUser = async (req, res) => {
         });
     } catch (error) {
         console.error('Erreur deleteUser:', error);
+        if (error?.statusCode) return res.status(error.statusCode).json({ status: 'fail', code: error.code, message: error.message });
         res.status(500).json({ status: 'error', message: "Erreur serveur lors de la suppression de l'utilisateur." });
     }
 };

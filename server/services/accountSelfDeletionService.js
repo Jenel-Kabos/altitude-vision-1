@@ -25,6 +25,11 @@ const OrgMembership = require('../models/OrgMembership');
 const OrgUnit = require('../models/OrgUnit');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const logger = require('../utils/logger');
+const {
+  acquireAuthoritySentinelLock,
+  assertCanRemoveViableOperator,
+  transitionOperatorForUserLifecycle,
+} = require('./platformOperator/platformOperatorService');
 
 class AccountSelfDeletionError extends Error {
   constructor(code, message, statusCode = 409, details = null) {
@@ -132,7 +137,10 @@ async function deleteMyAccount({ authenticatedUserId, reason = 'account_self_del
     fail('INVALID_USER_ID', 'Identifiant utilisateur invalide.', 400);
   }
 
-  return runInTransaction(async (session) => {
+  try {
+    return await runInTransaction(async (session) => {
+    await acquireAuthoritySentinelLock(session);
+    await assertCanRemoveViableOperator(userId, session);
     const query = User.findById(userId).select('+password +contratPdfUrl');
     const user = session ? await query.session(session) : await query;
     if (!user) {
@@ -176,6 +184,13 @@ async function deleteMyAccount({ authenticatedUserId, reason = 'account_self_del
     await user.save({ session, validateBeforeSave: false });
 
     const revokedCount = await revokeAllActiveMemberships(userId, session, reason);
+    await transitionOperatorForUserLifecycle({
+      userId,
+      status: 'revoked',
+      actor: user,
+      reason,
+      session,
+    });
 
     // Destruction Cloudinary hors transaction (best effort).
     setImmediate(() => {
@@ -189,7 +204,13 @@ async function deleteMyAccount({ authenticatedUserId, reason = 'account_self_del
       userId,
       revokedMembershipsCount: revokedCount,
     };
-  });
+    });
+  } catch (error) {
+    if (error?.code === 'LAST_PLATFORM_OPERATOR') {
+      fail('LAST_PLATFORM_OPERATOR', error.message, error.statusCode || 409);
+    }
+    throw error;
+  }
 }
 
 module.exports = {

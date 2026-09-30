@@ -30,10 +30,11 @@ const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/platformTenantController');
 const applicationController = require('../controllers/tenantApplicationController');
 const applicationUpload = require('../middleware/tenantApplicationUpload');
-const { requireGlobalAdmin, requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
+const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
 const PlatformTenantDomain = require('../models/PlatformTenantDomain');
 const { resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
+const { resolveTenantMembership } = require('../services/tenantMembershipService');
 
 router.get('/accessible', auth.protect, controller.listAccessibleTenants);
 router.get('/applications/me/status', auth.protect, applicationController.status);
@@ -44,16 +45,16 @@ router.post('/applications/:applicationId/documents', auth.protect, auth.restric
 router.get('/applications/:applicationId/documents/:documentId', auth.protect, auth.restrictTo('Proprietaire'), applicationController.readDocument);
 router.delete('/applications/:applicationId/documents/:documentId', auth.protect, auth.restrictTo('Proprietaire'), applicationController.deleteDocument);
 router.post('/applications/:applicationId/submit', auth.protect, auth.restrictTo('Proprietaire'), applicationController.submit);
-router.get('/applications', auth.protect, requireGlobalAdmin, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.listForReview);
-router.get('/applications/pending-count', auth.protect, requireGlobalAdmin, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.pendingCount);
-router.get('/applications/:applicationId', auth.protect, requireGlobalAdmin, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.readForReview);
-router.get('/applications/:applicationId/review-documents/:documentId', auth.protect, requireGlobalAdmin, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.readDocumentForReview);
-router.post('/applications/:applicationId/start-review', auth.protect, requireGlobalAdmin, requirePlatformOperatorCapability('platform.tenant_applications.review'), applicationController.startReview);
-router.post('/applications/:applicationId/request-changes', auth.protect, requireGlobalAdmin, requirePlatformOperatorCapability('platform.tenant_applications.request_changes'), applicationController.requestChanges);
-router.post('/applications/:applicationId/reject', auth.protect, requireGlobalAdmin, requirePlatformOperatorCapability('platform.tenant_applications.reject'), applicationController.reject);
-router.post('/applications/:applicationId/approve', auth.protect, requireGlobalAdmin, requirePlatformOperatorCapability('platform.tenant_applications.approve'), applicationController.approve);
+router.get('/applications', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.listForReview);
+router.get('/applications/pending-count', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.pendingCount);
+router.get('/applications/:applicationId', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.readForReview);
+router.get('/applications/:applicationId/review-documents/:documentId', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.readDocumentForReview);
+router.post('/applications/:applicationId/start-review', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.review'), applicationController.startReview);
+router.post('/applications/:applicationId/request-changes', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.request_changes'), applicationController.requestChanges);
+router.post('/applications/:applicationId/reject', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.reject'), applicationController.reject);
+router.post('/applications/:applicationId/approve', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.approve'), applicationController.approve);
 
-router.use(auth.protect, requireGlobalAdmin);
+router.use(auth.protect);
 
 // PLATFORM-ADMIN-1 — remplace l'ancienne vérification par appartenance
 // seule. Un PlatformOperator ACTIF détenant `platform.tenants.read` (ou
@@ -78,6 +79,12 @@ async function assertOwnTenantOrPlatformOperator(req, targetTenantId, { capabili
   const allowed = tenants.some((t) => String(t._id) === String(targetTenantId));
   if (!allowed) {
     const error = new Error('Action réservée à un opérateur plateforme ou au tenant concerné.');
+    error.statusCode = 403;
+    throw error;
+  }
+  const membership = await resolveTenantMembership(req.user._id || req.user.id, targetTenantId);
+  if (membership?.ambiguous || membership?.businessRole !== 'Admin') {
+    const error = new Error('Administration du tenant concerné requise.');
     error.statusCode = 403;
     throw error;
   }
