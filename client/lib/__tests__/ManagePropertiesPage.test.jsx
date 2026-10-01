@@ -2,7 +2,7 @@ vi.mock('../context/PlatformTenantRuntimeContext', () => ({ usePlatformTenantRun
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ManagePropertiesPage from '../pages/dashboard/ManagePropertiesPage';
 import {
-  getAllProperties, getPropertyById,
+  getAllProperties, getPropertyById, listPropertyRegistry,
 } from '../services/propertyService';
 import { createFullAccommodation, updateFullAccommodation, getHotels } from '../services/accommodationService';
 import { createFullSaleProperty, updateFullSaleProperty } from '../services/salePropertyService';
@@ -33,6 +33,7 @@ vi.mock('../services/propertyService', () => ({
   updateProperty: vi.fn(),
   addProperty: vi.fn(),
   toggleRecommande: vi.fn(),
+  listPropertyRegistry: vi.fn(),
 }));
 
 vi.mock('../services/accommodationService', () => ({
@@ -98,21 +99,24 @@ describe('Dashboard annonces — séparation des responsabilités', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useSearchParams.mockReturnValue(new URLSearchParams());
+    listPropertyRegistry.mockResolvedValue({ items: [], page: 1, limit: 20, total: 0, totalPages: 0 });
   });
 
   test('Toutes les annonces reste en consultation et oriente vers la rubrique métier', async () => {
-    getAllProperties.mockResolvedValue([{
+    listPropertyRegistry.mockResolvedValue({ items: [{
       _id: 'SALE-1', title: 'Villa TEST DATA', description: 'Vente', status: 'vente',
       type: 'Villa', price: 150000000, address: { city: 'Brazzaville' }, images: [],
       dashboardClassification: { family: 'vente', propertyId: 'SALE-1' },
-    }]);
+      owner: { _id: 'owner-1', name: 'Propriétaire Test' }, tenant: { _id: 'tenant-test', name: 'Tenant Test', status: 'active' },
+    }], page: 1, limit: 20, total: 1, totalPages: 1 });
     render(<ManagePropertiesPage readOnly />);
 
     expect(await screen.findByText('Villa TEST DATA')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Ajouter' })).not.toBeInTheDocument();
     expect(screen.queryByTitle('Modifier')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Supprimer')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Voir/i })).toHaveAttribute('href', '/dashboard/sales?focus=SALE-1');
+    expect(screen.queryByRole('link', { name: /Voir/i })).not.toBeInTheDocument();
+    expect(listPropertyRegistry).toHaveBeenCalledWith(expect.any(Object), { platformScoped: false });
   });
 
   test('la rubrique Ventes ouvre directement le formulaire Vente', async () => {
@@ -148,9 +152,9 @@ describe('Dashboard annonces — séparation des responsabilités', () => {
 
   test('la page "Tous les biens" (readOnly, aucune rubrique) ne monte pas le widget Patrimoine (comportement inchangé)', async () => {
     const propertyAssetService = await import('../services/propertyAssetService');
-    getAllProperties.mockResolvedValue([]);
+    listPropertyRegistry.mockResolvedValue({ items: [], page: 1, limit: 20, total: 0, totalPages: 0 });
     render(<ManagePropertiesPage readOnly />);
-    await screen.findByText('Aucun bien trouvé');
+    await screen.findByText('Aucun bien enregistré');
     expect(propertyAssetService.getPortfolioDashboard).not.toHaveBeenCalled();
   });
 });

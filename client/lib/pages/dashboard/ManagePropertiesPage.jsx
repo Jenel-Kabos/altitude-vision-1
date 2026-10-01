@@ -23,6 +23,7 @@ import PropertyPortfolioDashboard from '../../components/dashboard/propertyAsset
 import PropertyManagementCard from '../../components/dashboard/PropertyManagementCard';
 import { formatCurrencyXAF } from '../../utils/normalizePropertyDetail';
 import { getDashboardAnalytics } from '../../services/dashboardAnalyticsService';
+import PropertyRegistry from './PropertyRegistry';
 
 // Libellés d'affichage pour le titre de la modale "Ajouter" — le choix
 // métier lui-même est piloté par PropertyWizard.jsx (Sprint 0, point
@@ -31,7 +32,7 @@ const BUSINESS_TYPE_LABELS = { vente: 'Vente', location: 'Location', hebergement
 
 const PROPERTIES_PER_PAGE = 8;
 
-const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
+const LegacyManagePropertiesPage = ({ section = null, readOnly = false }) => {
   const { canEdit, canDelete, user } = useAuth();
   // TENANT-DATA-ISOLATION-SALES-RENTALS-1B — clé de scope tenant canonique.
   // Le changement de tenant (ou passage Vue plateforme) doit invalider les
@@ -840,5 +841,9 @@ const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
     </div>
   );
 };
+
+const ManagePropertiesPage = ({ section = null, readOnly = false }) => (
+  readOnly ? <PropertyRegistry /> : <LegacyManagePropertiesPage section={section} />
+);
 
 export default ManagePropertiesPage;

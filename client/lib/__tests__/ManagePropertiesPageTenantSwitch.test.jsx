@@ -15,6 +15,7 @@ let mockSelectedTenantId = 'tenant-A';
 vi.mock('../services/propertyService', () => ({
   getAllProperties: vi.fn(), getPropertyById: vi.fn(), deleteProperty: vi.fn(),
   updateProperty: vi.fn(), addProperty: vi.fn(), toggleRecommande: vi.fn(),
+  listPropertyRegistry: vi.fn(),
 }));
 vi.mock('../services/accommodationService', () => ({
   createFullAccommodation: vi.fn(), updateFullAccommodation: vi.fn(),

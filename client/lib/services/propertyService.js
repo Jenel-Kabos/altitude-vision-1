@@ -36,6 +36,36 @@ export const getAllProperties = async (options = {}) => {
   }
 };
 
+const PROPERTY_REGISTRY_PARAMS = [
+  'page', 'limit', 'search', 'offerType', 'propertyType', 'city', 'arrondissement', 'sort',
+];
+
+/**
+ * Contrat administratif read-only PA-03. Le contexte tenant reste la
+ * responsabilité de l'intercepteur Axios partagé ; seul le mode plateforme
+ * demande explicitement la suppression du header tenant.
+ */
+export const listPropertyRegistry = async (params = {}, { platformScoped = false } = {}) => {
+  const safeParams = { dashboardRegistry: '1' };
+  PROPERTY_REGISTRY_PARAMS.forEach((key) => {
+    const value = params[key];
+    if (value === undefined || value === null || value === '') return;
+    safeParams[key] = typeof value === 'string' ? value.trim() : value;
+  });
+  const config = platformScoped
+    ? { params: safeParams, platformScoped: true }
+    : { params: safeParams };
+  const response = await api.get('/properties', config);
+  const data = response.data?.data || {};
+  return {
+    items: data.properties || [],
+    page: data.page ?? 1,
+    limit: data.limit ?? 20,
+    total: data.total ?? 0,
+    totalPages: data.totalPages ?? 0,
+  };
+};
+
 /**
  * Récupère une propriété par son ID
  * @param {String} propertyId - ID de la propriété

@@ -35,6 +35,7 @@ const { STAFF_IMMO } = require('../utils/roles');
 // tenant.
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser, resolveTenantScope } = require('../services/platformTenant/tenantContextService');
+const { normalizePropertyRegistryQuery, projectPropertyRegistryRows } = require('../services/propertyRegistryQueryService');
 
 // TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traitait un
 // `Property.owner` sans OrgMembership (Proprietaire public-signup, cas
@@ -554,11 +555,40 @@ const getAllProperties = asyncHandler(async (req, res) => {
   // Collaborateur) a besoin de voir tous les biens gérables, pas seulement
   // ceux déjà publiés/validés — pas uniquement `Admin`.
   const isAdmin = Boolean(req.isPlatformOperatorContext) || (req.user && STAFF_IMMO.includes(req.user.role));
+  const includeDashboardRegistry = req.query.dashboardRegistry === '1';
   const includeDashboardClassification = req.query.dashboardClassification === '1';
-  const query = { ...req.query };
+  let query = { ...req.query };
+  let registryPage = null;
+  let registryLimit = null;
+  if (includeDashboardRegistry) {
+    // PA-03 — le registre est une surface administrative explicite. La
+    // capability plateforme reste vérifiée par le middleware canonique ; ce
+    // garde empêche seulement qu'un opérateur suspendu/non reconnu ou un
+    // Admin historique non rattaché tombe sur le catalogue public.
+    if (!req.user || (!req.isPlatformOperatorContext && !req.platformTenant)) {
+      res.status(403);
+      throw new Error('Contexte administratif immobilier requis.');
+    }
+    try {
+      const normalized = normalizePropertyRegistryQuery(req.query);
+      query = normalized.query;
+      registryPage = normalized.page;
+      registryLimit = normalized.limit;
+    } catch (error) {
+      res.status(error.statusCode || 400);
+      throw error;
+    }
+  }
+  delete query.dashboardRegistry;
   delete query.dashboardClassification;
   const tenantId = isAdmin ? (req.platformTenant?._id || req.platformTenant || null) : null;
   let { properties, total } = await runPropertySearch({ query, isAdmin, tenantId });
+
+  // PA-03 — enrichissement purement informatif, exécuté après l'autorité et
+  // le filtre tenant. Les documents projetés ne participent jamais au scope.
+  if (includeDashboardRegistry) {
+    properties = await projectPropertyRegistryRows(properties);
+  }
 
   if (includeDashboardClassification && properties.length) {
     const { classifyDashboardListing } = require('../services/moderationClassificationService');
@@ -586,7 +616,15 @@ const getAllProperties = asyncHandler(async (req, res) => {
     status:  'success',
     results: properties.length,
     total,
-    data: { properties, total },
+    data: {
+      properties,
+      total,
+      ...(includeDashboardRegistry && {
+        page: registryPage,
+        limit: registryLimit,
+        totalPages: total === 0 ? 0 : Math.ceil(total / registryLimit),
+      }),
+    },
   });
 });
 
