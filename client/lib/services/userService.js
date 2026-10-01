@@ -1,6 +1,37 @@
 // --- src/services/userService.js ---
 import api from "./api";
 
+const GLOBAL_USER_QUERY_KEYS = [
+  'page', 'limit', 'search', 'status', 'active', 'role',
+  'organization', 'tenantId', 'operator', 'sort',
+];
+
+export const listGlobalUsers = async (params = {}) => {
+  const safeParams = Object.fromEntries(
+    GLOBAL_USER_QUERY_KEYS
+      .filter((key) => params[key] !== undefined && params[key] !== null && params[key] !== '')
+      .map((key) => [key, params[key]]),
+  );
+  const response = await api.get('/users', { params: safeParams, platformScoped: true });
+  return response.data.data;
+};
+
+export const getGlobalUser = async (userId) => (
+  await api.get(`/users/${userId}`, { platformScoped: true })
+).data.data.user;
+
+export const suspendGlobalUser = async (userId) => (
+  await api.patch(`/users/${userId}/suspend`, undefined, { platformScoped: true })
+).data.data.user;
+
+export const activateGlobalUser = async (userId) => (
+  await api.patch(`/users/${userId}/activate`, undefined, { platformScoped: true })
+).data.data.user;
+
+export const deleteGlobalUser = async (userId) => {
+  await api.delete(`/users/${userId}`, { platformScoped: true });
+};
+
 /**
  * 🔹 Récupérer tous les utilisateurs
  */

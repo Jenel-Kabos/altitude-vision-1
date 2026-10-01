@@ -16,6 +16,10 @@ const {
 } = require('../services/platformOperator/platformOperatorService');
 const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 const { getEffectiveCapabilities } = require('../utils/iamArchitecture'); // RBAC-3 — refresh identité /me
+const {
+    listGlobalUsers,
+    getGlobalUserDetail,
+} = require('../services/globalUserAdministrationService');
 
 // HOTFIX-USERS-COUNT-1 — `req.tenantScopeUserIds` (posé par
 // `requireTenantScope`) ne contient que les membres `OrgMembership` du
@@ -170,12 +174,26 @@ exports.getAllUsers = async (req, res) => {
         // sans capacité tenant sélectionnée n'atteint jamais ce contrôleur
         // (403 en amont) — jamais de `User.find()` global implicite.
         const isGlobalPlatformRead = req.isPlatformOperatorContext && !req.platformTenant;
+        if (isGlobalPlatformRead) {
+            const registry = await listGlobalUsers(req.query);
+            return res.status(200).json({
+                status: 'success',
+                results: registry.items.length,
+                data: {
+                    ...registry,
+                    // Existing platform consumers still read `data.users`.
+                    // Keep it bound to the same safe projected rows as `items`.
+                    users: registry.items,
+                },
+            });
+        }
         const scopeUserIds = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || []).catch(() => req.tenantScopeUserIds || []);
-        const filter = isGlobalPlatformRead ? {} : { _id: { $in: scopeUserIds } };
+        const filter = { _id: { $in: scopeUserIds } };
         const users = await User.find(filter).select('-password');
         res.status(200).json({ status: 'success', results: users.length, data: { users } });
     } catch (error) {
         console.error('Erreur getAllUsers:', error);
+        if (error?.statusCode) return res.status(error.statusCode).json({ status: 'fail', code: error.code, message: error.message });
         res.status(500).json({ status: 'error', message: 'Erreur serveur lors de la récupération des utilisateurs.' });
     }
 };
@@ -212,6 +230,11 @@ exports.getAllOwners = async (req, res) => {
 // ======================================================
 exports.getUser = async (req, res) => {
     try {
+        const isGlobalPlatformRead = req.isPlatformOperatorContext && !req.platformTenant;
+        if (isGlobalPlatformRead && String(req.params.id) !== String(req.user?._id || req.user?.id || '')) {
+            const user = await getGlobalUserDetail(req.params.id);
+            return res.status(200).json({ status: 'success', data: { user } });
+        }
         const user = await User.findById(req.params.id).select('-password');
         if (!user) {
             return res.status(404).json({ status: 'fail', message: 'Aucun utilisateur trouvé avec cet ID.' });
@@ -235,6 +258,7 @@ exports.getUser = async (req, res) => {
         res.status(200).json({ status: 'success', data: payload });
     } catch (error) {
         console.error('Erreur getUser:', error);
+        if (error?.statusCode) return res.status(error.statusCode).json({ status: 'fail', code: error.code, message: error.message });
         res.status(500).json({ status: 'error', message: "Erreur serveur lors de la récupération de l'utilisateur." });
     }
 };

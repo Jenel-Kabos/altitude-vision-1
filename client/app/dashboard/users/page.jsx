@@ -1,8 +1,8 @@
 import { buildMetadata } from '@/lib/seo';
-import MembersPanel from "@/lib/pages/dashboard/MembersPanel";
+import UsersPanel from '@/lib/pages/dashboard/UsersPanel';
 
-export const metadata = buildMetadata({ title: 'Membres', noIndex: true });
+export const metadata = buildMetadata({ title: 'Utilisateurs de la plateforme', noIndex: true });
 
 export default function Page() {
-  return <MembersPanel />;
+  return <UsersPanel />;
 }

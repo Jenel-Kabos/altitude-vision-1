@@ -28,7 +28,6 @@ const userIdOf = (user) => String(user?._id || user?.id || '');
 export function PlatformTenantRuntimeProvider({ children }) {
   const { user, loading: authLoading, can: roleCan } = useAuth();
   const runtimeUserId = userIdOf(user);
-  const globalRole = user?.role;
   const [state, setState] = useState({ loading: true, operator: null, tenants: [], selectedTenantId: null });
 
   useEffect(() => {
@@ -48,7 +47,7 @@ export function PlatformTenantRuntimeProvider({ children }) {
       try {
         const [accessibleTenants, operator] = await Promise.all([
           listAccessibleTenants(),
-          globalRole === 'Admin' ? getMyOperatorStatus().catch(() => null) : Promise.resolve(null),
+          getMyOperatorStatus().catch(() => null),
         ]);
         const canonicalAccessibleTenants = (accessibleTenants || []).filter(
           (tenant) => tenant.membership?.status === 'active' && tenant.membership?.businessRole,
@@ -80,7 +79,7 @@ export function PlatformTenantRuntimeProvider({ children }) {
     };
     initialize();
     return () => { cancelled = true; };
-  }, [authLoading, runtimeUserId, globalRole]);
+  }, [authLoading, runtimeUserId]);
 
   const selectTenant = useCallback((tenantId) => {
     const userId = userIdOf(user);

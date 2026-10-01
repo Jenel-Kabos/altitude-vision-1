@@ -52,7 +52,7 @@ describe('runtime tenant plateforme', () => {
     getMyOperatorStatus.mockResolvedValue(null);
     const { result } = renderHook(() => usePlatformTenantRuntime(), { wrapper });
     await waitFor(() => expect(result.current.tenants).toHaveLength(2));
-    expect(getMyOperatorStatus).not.toHaveBeenCalled();
+    expect(getMyOperatorStatus).toHaveBeenCalledTimes(1);
     act(() => result.current.selectTenant('tenant-a'));
     expect(result.current.isTenantAdmin).toBe(true);
     expect(result.current.tenantBusinessRole).toBe('Admin');
@@ -61,6 +61,20 @@ describe('runtime tenant plateforme', () => {
     expect(result.current.isTenantAdmin).toBe(false);
     expect(result.current.tenantBusinessRole).toBe('Collaborateur');
     expect(authUser.role).toBe('Proprietaire');
+  });
+
+  test('un PlatformOperator non-Admin est découvert et reçoit uniquement ses capabilities exactes', async () => {
+    authUser = { _id: 'operator-client', role: 'Client' };
+    listAccessibleTenants.mockResolvedValue([]);
+    getMyOperatorStatus.mockResolvedValue({ status: 'active', capabilities: ['platform.users.read'] });
+
+    const { result } = renderHook(() => usePlatformTenantRuntime(), { wrapper });
+    await waitFor(() => expect(result.current.tenantReady).toBe(true));
+
+    expect(getMyOperatorStatus).toHaveBeenCalledTimes(1);
+    expect(result.current.operator).toMatchObject({ status: 'active' });
+    expect(result.current.can('platform.users.read')).toBe(true);
+    expect(result.current.can('platform.users.manage')).toBe(false);
   });
 
   test.each([

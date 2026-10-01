@@ -24,9 +24,9 @@ describe('LEGACY-18 · MembersPanel has no legacy /users administrative call', (
     expect(src).toMatch(/['"]\/members/);
   });
 
-  test('users/page.jsx renders MembersPanel, not UsersPanel', () => {
+  test('users/page.jsx renders the platform UsersPanel, not tenant MembersPanel', () => {
     const src = readFile('../../app/dashboard/users/page.jsx');
-    expect(src).toMatch(/MembersPanel/);
-    expect(src).not.toMatch(/UsersPanel/);
+    expect(src).toMatch(/UsersPanel/);
+    expect(src).not.toMatch(/MembersPanel/);
   });
 });
