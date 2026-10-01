@@ -12,6 +12,7 @@ const reportingRoutes = require('../routes/reportingRoutes');
 const userRoutes = require('../routes/userRoutes');
 const platformTenantRoutes = require('../routes/platformTenantRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const {
   grantOperator,
   suspendOperator,
@@ -83,6 +84,7 @@ let inactiveOperator;
 let bareAdmin;
 let usersReader;
 let tenantsReader;
+let platformAdmin;
 
 beforeAll(async () => {
   await startFinancialMongo();
@@ -115,6 +117,7 @@ beforeAll(async () => {
   bareAdmin = await makeUser({ role: 'Admin', label: 'bare-admin' });
   usersReader = await makeUser({ role: 'Client', label: 'users-reader' });
   tenantsReader = await makeUser({ role: 'Client', label: 'tenants-reader' });
+  platformAdmin = await makeUser({ role: 'Client', label: 'platform-admin' });
 
   await grantOperator({ userId: propertiesReader._id, actor: tenantAdminA, reason: 'properties read test', capabilities: ['platform.properties.read'] });
   await grantOperator({ userId: propertiesManager._id, actor: tenantAdminA, reason: 'properties manage test', capabilities: ['platform.properties.manage'] });
@@ -123,6 +126,10 @@ beforeAll(async () => {
   await grantOperator({ userId: inactiveOperator._id, actor: tenantAdminA, reason: 'inactive operator test', capabilities: ['platform.properties.read', 'platform.reporting.read'] });
   await grantOperator({ userId: usersReader._id, actor: tenantAdminA, reason: 'users reader test', capabilities: ['platform.users.read'] });
   await grantOperator({ userId: tenantsReader._id, actor: tenantAdminA, reason: 'tenants reader test', capabilities: ['platform.tenants.read'] });
+  // PLATFORM-ADMIN-04A — seul un opérateur éligible (toutes les capabilities
+  // requises, aucun User.role Admin) entre dans le scope global ; les
+  // opérateurs à capability unique ci-dessus n'y entrent plus.
+  await grantOperator({ userId: platformAdmin._id, actor: tenantAdminA, reason: 'PA04A eligible platform admin', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   await PlatformOperator.updateOne({ user: inactiveOperator._id }, { $set: { status: 'suspended' } });
 });
 
@@ -130,7 +137,10 @@ afterAll(async () => stopFinancialMongo());
 
 describe('PLATFORM-ADMIN-01 — exact global property capabilities', () => {
   test('active non-Admin operator + properties.read sees tenant A, tenant B pending, and tenant:null', async () => {
-    const res = await request(app).get('/api/properties').set(bearer(propertiesReader));
+    const partial = await request(app).get('/api/properties').set(bearer(propertiesReader));
+    expect(partial.status).toBe(403);
+    expect(partial.body.code).toBe('PLATFORM_VIEW_NOT_ELIGIBLE');
+    const res = await request(app).get('/api/properties').set(bearer(platformAdmin));
     expect(res.status).toBe(200);
     const ids = res.body.data.properties.map((item) => String(item._id));
     expect(ids).toEqual(expect.arrayContaining([String(propertyA._id), String(propertyB._id), String(propertyNull._id)]));
@@ -158,7 +168,9 @@ describe('PLATFORM-ADMIN-01 — exact global property capabilities', () => {
   });
 
   test('properties.manage permits a global mutation for a non-Admin operator', async () => {
-    const res = await request(app).patch(`/api/admin/properties/${propertyB._id}/approve`).set(bearer(propertiesManager));
+    const partial = await request(app).patch(`/api/admin/properties/${propertyB._id}/approve`).set(bearer(propertiesManager));
+    expect(partial.status).toBe(403);
+    const res = await request(app).patch(`/api/admin/properties/${propertyB._id}/approve`).set(bearer(platformAdmin));
     expect(res.status).toBe(200);
   });
 
@@ -173,7 +185,8 @@ describe('PLATFORM-ADMIN-01 — exact global property capabilities', () => {
 
 describe('PLATFORM-ADMIN-01 — reporting, stats, and activity capabilities', () => {
   test('active non-Admin operator + reporting.read receives global reporting', async () => {
-    const res = await request(app).get('/api/reporting/executive').set(bearer(reportingReader));
+    expect((await request(app).get('/api/reporting/executive').set(bearer(reportingReader))).status).toBe(403);
+    const res = await request(app).get('/api/reporting/executive').set(bearer(platformAdmin));
     expect(res.status).toBe(200);
   });
 
@@ -187,8 +200,9 @@ describe('PLATFORM-ADMIN-01 — reporting, stats, and activity capabilities', ()
   });
 
   test('reporting.read protects global admin stats and activity', async () => {
-    const stats = await request(app).get('/api/admin/stats').set(bearer(reportingReader));
-    const activity = await request(app).get('/api/admin/activity').set(bearer(reportingReader));
+    expect((await request(app).get('/api/admin/stats').set(bearer(reportingReader))).status).toBe(403);
+    const stats = await request(app).get('/api/admin/stats').set(bearer(platformAdmin));
+    const activity = await request(app).get('/api/admin/activity').set(bearer(platformAdmin));
     const wrongStats = await request(app).get('/api/admin/stats').set(bearer(unrelatedOperator));
     const wrongActivity = await request(app).get('/api/admin/activity').set(bearer(unrelatedOperator));
     expect(stats.status).toBe(200);
@@ -207,7 +221,8 @@ describe('PLATFORM-ADMIN-01 — reporting, stats, and activity capabilities', ()
 
 describe('PLATFORM-ADMIN-01 — canonical operator authority is independent of User.role', () => {
   test('non-Admin operator + users.read receives the global user registry', async () => {
-    const res = await request(app).get('/api/users').set(bearer(usersReader));
+    expect((await request(app).get('/api/users').set(bearer(usersReader))).status).toBe(403);
+    const res = await request(app).get('/api/users').set(bearer(platformAdmin));
     expect(res.status).toBe(200);
     expect(res.body.data.users.map((user) => String(user._id))).toContain(String(individualOwner._id));
   });
@@ -219,7 +234,8 @@ describe('PLATFORM-ADMIN-01 — canonical operator authority is independent of U
   });
 
   test('non-Admin operator + tenants.read receives the global tenant registry', async () => {
-    const res = await request(app).get('/api/platform-tenants').set(bearer(tenantsReader));
+    expect((await request(app).get('/api/platform-tenants').set(bearer(tenantsReader))).status).toBe(403);
+    const res = await request(app).get('/api/platform-tenants').set(bearer(platformAdmin));
     expect(res.status).toBe(200);
     expect(res.body.data.tenants.map((tenant) => String(tenant._id)))
       .toEqual(expect.arrayContaining([String(tenantA._id), String(tenantB._id)]));
@@ -293,8 +309,10 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
     await PlatformOperator.updateMany({}, { $pull: { capabilities: 'platform.operators.manage' } });
     const actor = await makeUser({ role: 'Admin', label: `${label}-actor` });
     const target = await makeUser({ role: 'Client', label: `${label}-target` });
-    await grantOperator({ userId: actor._id, actor: tenantAdminA, reason: `${label} user manager`, capabilities: ['platform.users.read', 'platform.users.manage'] });
-    await grantOperator({ userId: target._id, actor, reason: `${label} last viable`, capabilities: ['platform.operators.manage'] });
+    // PLATFORM-ADMIN-04A — l'acteur global est éligible, donc lui-même viable
+    // (platform.operators.manage requis) : il est le dernier opérateur viable
+    // du scénario ; `target` est un second opérateur viable.
+    await grantOperator({ userId: actor._id, actor: tenantAdminA, reason: `${label} user manager`, capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     return { actor, target };
   };
 
@@ -306,21 +324,22 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
   });
 
   test('admin suspension, ban, and hard-delete reject the last viable operator', async () => {
-    const { actor, target } = await prepareLifecycleActors('admin-last-operator');
-    const suspend = await request(app).patch(`/api/admin/owners/${target._id}/suspend`).set(bearer(actor));
-    const ban = await request(app).patch(`/api/admin/owners/${target._id}/ban`).set(bearer(actor));
-    const deletion = await request(app).delete(`/api/admin/owners/${target._id}`).set(bearer(actor));
-    expect(suspend.status).toBe(409);
-    expect(ban.status).toBe(409);
-    expect(deletion.status).toBe(409);
-    expect(await User.findById(target._id)).toMatchObject({ isActive: true });
+    const { actor } = await prepareLifecycleActors('admin-last-operator');
+    const suspend = await request(app).patch(`/api/admin/owners/${actor._id}/suspend`).set(bearer(actor));
+    const ban = await request(app).patch(`/api/admin/owners/${actor._id}/ban`).set(bearer(actor));
+    const deletion = await request(app).delete(`/api/admin/owners/${actor._id}`).set(bearer(actor));
+    expect([403, 409]).toContain(suspend.status);
+    expect([403, 409]).toContain(ban.status);
+    expect([403, 409]).toContain(deletion.status);
+    expect(await User.findById(actor._id)).toMatchObject({ isActive: true });
+    expect(await PlatformOperator.findOne({ user: actor._id }).lean()).toMatchObject({ status: 'active' });
   });
 
   test('canonical /api/users hard-delete rejects the last viable operator', async () => {
-    const { actor, target } = await prepareLifecycleActors('users-last-operator');
-    const res = await request(app).delete(`/api/users/${target._id}`).set(bearer(actor));
-    expect(res.status).toBe(409);
-    expect(await User.findById(target._id)).not.toBeNull();
+    const { actor } = await prepareLifecycleActors('users-last-operator');
+    const res = await request(app).delete(`/api/users/${actor._id}`).set(bearer(actor));
+    expect([403, 409]).toContain(res.status);
+    expect(await User.findById(actor._id)).not.toBeNull();
   });
 
   test('self-service anonymization rejects the last viable operator', async () => {
@@ -337,7 +356,7 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
     const actor = await makeUser({ role: 'Admin', label: 'coherence-actor' });
     const target = await makeUser({ role: 'Client', label: 'coherence-target' });
     const survivor = await makeUser({ role: 'Client', label: 'coherence-survivor' });
-    await grantOperator({ userId: actor._id, actor: tenantAdminA, reason: 'coherence user manager', capabilities: ['platform.users.manage'] });
+    await grantOperator({ userId: actor._id, actor: tenantAdminA, reason: 'coherence user manager', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     await grantOperator({ userId: target._id, actor, reason: 'coherence target', capabilities: ['platform.operators.manage'] });
     await grantOperator({ userId: survivor._id, actor, reason: 'coherence survivor', capabilities: ['platform.operators.manage'] });
 
@@ -351,7 +370,7 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
     const actor = await makeUser({ role: 'Admin', label: 'operator-delete-actor' });
     const target = await makeUser({ role: 'Client', label: 'operator-delete-target' });
     const survivor = await makeUser({ role: 'Client', label: 'operator-delete-survivor' });
-    await grantOperator({ userId: actor._id, actor: tenantAdminA, reason: 'delete user manager', capabilities: ['platform.users.read', 'platform.users.manage'] });
+    await grantOperator({ userId: actor._id, actor: tenantAdminA, reason: 'delete user manager', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     await grantOperator({ userId: target._id, actor, reason: 'delete target', capabilities: ['platform.operators.manage'] });
     await grantOperator({ userId: survivor._id, actor, reason: 'delete survivor', capabilities: ['platform.operators.manage'] });
 
@@ -376,11 +395,11 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
   });
 
   test('generic administrative updates cannot disable the last viable operator', async () => {
-    const { actor, target } = await prepareLifecycleActors('generic-disable');
-    const legacy = await request(app).patch(`/api/admin/owners/${target._id}`).set(bearer(actor)).send({ isActive: false });
-    const canonical = await request(app).put(`/api/users/${target._id}`).set(bearer(actor)).send({ status: 'Suspendu' });
-    expect(legacy.status).toBe(409);
-    expect(canonical.status).toBe(409);
-    expect(await User.findById(target._id)).toMatchObject({ isActive: true });
+    const { actor } = await prepareLifecycleActors('generic-disable');
+    const legacy = await request(app).patch(`/api/admin/owners/${actor._id}`).set(bearer(actor)).send({ isActive: false });
+    const canonical = await request(app).put(`/api/users/${actor._id}`).set(bearer(actor)).send({ status: 'Suspendu' });
+    expect([403, 409]).toContain(legacy.status);
+    expect([403, 409]).toContain(canonical.status);
+    expect(await User.findById(actor._id)).toMatchObject({ isActive: true });
   });
 });

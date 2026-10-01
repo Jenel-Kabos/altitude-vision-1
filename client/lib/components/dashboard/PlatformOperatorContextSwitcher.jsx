@@ -12,7 +12,7 @@ import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeCon
 const GOLD = '#C8960C';
 
 export default function PlatformOperatorContextSwitcher() {
-  const { operator, tenants, selectedTenantId, selectTenant, tenantLoading } = usePlatformTenantRuntime();
+  const { operator, platformViewEligible, tenants, selectedTenantId, selectTenant, tenantLoading } = usePlatformTenantRuntime();
 
   const handleChange = useCallback((event) => {
     const value = event.target.value || null;
@@ -40,7 +40,10 @@ export default function PlatformOperatorContextSwitcher() {
         className="w-full text-sm rounded-md border border-gray-300 px-2 py-1.5 bg-white"
         aria-label="Sélectionner le tenant à administrer"
       >
-        <option value="">{operator?.status === 'active' ? 'Vue plateforme' : 'Sélectionner un tenant'}</option>
+        {/* PLATFORM-ADMIN-04A — « Vue plateforme » uniquement si le backend
+            déclare l'opérateur éligible ; sinon l'option vide n'est qu'un
+            invite de sélection, jamais un scope global. */}
+        <option value="">{platformViewEligible ? 'Vue plateforme' : 'Sélectionner un tenant'}</option>
         {tenants.map((tenant) => (
           <option key={tenant._id} value={tenant._id}>{tenant.name}</option>
         ))}

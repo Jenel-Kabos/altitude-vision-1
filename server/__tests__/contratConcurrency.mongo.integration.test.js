@@ -16,6 +16,7 @@ const Contrat = require('../models/Contrat');
 const contratRoutes = require('../routes/contratRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { acceptApplication } = require('../services/realEstateApplicationService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(120000);
 
@@ -46,7 +47,7 @@ async function setupActiveRentalReservation() {
   // désormais PLATFORM-only ; fixture élève l'admin en operator.
   const { grantOperator } = require('../services/platformOperator/platformOperatorService');
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: admin._id, actor: granter, reason: 'concurrency test fixture', capabilities: ['platform.commercial.manage'] });
+  await grantOperator({ userId: admin._id, actor: granter, reason: 'concurrency test fixture', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   const owner = await makeUser({ role: 'Proprietaire' });
   const client = await makeUser({ role: 'Client' });
   const property = await Property.create({

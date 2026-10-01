@@ -16,6 +16,7 @@ const {
 } = require('../services/platformOperator/platformOperatorService');
 const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 const { getEffectiveCapabilities } = require('../utils/iamArchitecture'); // RBAC-3 — refresh identité /me
+const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
 const {
     listGlobalUsers,
     getGlobalUserDetail,
@@ -173,7 +174,7 @@ exports.getAllUsers = async (req, res) => {
         // utilisateurs réellement membres du tenant actif. Un PlatformOperator
         // sans capacité tenant sélectionnée n'atteint jamais ce contrôleur
         // (403 en amont) — jamais de `User.find()` global implicite.
-        const isGlobalPlatformRead = req.isPlatformOperatorContext && !req.platformTenant;
+        const isGlobalPlatformRead = isPlatformWideRequest(req);
         if (isGlobalPlatformRead) {
             const registry = await listGlobalUsers(req.query);
             return res.status(200).json({
@@ -211,7 +212,7 @@ exports.getAllOwners = async (req, res) => {
         // même principe que getAllUsers ci-dessus (HOTFIX-USERS-COUNT-1 :
         // scope étendu localement, voir expandScopeWithUnaffiliatedUsersIfSoleTenant).
         const expandedScope = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || []).catch(() => req.tenantScopeUserIds || []);
-        if (req.isPlatformOperatorContext && !req.platformTenant) {
+        if (isPlatformWideRequest(req)) {
             const owners = await User.find({ role: 'Proprietaire' }).select('-password');
             return res.status(200).json({ status: 'success', results: owners.length, data: { owners } });
         }
@@ -230,7 +231,7 @@ exports.getAllOwners = async (req, res) => {
 // ======================================================
 exports.getUser = async (req, res) => {
     try {
-        const isGlobalPlatformRead = req.isPlatformOperatorContext && !req.platformTenant;
+        const isGlobalPlatformRead = isPlatformWideRequest(req);
         if (isGlobalPlatformRead && String(req.params.id) !== String(req.user?._id || req.user?.id || '')) {
             const user = await getGlobalUserDetail(req.params.id);
             return res.status(200).json({ status: 'success', data: { user } });

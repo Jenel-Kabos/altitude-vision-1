@@ -24,6 +24,17 @@ const activeTenantId = (req) => req.platformTenant?._id;
  * condition ajoutée par rapport au comportement historique.
  */
 async function assertConversationAccess(req, conversation) {
+  // PLATFORM-ADMIN-04A CLOSURE (H3) — workflow spécialisé `support_inbox` :
+  // l'autorité vient de la capability exacte (pas de User.role) et se limite
+  // STRICTEMENT aux conversations de l'inbox support ; toute autre
+  // conversation (privée, directe) est refusée.
+  if (req.platformNativeWorkflow?.workflow === 'support_inbox') {
+    if (conversation?.isStaffInbox === true) return;
+    const error = new Error('Accès refusé');
+    error.name = 'ConversationAccessError';
+    error.statusCode = 403;
+    throw error;
+  }
   if (activeTenantId(req)) {
     await assertResourceTenantOrUnattributed({ resourceType: 'Conversation', resource: conversation, tenantId: activeTenantId(req) });
   }

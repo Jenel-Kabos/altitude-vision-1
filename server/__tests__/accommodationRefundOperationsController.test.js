@@ -45,7 +45,18 @@ test('PlatformOperator finance.manage peut finaliser globalement sans qu’un te
   FinancialRefund.findOne.mockResolvedValue({ _id:'F1', subjectId:'R1', amountMinor:1000 });
   FinancialRefund.findOneAndUpdate.mockResolvedValue(null);
   refunds.completeManualRefund.mockResolvedValue({ _id:'F1', subjectId:'R1', amountMinor:1000, status:'completed', businessOperationKey:'OP1' });
-  const user={ id:'OP1', role:'Client', isPlatformOperatorContext:true, platformTenant:null, platformOperatorCapabilities:['platform.finance.manage'] };
+  // PLATFORM-ADMIN-04A — la portée globale provient de la source canonique
+  // `platform_operator_unscoped` (opérateur éligible), jamais du seul couple
+  // isPlatformOperatorContext + absence de tenant.
+  const user={ id:'OP1', role:'Client', isPlatformOperatorContext:true, tenantContextSource:'platform_operator_unscoped', platformTenant:null, platformOperatorCapabilities:['platform.finance.manage'] };
   const res=response(); await ctrl.completeRefund(req(user,{ params:{refundId:'F1'}, headers:{'idempotency-key':'K1'}, body:{reference:'EXT',method:'cash',amountMinor:1000,tenantId:'FORGED'} }),res);
   expect(res.status).not.toHaveBeenCalled(); expect(refunds.completeManualRefund).toHaveBeenCalledWith(expect.objectContaining({ refundId:'F1', amountMinor:1000 }));
+});
+
+test('PA-04A — opérateur partiel (source platform_operator_platform_view_forbidden) ne finalise jamais globalement', async () => {
+  FinancialRefund.findOne.mockResolvedValue({ _id:'F2', subjectId:'R2', amountMinor:1000 });
+  refunds.completeManualRefund.mockClear();
+  const user={ id:'OP2', role:'Client', isPlatformOperatorContext:true, tenantContextSource:'platform_operator_platform_view_forbidden', platformTenant:null, platformOperatorCapabilities:['platform.finance.manage'] };
+  const res=response(); await ctrl.completeRefund(req(user,{ params:{refundId:'F2'}, headers:{'idempotency-key':'K2'}, body:{reference:'EXT',method:'cash',amountMinor:1000} }),res);
+  expect(refunds.completeManualRefund).not.toHaveBeenCalled();
 });

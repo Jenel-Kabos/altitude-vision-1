@@ -19,6 +19,7 @@ const PaymentAllocation = require('../models/PaymentAllocation');
 const FinancialDocument = require('../models/FinancialDocument');
 const dashboardAnalyticsRoutes = require('../routes/dashboardAnalyticsRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -100,7 +101,8 @@ beforeAll(async () => {
     userId: operatorUser._id,
     actor: plainAdmin,
     reason: 'Analytics tenant test',
-    capabilities: ['platform.reporting.read', 'platform.accommodations.read'],
+    // PLATFORM-ADMIN-04A — opérateur éligible à la Vue plateforme.
+    capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES],
   });
 });
 

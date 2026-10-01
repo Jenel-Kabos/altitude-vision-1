@@ -15,6 +15,7 @@ const Property = require('../models/Property');
 const Transaction = require('../models/Transaction');
 const transactionRoutes = require('../routes/transactionRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -142,7 +143,7 @@ describe('SALE-PLAT — marketplace sale commercial authority is PLATFORM-ONLY',
     const { tx } = await scenario();
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PLAT-09', capabilities: ['platform.finance.manage'] });
+    await grantOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PLAT-09', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const res = await request(app).post(`/api/transactions/${tx._id}/finalize`).set(bearer(opUser));
     // La couche autorité laisse passer ; le résultat métier peut être 200/4xx business selon l'état
     // de la transaction (fixture raw sans finalization payload) — l'invariant testé ici est
@@ -239,7 +240,7 @@ describe('SALE-PAY — payment mutations are PLATFORM FINANCIAL', () => {
     const tx = await makeTransaction(property, client, agent);
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PAY-10', capabilities: ['platform.finance.manage'] });
+    await grantOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PAY-10', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const res = await request(app).post(`/api/transactions/${tx.insertedId}/paiements/especes`).set(bearer(opUser)).send({ montant: 1000000 });
     expect(res.status).not.toBe(403);
   });

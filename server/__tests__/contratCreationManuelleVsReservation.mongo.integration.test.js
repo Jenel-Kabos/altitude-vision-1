@@ -25,6 +25,7 @@ const contratRoutes = require('../routes/contratRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 const { acceptApplication } = require('../services/realEstateApplicationService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(120000);
 
@@ -51,7 +52,7 @@ afterAll(stopFinancialMongo);
 async function makeAdminOperator() {
   const admin = await makeUser({ role: 'Admin' });
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: admin._id, actor: granter, reason: 'Fixture: platform commercial marketplace conclusion', capabilities: ['platform.commercial.manage'] });
+  await grantOperator({ userId: admin._id, actor: granter, reason: 'Fixture: platform commercial marketplace conclusion', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   return admin;
 }
 

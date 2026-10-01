@@ -16,6 +16,7 @@ const PlatformTenantSubscription = require('../models/PlatformTenantSubscription
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 const propertyRoutes = require('../routes/propertyRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(240000);
 
@@ -111,7 +112,7 @@ beforeEach(async () => {
   opNoCap = await makeUser({ role: 'Admin' });
   await grantOperator({ userId: opNoCap._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read'] });
   opWithCap = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opWithCap._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read', 'platform.properties.manage'] });
+  await grantOperator({ userId: opWithCap._id, actor: bA, reason: 'fx', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

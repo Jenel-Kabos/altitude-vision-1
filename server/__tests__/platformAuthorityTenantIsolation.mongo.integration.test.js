@@ -11,6 +11,7 @@ const userRoutes = require('../routes/userRoutes');
 const adminRoutes = require('../routes/adminRoutes');
 const conversationRoutes = require('../routes/conversationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -45,7 +46,8 @@ beforeAll(async () => {
     userId: platformOperator._id,
     actor: legacyAdmin,
     reason: 'RBAC tenant reset integration test',
-    capabilities: ['platform.users.read', 'platform.users.manage', 'platform.support.read'],
+    // PLATFORM-ADMIN-04A — portée globale : opérateur éligible à la Vue plateforme.
+    capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES],
   });
   await Conversation.create({ isStaffInbox: true, tenant: tenantA._id, participants: [ownerA._id], lastMessage: 'Support A' });
   await Conversation.create({ isStaffInbox: true, tenant: tenantB._id, participants: [legacyAdmin._id], lastMessage: 'Support B' });

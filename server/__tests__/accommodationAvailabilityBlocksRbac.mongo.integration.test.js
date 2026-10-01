@@ -26,6 +26,7 @@ const NightLock = require('../models/AccommodationNightLock');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 const routes = require('../routes/accommodationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -86,7 +87,8 @@ beforeAll(async () => {
   ownerB = await User.create({ name: 'RBAC Owner B', email: `rbac-owner-b-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   client = await User.create({ name: 'RBAC Client', email: `rbac-client-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   operatorGlobal = await User.create({ name: 'RBAC Operator', email: `rbac-operator-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-  await grantOperator({ userId: operatorGlobal._id, actor: adminA, reason: 'RBAC-FINAL-01 test', capabilities: [] });
+  // PLATFORM-ADMIN-04A — la portée globale exige un opérateur éligible à la Vue plateforme.
+  await grantOperator({ userId: operatorGlobal._id, actor: adminA, reason: 'RBAC-FINAL-01 test', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
 
   accommodationA = await makeAccommodation(tenantA, ownerA, 'A');
   blockA = await makeBlock(accommodationA, ownerA);

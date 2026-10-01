@@ -28,6 +28,35 @@
 //                                 par la seule présence d'un tenant) — voir
 //                                 TENANT_SCOPE_HOTFIX3_ROUTE_MATRIX.md.
 const { resolveEffectiveTenantContext, resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
+const { PLATFORM_WIDE_CONTEXT_SOURCE, PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE } = require('../constants/platformOperatorConstants');
+
+// PLATFORM-ADMIN-04A — prédicat CANONIQUE du scope plateforme global. Fondé
+// exclusivement sur la source de contexte résolue (`platform_operator_unscoped`,
+// réservée à un opérateur éligible à la Vue plateforme) — jamais sur la seule
+// présence d'un PlatformOperator, l'absence de tenant ou User.role. Fail-closed :
+// une requête dont le contexte n'a pas été résolu n'est jamais globale. Accepte
+// `req` (source portée par req.tenantContextSource) ; ne lit `req.user` que pour
+// les helpers historiques qui ne reçoivent que l'acteur enrichi.
+const isPlatformWideRequest = (req) => {
+  if (!req) return false;
+  const source = req.tenantContextSource ?? req.user?.tenantContextSource;
+  const tenant = req.platformTenant ?? req.user?.platformTenant;
+  return typeof source === 'string' && source.length > 0 && source === PLATFORM_WIDE_CONTEXT_SOURCE && !tenant;
+};
+
+const isPlatformViewForbiddenRequest = (req) => {
+  if (!req) return false;
+  const source = req.tenantContextSource ?? req.user?.tenantContextSource;
+  return typeof source === 'string' && source.length > 0 && source === PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE;
+};
+
+const platformViewNotEligibleError = () => {
+  const error = new Error("Accès refusé : la Vue plateforme est réservée aux administrateurs plateforme pleinement habilités. Sélectionnez un tenant.");
+  error.name = 'TenantContextError';
+  error.code = 'PLATFORM_VIEW_NOT_ELIGIBLE';
+  error.statusCode = 403;
+  return error;
+};
 
 const requestedTenant = (req) => req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
 
@@ -121,7 +150,16 @@ const createRequireTenantScope = ({ allowPlatformWide = false, requireWhen = () 
     return next();
   }
 
-  const unscopedOperatorAllowed = allowPlatformWide && isPlatformOperator && req.tenantContextSource === 'platform_operator_unscoped';
+  const unscopedOperatorAllowed = allowPlatformWide && isPlatformOperator && isPlatformWideRequest(req);
+
+  // PLATFORM-ADMIN-04A — route supportant la Vue plateforme, opérateur partiel
+  // sans tenant sélectionné : refus explicite et stable. Les routes
+  // strictement tenant-scoped conservent leur signal historique
+  // (sélection de tenant requise) ci-dessous.
+  if (!resolved && allowPlatformWide && isPlatformViewForbiddenRequest(req)) {
+    res.status(403);
+    return next(platformViewNotEligibleError());
+  }
 
   if (!resolved && !unscopedOperatorAllowed) {
     res.status(403);
@@ -155,6 +193,7 @@ const createRequireTenantScope = ({ allowPlatformWide = false, requireWhen = () 
     req.tenantScopeUserIds = null;
     req.user.isPlatformOperatorContext = req.isPlatformOperatorContext;
     req.user.platformOperatorCapabilities = req.platformOperatorCapabilities;
+    req.user.tenantContextSource = req.tenantContextSource;
   }
   return next();
 };
@@ -189,6 +228,7 @@ const attachTenantScopeIfResolvable = async (req, res, next) => {
 };
 
 module.exports = {
+  isPlatformWideRequest, isPlatformViewForbiddenRequest, platformViewNotEligibleError,
   attachTenantContext, requireTenantScope, requireTenantScopeAllowPlatformWide,
   requireTenantScopeForStaffOrPlatformOperator, requireTenantScopeForAnalytics,
   requireTenantScopeForStaffAllowPlatformWide,

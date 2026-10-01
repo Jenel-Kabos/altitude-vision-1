@@ -30,7 +30,11 @@ const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/platformTenantController');
 const applicationController = require('../controllers/tenantApplicationController');
 const applicationUpload = require('../middleware/tenantApplicationUpload');
-const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
+const { requirePlatformOperatorCapability, requirePlatformNativeCapability } = require('../middleware/platformAuthority');
+// PLATFORM-ADMIN-04A CLOSURE (H3) — l'instruction des demandes d'activation
+// est un workflow platform-native spécialisé : capability exacte, opérateur
+// partiel autorisé, jamais la Vue plateforme (voir platformAuthority.js).
+const TENANT_APPLICATIONS_WORKFLOW = { workflow: 'tenant_applications' };
 const PlatformTenantDomain = require('../models/PlatformTenantDomain');
 const { resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
@@ -45,14 +49,14 @@ router.post('/applications/:applicationId/documents', auth.protect, auth.restric
 router.get('/applications/:applicationId/documents/:documentId', auth.protect, auth.restrictTo('Proprietaire'), applicationController.readDocument);
 router.delete('/applications/:applicationId/documents/:documentId', auth.protect, auth.restrictTo('Proprietaire'), applicationController.deleteDocument);
 router.post('/applications/:applicationId/submit', auth.protect, auth.restrictTo('Proprietaire'), applicationController.submit);
-router.get('/applications', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.listForReview);
-router.get('/applications/pending-count', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.pendingCount);
-router.get('/applications/:applicationId', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.readForReview);
-router.get('/applications/:applicationId/review-documents/:documentId', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.read'), applicationController.readDocumentForReview);
-router.post('/applications/:applicationId/start-review', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.review'), applicationController.startReview);
-router.post('/applications/:applicationId/request-changes', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.request_changes'), applicationController.requestChanges);
-router.post('/applications/:applicationId/reject', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.reject'), applicationController.reject);
-router.post('/applications/:applicationId/approve', auth.protect, requirePlatformOperatorCapability('platform.tenant_applications.approve'), applicationController.approve);
+router.get('/applications', auth.protect, requirePlatformNativeCapability('platform.tenant_applications.read', TENANT_APPLICATIONS_WORKFLOW), applicationController.listForReview);
+router.get('/applications/pending-count', auth.protect, requirePlatformNativeCapability('platform.tenant_applications.read', TENANT_APPLICATIONS_WORKFLOW), applicationController.pendingCount);
+router.get('/applications/:applicationId', auth.protect, requirePlatformNativeCapability('platform.tenant_applications.read', TENANT_APPLICATIONS_WORKFLOW), applicationController.readForReview);
+router.get('/applications/:applicationId/review-documents/:documentId', auth.protect, requirePlatformNativeCapability('platform.tenant_applications.read', TENANT_APPLICATIONS_WORKFLOW), applicationController.readDocumentForReview);
+router.post('/applications/:applicationId/start-review', auth.protect, requirePlatformNativeCapability('platform.tenant_applications.review', TENANT_APPLICATIONS_WORKFLOW), applicationController.startReview);
+router.post('/applications/:applicationId/request-changes', auth.protect, requirePlatformNativeCapability('platform.tenant_applications.request_changes', TENANT_APPLICATIONS_WORKFLOW), applicationController.requestChanges);
+router.post('/applications/:applicationId/reject', auth.protect, requirePlatformNativeCapability('platform.tenant_applications.reject', TENANT_APPLICATIONS_WORKFLOW), applicationController.reject);
+router.post('/applications/:applicationId/approve', auth.protect, requirePlatformNativeCapability('platform.tenant_applications.approve', TENANT_APPLICATIONS_WORKFLOW), applicationController.approve);
 
 router.use(auth.protect);
 

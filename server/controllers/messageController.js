@@ -25,6 +25,13 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     const { conversationId, receiverId, content, duration } = req.body;
     const uploadedFiles = req.files || [];
 
+    // PLATFORM-ADMIN-04A CLOSURE (H3) — l'agent support spécialisé ne répond
+    // que dans une conversation de l'inbox support : jamais de message direct.
+    if (req.platformNativeWorkflow?.workflow === 'support_inbox' && (receiverId || !conversationId)) {
+        res.status(403);
+        throw new Error('Accès refusé : réponse limitée aux conversations de l’inbox support.');
+    }
+
     // --- 1. Validation ---
     if ((!content && !uploadedFiles.length) || (!conversationId && !receiverId)) {
         res.status(400);
@@ -302,6 +309,12 @@ exports.getMessages = asyncHandler(async (req, res) => {
   // Résoudre la conversation pour identifier l'autre participant
   let otherUserId = conversationId;
   const convDoc = await Conversation.findById(conversationId);
+  // PLATFORM-ADMIN-04A CLOSURE (H3) — l'agent support spécialisé ne lit jamais
+  // l'historique direct legacy indexé par userId (aucune conversation).
+  if (!convDoc && req.platformNativeWorkflow?.workflow === 'support_inbox') {
+    res.status(403);
+    throw new Error('Accès refusé : lecture limitée aux conversations de l’inbox support.');
+  }
   if (convDoc) {
     // HOTFIX-MESSAGING-MESSAGE-READ-AUTHORITY-1 — remplace l'ancienne
     // vérification tenant-seule (`if (req.platformTenant) { assertResourceTenantOrUnattributed }`)

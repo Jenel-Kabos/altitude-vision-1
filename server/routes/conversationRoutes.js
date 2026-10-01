@@ -4,7 +4,8 @@ const { ALL_STAFF } = require('../utils/roles');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
-const { attachTenantContext, requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
+const { attachTenantContext, requireTenantScopeForStaffOrPlatformOperator, isPlatformWideRequest, isPlatformViewForbiddenRequest } = require('../middleware/tenantContext');
+const { requirePlatformNativeCapability } = require('../middleware/platformAuthority');
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
 const { restrictTo } = require('../middleware/authMiddleware');
 const {
@@ -37,7 +38,7 @@ router.use(authController.protect, attachTenantContext);
 // tenant only with the explicit support capability; ordinary staff remain
 // tenant-scoped and tenant owners/clients never enter this route group.
 const requireStaffConversationScope = async (req, res, next) => {
-  if (req.isPlatformOperatorContext && !req.platformTenant) {
+  if (isPlatformWideRequest(req)) {
     const operator = await resolveActiveOperator(req.user?._id || req.user?.id).catch(() => null);
     if (!hasCapability(operator, 'platform.support.read')) {
       // Preserve the established fail-closed signal for operators that still
@@ -47,6 +48,16 @@ const requireStaffConversationScope = async (req, res, next) => {
     }
     req.platformOperator = operator;
     return next();
+  }
+  // PLATFORM-ADMIN-04A CLOSURE (H3) — agent support PARTIEL (non éligible à la
+  // Vue plateforme) : workflow platform-native spécialisé `support_inbox`,
+  // capability exacte, borné aux conversations `isStaffInbox` par
+  // messagingAuthorizationService / messageController — jamais un scope global.
+  if (isPlatformViewForbiddenRequest(req)) {
+    const operator = await resolveActiveOperator(req.user?._id || req.user?.id).catch(() => null);
+    if (hasCapability(operator, 'platform.support.read')) {
+      return requirePlatformNativeCapability('platform.support.read', { workflow: 'support_inbox' })(req, res, next);
+    }
   }
   return requireTenantScopeForStaffOrPlatformOperator(req, res, next);
 };

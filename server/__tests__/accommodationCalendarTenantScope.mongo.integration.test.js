@@ -16,6 +16,7 @@ const FinancialPayment = require('../models/FinancialPayment');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 const routes = require('../routes/accommodationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -110,7 +111,8 @@ beforeAll(async () => {
   ownerA = await User.create({ name: 'Calendar Owner A', email: 'calendar-owner-a@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   ownerB = await User.create({ name: 'Calendar Owner B', email: 'calendar-owner-b@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   operator = await User.create({ name: 'Calendar Operator', email: 'calendar-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'Certification calendar tenant', capabilities: [] });
+  // PLATFORM-ADMIN-04A — la portée globale exige un opérateur éligible à la Vue plateforme.
+  await grantOperator({ userId: operator._id, actor: adminA, reason: 'Certification calendar tenant', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   accommodationA = await makeAccommodation(tenantA, ownerA, 'A');
   accommodationB = await makeAccommodation(tenantB, ownerB, 'B');
 });

@@ -9,6 +9,7 @@ const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const routes = require('../routes/accommodationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -80,7 +81,8 @@ beforeAll(async () => {
   proprietor = await User.create({ name: 'HZ04 Owner', email: 'hz04-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   await grantOperator({
     userId: operator._id, actor: adminA, reason: 'HZ04 admin lists certification',
-    capabilities: ['platform.accommodations.read'],
+    // PLATFORM-ADMIN-04A — opérateur éligible à la Vue plateforme.
+    capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES],
   });
   await grantOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ04 missing read certification', capabilities: [] });
   accommodationA1 = await makeAccommodation({ tenant: tenantA, owner: adminA, suffix: 'A1', status: 'soumis', submittedAt: new Date('2028-01-01') });

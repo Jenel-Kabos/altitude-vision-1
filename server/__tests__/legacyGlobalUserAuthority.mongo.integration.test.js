@@ -17,6 +17,7 @@ const { grantOperator } = require('../services/platformOperator/platformOperator
 const userRoutes = require('../routes/userRoutes');
 const memberRoutes = require('../routes/tenantMemberRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -80,7 +81,7 @@ beforeEach(async () => {
   // AUTORITÉ (`platform.users.manage`) — on donne donc les deux pour isoler
   // proprement le contrôle de mutation.
   opFull = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opFull._id, actor: bA, reason: 'fx-full', capabilities: ['platform.support.read', 'platform.users.read', 'platform.users.manage'] });
+  await grantOperator({ userId: opFull._id, actor: bA, reason: 'fx-full', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
 
   // Operator possédant la capacité mais MARQUÉ SUSPENDU côté PlatformOperator.
   opInactive = await makeUser({ role: 'Admin' });

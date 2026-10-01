@@ -188,11 +188,13 @@ describe('Tenant Admin — isolation stricte inchangée (mission §37)', () => {
 });
 
 describe('PlatformOperator — administration transversale des tenants (mission §21, §38)', () => {
-  test('opérateur avec platform.tenants.read → liste TOUS les tenants (A et B)', async () => {
+  // PLATFORM-ADMIN-04A — le registre global des tenants relève de la Vue
+  // plateforme : un opérateur partiel (5 capabilities) n'y entre plus, même
+  // avec platform.tenants.read. Couverture positive : platformViewEligibility.
+  test('opérateur partiel avec platform.tenants.read → registre global des tenants refusé (PLATFORM_VIEW_NOT_ELIGIBLE)', async () => {
     const res = await request(app).get('/api/platform-tenants').set(bearer(operatorUser));
-    expect(res.status).toBe(200);
-    const ids = res.body.data.tenants.map((t) => String(t._id));
-    expect(ids).toEqual(expect.arrayContaining([String(tenantA._id), String(tenantB._id)]));
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PLATFORM_VIEW_NOT_ELIGIBLE');
   });
 
   test('opérateur avec platform.tenants.read → overview Tenant B accessible', async () => {
@@ -234,22 +236,20 @@ describe('Gestion des opérateurs — jamais d\'auto-promotion (mission §44-46)
     expect(grant.status).toBe(403);
   });
 
-  test('opérateur avec platform.operators.manage → peut accorder la capacité à un autre utilisateur', async () => {
+  test('opérateur partiel avec platform.operators.manage → ne peut plus accorder de capacité (PLATFORM_VIEW_NOT_ELIGIBLE)', async () => {
     // Cible = adminB (role Admin, déjà membre du tenant B) : les routes
     // platform-tenants/platform-operators exigent `role === 'Admin'` comme
     // garde de base (inchangé) — la capacité opérateur s'ajoute à ce rôle,
     // elle ne le remplace pas. Prouve qu'un Admin tenant-scopé ordinaire
     // devient réellement transversal une fois la capacité accordée.
+    // PLATFORM-ADMIN-04A — la gouvernance des opérateurs est une surface
+    // platform-native : un opérateur partiel (même avec operators.manage)
+    // n'est pas éligible et ne peut plus déléguer ; aucune capacité accordée.
     const res = await request(app).post('/api/platform-operators').set(bearer(operatorUser))
       .send({ userId: adminB._id, capabilities: ['platform.tenants.read'], reason: 'Test délégation' });
-    expect(res.status).toBe(201);
-    expect(res.body.data.operator.status).toBe('active');
-    // adminB (auparavant Admin scopé au seul tenant B) peut maintenant lister tous les tenants
-    const list = await request(app).get('/api/platform-tenants').set(bearer(adminB));
-    expect(list.status).toBe(200);
-    const ids = list.body.data.tenants.map((t) => String(t._id));
-    expect(ids).toEqual(expect.arrayContaining([String(tenantA._id), String(tenantB._id)]));
-    await PlatformOperator.deleteOne({ user: adminB._id });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PLATFORM_VIEW_NOT_ELIGIBLE');
+    expect(await PlatformOperator.findOne({ user: adminB._id })).toBeNull();
   });
 
   test('opérateur ne peut pas modifier ses propres capacités (auto-promotion interdite)', async () => {
@@ -273,9 +273,11 @@ describe('Gestion des opérateurs — jamais d\'auto-promotion (mission §44-46)
 });
 
 describe('Reporting — mode plateforme natif, jamais fabriqué pour un non-opérateur (mission §20, §31)', () => {
-  test('opérateur SANS tenant sélectionné → rapport exécutif consolidé accessible (200)', async () => {
+  // PLATFORM-ADMIN-04A — rapport consolidé = Vue plateforme : opérateur partiel refusé.
+  test('opérateur partiel SANS tenant sélectionné → rapport exécutif consolidé refusé (PLATFORM_VIEW_NOT_ELIGIBLE)', async () => {
     const res = await request(app).get('/api/reporting/executive').set(bearer(operatorUser));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PLATFORM_VIEW_NOT_ELIGIBLE');
   });
 
   test('opérateur AVEC tenant sélectionné → rapport scopé à ce tenant (200)', async () => {

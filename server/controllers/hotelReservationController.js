@@ -24,6 +24,7 @@ const { resolveHotelAccessScope, listAccessibleHotels } = require('../services/h
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
 const { computeCancellationEligibility } = require('../services/hotel/hotelCancellationPolicyService');
 const HotelReview = require('../models/HotelReview');
+const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
 
 /**
  * N'attache le numéro de chambre QUE pour les réservations checked_in
@@ -94,7 +95,7 @@ async function assertReservationAccess(req, reservation) {
   // Global admin routes/actions apply their read/manage PlatformOperator
   // capability guard before reaching this resource check. In platform view,
   // there is intentionally no tenant to feed into the hotel access scope.
-  if (req.isPlatformOperatorContext && !req.platformTenant) return { role: 'staff', hotel };
+  if (isPlatformWideRequest(req)) return { role: 'staff', hotel };
   // `hotelReservationRoutes.js` n'attache pas `requireTenantScope` (contrairement à
   // financialRoutes.js) : `req.user.platformTenant` n'est jamais peuplé ici. Sans ce
   // repli sur `req.platformTenant` (résolu par `attachTenantContext`, non bloquant),

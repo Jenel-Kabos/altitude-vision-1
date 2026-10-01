@@ -4,7 +4,13 @@ import api from './api';
 // Aucune décision métier ici (voir platformTenantService.js pour la même
 // convention).
 
-export const getMyOperatorStatus = async () => (await api.get('/platform-operators/me')).data.data.operator;
+// PLATFORM-ADMIN-04A — `platformViewEligible` est calculé exclusivement par le
+// backend (jamais déduit côté client des capabilities ou du rôle) et porté
+// sur l'opérateur retourné ; absent ou non booléen → false (fail-closed).
+export const getMyOperatorStatus = async () => {
+  const { operator, platformViewEligible } = (await api.get('/platform-operators/me')).data.data;
+  return operator ? { ...operator, platformViewEligible: platformViewEligible === true } : null;
+};
 export const listOperators = async () => (await api.get('/platform-operators')).data.data.operators;
 export const grantOperator = async (payload) => (await api.post('/platform-operators', payload)).data.data.operator;
 export const suspendOperator = async (userId, reason) => (await api.patch(`/platform-operators/${userId}/suspend`, { reason })).data.data.operator;

@@ -10,6 +10,7 @@ const { requirePlatformOperatorCapability } = require('../middleware/platformAut
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
 const platformTenantRoutes = require('../routes/platformTenantRoutes');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -101,7 +102,8 @@ beforeAll(async () => {
     actor: secondFixture.bootstrap,
   });
 
-  await grant(admin, admin, ['platform.operators.manage', 'platform.tenant_applications.read']);
+  // PLATFORM-ADMIN-04A — autorité globale = opérateur éligible à la Vue plateforme.
+  await grant(admin, admin, [...PLATFORM_VIEW_REQUIRED_CAPABILITIES]);
   await grant(nonAdminOperator, admin, ['platform.operators.manage', 'platform.tenant_applications.read']);
   await grant(wrongCapabilityAdmin, admin, ['platform.tenants.read']);
   await grant(suspendedAdmin, admin, ['platform.operators.manage', 'platform.tenant_applications.read'], 'suspended');

@@ -13,6 +13,8 @@ const DEFAULT_RUNTIME = {
   tenantReady: true,
   tenantRequired: false,
   operator: null,
+  platformViewEligible: false,
+  isPlatformView: false,
   tenants: [],
   selectedTenantId: null,
   selectedTenant: null,
@@ -117,11 +119,19 @@ export function PlatformTenantRuntimeProvider({ children }) {
   const tenantMembership = selectedTenant?.membership?.status === 'active' ? selectedTenant.membership : null;
   const tenantBusinessRole = tenantMembership?.businessRole || null;
 
+  // PLATFORM-ADMIN-04A — la Vue plateforme n'existe que si le backend déclare
+  // l'opérateur éligible. Sans tenant sélectionné, un opérateur non éligible
+  // n'est JAMAIS en Vue plateforme (sélection de tenant requise).
+  const platformViewEligible = state.operator?.status === 'active' && state.operator?.platformViewEligible === true;
+  const isPlatformView = platformViewEligible && !state.selectedTenantId;
+
   const value = useMemo(() => ({
     tenantLoading: authLoading || state.loading,
     tenantReady: !authLoading && !state.loading,
     tenantRequired: state.tenants.length > 0 || state.operator?.status === 'active',
     operator: state.operator,
+    platformViewEligible,
+    isPlatformView,
     tenants: state.tenants,
     selectedTenantId: state.selectedTenantId,
     selectedTenant,
@@ -130,7 +140,7 @@ export function PlatformTenantRuntimeProvider({ children }) {
     isTenantAdmin: tenantBusinessRole === 'Admin',
     selectTenant,
     can,
-  }), [authLoading, state, selectedTenant, tenantMembership, tenantBusinessRole, selectTenant, can]);
+  }), [authLoading, state, platformViewEligible, isPlatformView, selectedTenant, tenantMembership, tenantBusinessRole, selectTenant, can]);
 
   return <TenantRuntimeContext.Provider value={value}>{children}</TenantRuntimeContext.Provider>;
 }

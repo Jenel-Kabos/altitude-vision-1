@@ -45,6 +45,7 @@ const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAcces
 const { buildExactCiRegexFilter } = require('../services/propertyFilterService');
 const { escapeRegex } = require('../utils/regexEscape');
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
+const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
@@ -729,6 +730,11 @@ exports.reviewDecision = async (req, res) => {
     if (req.isPlatformOperatorContext) {
       if (!platformCapability(req, 'platform.hotels.manage')) {
         return fail(res, 403, 'Capacité PlatformOperator requise.', { code: 'PLATFORM_HOTELS_MANAGE_REQUIRED' });
+      }
+      // PLATFORM-ADMIN-04A — sans tenant sélectionné, la décision relève de la
+      // Vue plateforme : réservée à un opérateur éligible (source canonique).
+      if (!req.platformTenant && !isPlatformWideRequest(req)) {
+        return fail(res, 403, 'Action refusée : la Vue plateforme est réservée aux administrateurs plateforme pleinement habilités.', { code: 'PLATFORM_VIEW_NOT_ELIGIBLE' });
       }
       if (req.platformTenant && String(req.platformTenant._id || req.platformTenant) !== String(hotel.tenant || '')) {
         return fail(res, 404, 'Hôtel introuvable.');

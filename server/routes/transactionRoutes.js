@@ -27,9 +27,20 @@ const { upload } = require('../config/cloudinary');
 const { requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/tenantContext');
 const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
 
-const platformFinanceRead = [auth.protect, requirePlatformOperatorCapability('platform.finance.read')];
+// PLATFORM-ADMIN-04A — lectures tenant-aware : la chaîne aval
+// (`requireTenantScopeForStaffOrPlatformOperator`, sans mode plateforme)
+// impose le tenant sélectionné ; un opérateur partiel garde donc la lecture
+// tenant-scopée. Les mutations ci-dessous restent platform-native.
+const platformFinanceRead = [auth.protect, requirePlatformOperatorCapability('platform.finance.read', { allowTenantSelection: true })];
 const platformFinanceManage = [auth.protect, requirePlatformOperatorCapability('platform.finance.manage')];
-const platformCommercialManage = [auth.protect, requirePlatformOperatorCapability('platform.commercial.manage')];
+// PLATFORM-ADMIN-04A — mutations sur une Transaction existante : le contrôleur
+// borne la ressource au tenant sélectionné (`assertTransactionTenantAccessIfStaff`
+// / `assertResourceTenantOrUnattributed` via X-Platform-Tenant-Id). Un opérateur
+// partiel avec tenant résolu conserve ce comportement tenant ; sans tenant, la
+// mutation relève de la Vue plateforme (éligibilité requise). La création
+// (`POST /`) n'a aucune frontière tenant et reste strictement platform-native.
+const platformFinanceManageOnScopedTransaction = [auth.protect, requirePlatformOperatorCapability('platform.finance.manage', { allowTenantSelection: true })];
+const platformCommercialManage = [auth.protect, requirePlatformOperatorCapability('platform.commercial.manage', { allowTenantSelection: true })];
 
 // Webhooks publics (pas d'auth)
 router.post('/webhook/cinetpay', pCtrl.webhookCinetpay); // legacy — conservé, non utilisé par les nouveaux paiements
@@ -50,8 +61,8 @@ router.post('/',   platformFinanceManage, ctrl.createTransaction);
 router.get   ('/:id',          auth.protect,   ctrl.getTransaction);
 
 // PLATFORM FINANCIAL MUTATIONS — sensitive.
-router.post  ('/:id/finalize', platformFinanceManage, ctrl.finalizeTransaction);
-router.patch ('/:id/cancel',   platformFinanceManage, ctrl.cancelTransaction);
+router.post  ('/:id/finalize', platformFinanceManageOnScopedTransaction, ctrl.finalizeTransaction);
+router.patch ('/:id/cancel',   platformFinanceManageOnScopedTransaction, ctrl.cancelTransaction);
 
 // PLATFORM COMMERCIAL NON-FINANCIAL WRITE — notes only. Requires
 // platform.commercial.manage (not finance.manage — capabilities are
@@ -72,7 +83,7 @@ router.post  ('/:id/paiements/virement', upload.single('preuve'),      auth.prot
 // PLATFORM FINANCIAL MUTATIONS — cash/check recording and virement
 // validation are Altitude Vision financial operations; they freeze
 // platform revenue/settlement state.
-router.post  ('/:id/paiements/especes',                                platformFinanceManage, pCtrl.enregistrerEspecesCheque);
-router.patch ('/:txId/paiements/:pId/valider',                         platformFinanceManage, pCtrl.validerVirement);
+router.post  ('/:id/paiements/especes',                                platformFinanceManageOnScopedTransaction, pCtrl.enregistrerEspecesCheque);
+router.patch ('/:txId/paiements/:pId/valider',                         platformFinanceManageOnScopedTransaction, pCtrl.validerVirement);
 
 module.exports = router;

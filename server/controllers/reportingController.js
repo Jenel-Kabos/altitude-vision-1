@@ -17,6 +17,7 @@ const asyncHandler = require('express-async-handler');
 const { getExecutiveReport, getDomainReport, DOMAINS } = require('../services/reporting/reportingService');
 const { buildCsv, buildPdf } = require('../services/reporting/reportingExportService');
 const { resolveRootOrgUnitId } = require('../services/platformTenant/tenantContextService');
+const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
 
 // PLATFORM-ADMIN-1 — un PlatformOperator sans tenant sélectionné
 // (`req.isPlatformOperatorContext` vrai ET `req.platformTenant` absent) est
@@ -32,7 +33,7 @@ async function scopeParams(req) {
   const { orgUnitId } = req.query;
   const activeTenant = req.platformTenant;
   if (!activeTenant) {
-    if (req.isPlatformOperatorContext) return {};
+    if (isPlatformWideRequest(req)) return {};
     // Ne devrait jamais arriver (requireTenantScope aurait déjà 403), mais
     // ne jamais retomber sur un scope global par défaut si ce n'est pas le cas.
     const error = new Error('Contexte tenant requis.');

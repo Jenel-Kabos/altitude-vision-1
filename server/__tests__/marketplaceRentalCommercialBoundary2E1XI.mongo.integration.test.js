@@ -26,6 +26,7 @@ const Transaction = require('../models/Transaction');
 const contratRoutes = require('../routes/contratRoutes');
 const transactionRoutes = require('../routes/transactionRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -112,7 +113,7 @@ describe('MRCB — rental Transaction lifecycle uses canonical platform authorit
 
   test('MRCB-11/12 (Admin + PlatformOperator + platform.finance.manage authorized on rental finalize; commercial.manage alone denied)', async () => {
     const { txId } = await rentalTx();
-    const financeOp = await operatorWith(['platform.finance.manage']);
+    const financeOp = await operatorWith(/* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES]);
     const commercialOp = await operatorWith(['platform.commercial.manage']);
     const resFin = await request(app).post(`/api/transactions/${txId}/finalize`).set(bearer(financeOp));
     expect(resFin.status).not.toBe(403);
@@ -168,7 +169,7 @@ describe('MRCB — POST /api/contrats (rental contract formation) is PLATFORM-ON
 
   test('MRCB-11b (Admin + PlatformOperator + platform.commercial.manage → allowed)', async () => {
     const { property } = await contractCandidate();
-    const op = await operatorWith(['platform.commercial.manage']);
+    const op = await operatorWith(/* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES]);
     const res = await request(app).post('/api/contrats').set(bearer(op)).send(payload(property));
     // La couche autorité laisse passer ; le résultat métier peut échouer
     // pour d'autres raisons (validation), l'invariant testé est NON-403.

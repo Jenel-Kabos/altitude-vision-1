@@ -19,7 +19,7 @@ const leaseLifecycle = require('../services/rentalLeaseLifecycleService');
 // controller n'écrit JAMAIS `saleCycle`/`saleCycleHistory` directement.
 const saleLifecycle = require('../services/saleContractLifecycleService');
 const { generatePaiements } = require('../services/rentalPaymentScheduleService');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenant, assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { isModuleAvailable } = require('../middleware/tenantModuleGate');
 
@@ -50,7 +50,13 @@ async function ensureModuleAvailableForContratType(req, contratType) {
 async function assertPropertyTenantAccess(req, property) {
   const explicitTenantId = req.get?.('X-Platform-Tenant-Id') || req.get?.('X-Tenant-Id') || null;
   const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-  await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
+  // PLATFORM-ADMIN-04A CLOSURE — un PlatformOperator agissant via un tenant
+  // sélectionné (allowTenantSelection) n'opère QUE sur une ressource
+  // positivement attribuée à ce tenant : attribution stricte (une ressource
+  // non attribuée / tenant:null est refusée). Le chemin staff tenant (PATH A)
+  // reste inchangé — sa politique `unresolved` relève de PA-04B.
+  const assertAttribution = req.isPlatformOperatorContext && tenant?._id ? assertResourceTenant : assertResourceTenantOrUnattributed;
+  await assertAttribution({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
 }
 
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-A, finding RA-04) — même relation

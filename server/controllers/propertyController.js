@@ -36,6 +36,7 @@ const { STAFF_IMMO } = require('../utils/roles');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser, resolveTenantScope } = require('../services/platformTenant/tenantContextService');
 const { normalizePropertyRegistryQuery, projectPropertyRegistryRows } = require('../services/propertyRegistryQueryService');
+const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
 
 // TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traitait un
 // `Property.owner` sans OrgMembership (Proprietaire public-signup, cas
@@ -565,7 +566,7 @@ const getAllProperties = asyncHandler(async (req, res) => {
     // capability plateforme reste vérifiée par le middleware canonique ; ce
     // garde empêche seulement qu'un opérateur suspendu/non reconnu ou un
     // Admin historique non rattaché tombe sur le catalogue public.
-    if (!req.user || (!req.isPlatformOperatorContext && !req.platformTenant)) {
+    if (!req.user || (!isPlatformWideRequest(req) && !req.platformTenant)) {
       res.status(403);
       throw new Error('Contexte administratif immobilier requis.');
     }

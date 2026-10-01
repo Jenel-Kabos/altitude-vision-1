@@ -7,7 +7,7 @@ const { notify, notifyStaff } = require('../services/notificationService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ALL_STAFF } = require('../utils/roles');
 const { registerProviderEvent, claimProviderEvent, completeProviderEvent, failProviderEvent } = require('../services/finance/financialIdempotencyService');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenant, assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-I, finding RA-14) — mêmes mutations
@@ -21,8 +21,14 @@ const { resolveTenantForUser } = require('../services/platformTenant/tenantConte
 async function assertTransactionTenantAccessForStaff(req, res, tx) {
   const explicitTenantId = req.get?.('X-Platform-Tenant-Id') || req.get?.('X-Tenant-Id') || null;
   const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+  // PLATFORM-ADMIN-04A CLOSURE — un PlatformOperator agissant via un tenant
+  // sélectionné (allowTenantSelection) n'opère QUE sur une ressource
+  // positivement attribuée à ce tenant : attribution stricte (une ressource
+  // non attribuée / tenant:null est refusée). Le chemin staff tenant (PATH A)
+  // reste inchangé — sa politique `unresolved` relève de PA-04B.
+  const assertAttribution = req.isPlatformOperatorContext && tenant?._id ? assertResourceTenant : assertResourceTenantOrUnattributed;
   try {
-    await assertResourceTenantOrUnattributed({ resourceType: 'Transaction', resource: tx, tenantId: tenant?._id });
+    await assertAttribution({ resourceType: 'Transaction', resource: tx, tenantId: tenant?._id });
     return true;
   } catch (error) {
     res.status(error.statusCode || 404).json({ status: 'fail', message: 'Transaction introuvable.' });

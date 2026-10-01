@@ -12,6 +12,7 @@ const RatePlan = require('../models/RatePlan');
 const routes = require('../routes/hotelRoutes');
 const propertyRoutes = require('../routes/propertyRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -93,7 +94,7 @@ beforeAll(async () => {
   proprietor = await User.create({ name: 'HZ06 Owner', email: 'hz06-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   client = await User.create({ name: 'HZ06 Client', email: 'hz06-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   operator = await User.create({ name: 'HZ06 Operator', email: 'hz06-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ06 hotel lists certification', capabilities: ['platform.hotels.read', 'platform.hotels.manage'] });
+  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ06 hotel lists certification', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   operatorNoRead = await User.create({ name: 'HZ06 Operator No Read', email: 'hz06-operator-no-read@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   await grantOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ06 capability denial certification', capabilities: [] });
 
@@ -174,7 +175,9 @@ test('PlatformOperator global conserve la portée globale historique', async () 
 test('PlatformOperator sans platform.hotels.read est refusé en vue globale', async () => {
   const response = await request(app).get('/api/hotels/status/pending').set(bearer(operatorNoRead));
   expect(response.status).toBe(403);
-  expect(response.body.code).toBe('PLATFORM_HOTELS_READ_REQUIRED');
+  // PLATFORM-ADMIN-04A — sans capability, l'opérateur n'est pas éligible :
+  // la gate d'entrée en Vue plateforme refuse avant la gate de capability.
+  expect(response.body.code).toBe('PLATFORM_VIEW_NOT_ELIGIBLE');
 });
 
 test.each([

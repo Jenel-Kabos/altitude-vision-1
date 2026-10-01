@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const { getPropertyPortfolio, getPropertyPortfolioForTenantScope } = require('../services/propertyPortfolioService');
+const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
 
 // TENANT-SCOPE-AUDIT-1 — `req.tenantScopeUserIds` reste le scope brut
 // `OrgMembership`-only : un bien appartenant à un Proprietaire créé par
@@ -19,7 +20,7 @@ exports.list = asyncHandler(async (req, res) => {
   // tenant so the portfolio filters strictly by `Property.tenant` when a
   // canonical tenant context is resolved. PlatformOperator platform-wide
   // (no tenant selected) keeps the unscoped variant.
-  const portfolio = req.isPlatformOperatorContext && !req.platformTenant
+  const portfolio = isPlatformWideRequest(req)
     ? await getPropertyPortfolio()
     : await getPropertyPortfolioForTenantScope({
       scopeUserIds: req.tenantScopeUserIds || [],

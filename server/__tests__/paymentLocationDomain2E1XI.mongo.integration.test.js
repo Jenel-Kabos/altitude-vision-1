@@ -22,6 +22,7 @@ const Paiement = require('../models/Paiement');
 const paiementLocationRoutes = require('../routes/paiementLocationRoutes');
 const paiementRoutes = require('../routes/paiementRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -243,7 +244,7 @@ describe('PAY-PEN — penalty separation', () => {
   test('PAY-PEN-06 (PlatformOperator + platform.finance.manage → global /calculer-penalites allowed)', async () => {
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'PAY-PEN-06', capabilities: ['platform.finance.manage'] });
+    await grantOperator({ userId: opUser._id, actor: granter, reason: 'PAY-PEN-06', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const res = await request(app).post('/api/paiements/calculer-penalites').set(bearer(opUser));
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveProperty('verifies');

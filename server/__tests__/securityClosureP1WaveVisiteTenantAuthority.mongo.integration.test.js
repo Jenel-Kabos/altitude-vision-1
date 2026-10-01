@@ -16,6 +16,7 @@ const { errorHandler } = require('../middleware/errorMiddleware');
 const organizationService = require('../services/organizationService');
 const platformTenantService = require('../services/platformTenant/platformTenantService');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -61,7 +62,7 @@ describe('SECURITY-CLOSURE-P1-WAVE-1 (P1-B) — GET /api/visites, /all-payments,
     const a = await buildTenantWithVisite('GLOBAL-A');
     const b = await buildTenantWithVisite('GLOBAL-B');
     const operator = await User.create({ name: 'Visit Operator', email: `visit-operator-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'ALTIMMO-CORE-4 visit global read', capabilities: ['platform.properties.read'] });
+    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'ALTIMMO-CORE-4 visit global read', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] }); // PLATFORM-ADMIN-04A
     const res = await request(app).get('/api/visites').set(bearer(operator));
     expect(res.status).toBe(200);
     expect(res.body.data.visites.map((visit) => String(visit._id))).toEqual(expect.arrayContaining([String(a.visite._id), String(b.visite._id)]));

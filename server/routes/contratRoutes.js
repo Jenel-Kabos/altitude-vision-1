@@ -82,7 +82,10 @@ router.get('/:id', ...tenantRead, ctrl.getOne);
 // BOUNDARY — la conclusion marketplace reste PLATFORM-ONLY. NE PAS composer
 // avec la chaîne tenant ci-dessus : cette route n'exige NI membership tenant
 // NI module `location` — l'autorité provient de `platform.commercial.manage`.
-router.post('/', auth.protect, requirePlatformOperatorCapability('platform.commercial.manage'), ctrl.create);
+// PLATFORM-ADMIN-04A — `ctrl.create` borne la Property au tenant sélectionné
+// (`assertPropertyTenantAccess`) : opérateur partiel + tenant résolu conserve
+// la conclusion tenant-scopée ; sans tenant, Vue plateforme (éligibilité requise).
+router.post('/', auth.protect, requirePlatformOperatorCapability('platform.commercial.manage', { allowTenantSelection: true }), ctrl.create);
 // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV-3C — LEGACY-CONTRAT-MUTATION-
 // RETIREMENT. Les mutations polymorphiques legacy sont retirées : les
 // surfaces canoniques restent `/api/contrats/location/:id` et

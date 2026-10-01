@@ -17,14 +17,15 @@ const { resolveTenantForUser } = require('../services/platformTenant/tenantConte
 const financialAuthz = require('../services/finance/financialAuthorizationService');
 const deductions = require('../services/finance/accommodationDeductionService');
 const FinancialDeduction = require('../models/FinancialDeduction');
+const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
 
 const respondError = (res, error) => res.status(error.status || error.statusCode || 500).json({ status: 'fail', code: error.code, message: error.message });
 const isStaff = (user) => ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'].includes(user?.role);
-const isPlatformWide = (user) => Boolean(user?.isPlatformOperatorContext && !user?.platformTenant);
+const isPlatformWide = (req) => isPlatformWideRequest(req);
 
 async function authorizedCalendarAccommodation(req) {
   const query = { _id: req.params.id };
-  if (isStaff(req.user) && !isPlatformWide(req.user)) query.tenant = req.user.platformTenant?._id || req.user.platformTenant;
+  if (isStaff(req.user) && !isPlatformWide(req)) query.tenant = req.user.platformTenant?._id || req.user.platformTenant;
   const accommodation = await Accommodation.findOne(query).populate('property');
   if (!accommodation || accommodation.hotel) throw service.fail('Hébergement indépendant introuvable.', 404, 'NOT_FOUND');
   return accommodation;
@@ -104,7 +105,7 @@ exports.transition = (to) => async (req, res) => {
   try {
     let authorizedReservation = null;
     if (isStaff(req.user)) {
-      const platformWide = req.user.isPlatformOperatorContext && !req.user.platformTenant;
+      const platformWide = isPlatformWideRequest(req);
       const query = { _id: req.params.id };
       if (!platformWide) query.tenant = req.user.platformTenant?._id || req.user.platformTenant;
       authorizedReservation = await Reservation.findOne(query);
@@ -127,7 +128,7 @@ exports.transition = (to) => async (req, res) => {
 const accountingRoles = ['Admin', 'Collaborateur', 'Secretaire'];
 const assertReservationAccess = async (reservationId, user, req) => {
   const reservation = await Reservation.findById(reservationId); if (!reservation) throw service.fail('Réservation introuvable.', 404);
-  const platformFinance = user?.isPlatformOperatorContext && !user?.platformTenant
+  const platformFinance = isPlatformWideRequest(req)
     && user.platformOperatorCapabilities?.some((capability) => ['platform.finance.read', 'platform.finance.manage'].includes(capability));
   if (platformFinance) return reservation;
   if (!(isStaff(user) || accountingRoles.includes(user.role) || String(reservation.owner) === String(user.id) || String(reservation.guest) === String(user.id))) throw service.fail('Accès refusé.', 403, 'FORBIDDEN');
@@ -175,7 +176,7 @@ const assertRefundAccess = async (refundId, user, req) => {
     _id: refundId, domain: 'real_estate', subjectType: 'AccommodationReservation',
   });
   if (!refund) throw service.fail('Remboursement introuvable.', 404, 'NOT_FOUND');
-  if (user?.isPlatformOperatorContext && !user?.platformTenant && user.platformOperatorCapabilities?.includes('platform.finance.manage')) return refund;
+  if (isPlatformWideRequest(req) && user.platformOperatorCapabilities?.includes('platform.finance.manage')) return refund;
   await assertReservationAccess(refund.subjectId, user, req);
   return refund;
 };
@@ -203,7 +204,7 @@ exports.listRefundOperations = async (req, res) => {
     await financialAuthz.assertFinancialCapability(req.user, financialAuthz.CAPABILITIES.PAYMENT_VIEW);
     const query = { domain: 'real_estate', subjectType: 'AccommodationReservation' };
     if (req.query.status) query.status = req.query.status; else query.status = { $in: ['requested', 'approved', 'processing'] };
-    if (!(req.user.isPlatformOperatorContext && !req.user.platformTenant)) {
+    if (!isPlatformWideRequest(req)) {
       const tenant = await resolveTenantForUser(req.user._id || req.user.id, req.get('X-Platform-Tenant-Id'));
       if (!tenant?._id) throw service.fail('Contexte tenant requis.', 403, 'FORBIDDEN'); query.tenant = tenant._id;
     }
@@ -220,7 +221,7 @@ exports.listDeductionOperations = async (req, res) => {
     await financialAuthz.assertFinancialCapability(req.user, financialAuthz.CAPABILITIES.PAYMENT_VIEW);
     const query = {};
     if (req.query.status) query.status = req.query.status; else query.status = 'pending_validation';
-    if (!(req.user.isPlatformOperatorContext && !req.user.platformTenant)) {
+    if (!isPlatformWideRequest(req)) {
       const tenant = await resolveTenantForUser(req.user._id || req.user.id, req.get('X-Platform-Tenant-Id'));
       if (!tenant?._id) throw service.fail('Contexte tenant requis.', 403, 'FORBIDDEN');
       query.tenant = tenant._id;

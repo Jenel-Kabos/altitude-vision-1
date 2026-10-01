@@ -21,6 +21,7 @@ const PlatformOperator = require('../models/PlatformOperator');
 const transactionRoutes = require('../routes/transactionRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -374,7 +375,7 @@ describe('FIN-CAP — commercial.manage does not grant financial authority', () 
     const tx = await makeTransaction(property, client, agent);
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP-04', capabilities: ['platform.finance.manage'] });
+    await grantOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP-04', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const res = await request(app).post(`/api/transactions/${tx._id}/finalize`).set(bearer(opUser));
     expect(res.status).not.toBe(403);
   });
@@ -388,7 +389,7 @@ describe('FIN-CAP — commercial.manage does not grant financial authority', () 
     const tx = await makeTransaction(property, client, agent);
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP-05', capabilities: ['platform.finance.manage'] });
+    await grantOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP-05', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const paiementId = new mongoose.Types.ObjectId();
     const res = await request(app)
       .patch(`/api/transactions/${tx._id}/paiements/${paiementId}/valider`)

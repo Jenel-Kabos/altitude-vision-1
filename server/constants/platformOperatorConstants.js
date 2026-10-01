@@ -52,4 +52,58 @@ const PLATFORM_OPERATOR_CAPABILITIES = [
 
 const PLATFORM_OPERATOR_STATUSES = ['active', 'suspended', 'revoked'];
 
-module.exports = { PLATFORM_OPERATOR_CAPABILITIES, PLATFORM_OPERATOR_STATUSES };
+// PLATFORM-ADMIN-04A — Éligibilité à la Vue plateforme (scope global).
+// Seul un opérateur actif détenant TOUTES les capabilities requises peut
+// entrer dans le scope plateforme ; chaque action y reste ensuite gardée par
+// sa capability métier. La liste requise est DÉRIVÉE du registre ci-dessus
+// moins les exclusions documentées ci-dessous — jamais une seconde liste
+// manuelle. Conséquence assumée : ajouter une capability au registre rend
+// inéligibles les administrateurs existants tant qu'elle ne leur est pas
+// accordée (snapshot dans platformViewEligibility.test.js).
+const PLATFORM_VIEW_EXCLUDED_CAPABILITIES = Object.freeze({
+  'platform.support.impersonation':
+    "Capacité break-glass de support (agir au nom d'un utilisateur) : l'exiger forcerait chaque administrateur plateforme à détenir le pouvoir le plus sensible du registre, contraire au moindre privilège (décision H1, PA-04).",
+});
+
+const PLATFORM_VIEW_REQUIRED_CAPABILITIES = Object.freeze(
+  PLATFORM_OPERATOR_CAPABILITIES.filter(
+    (capability) => !Object.prototype.hasOwnProperty.call(PLATFORM_VIEW_EXCLUDED_CAPABILITIES, capability),
+  ),
+);
+
+// PLATFORM-ADMIN-04A — sources de contexte opérateur sans tenant. Définies
+// ici (module sans dépendance) pour que le prédicat canonique ne dépende
+// jamais d'un service mockable : une constante absente doit échouer FERMÉ.
+const PLATFORM_WIDE_CONTEXT_SOURCE = 'platform_operator_unscoped';
+const PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE = 'platform_operator_platform_view_forbidden';
+
+// PLATFORM-ADMIN-04A CLOSURE (H3) — workflows platform-native SPÉCIALISÉS.
+// Distincts de la Vue plateforme : un opérateur PARTIEL détenant la
+// capability exacte peut exercer CE workflow global (ressources propres au
+// workflow uniquement), sans jamais obtenir `platform_operator_unscoped` ni
+// un scope réutilisable ailleurs. Liste fermée : toute nouvelle entrée est une
+// décision d'autorité explicite (testée).
+//   - tenant_applications : instruction des demandes d'activation (pas de
+//     donnée tenant) ; séparation read/review/request_changes/approve/reject.
+//   - support_inbox : inbox support transverse, bornée aux conversations
+//     `isStaffInbox` (aucun message direct, aucune conversation privée).
+const PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS = Object.freeze({
+  tenant_applications: Object.freeze([
+    'platform.tenant_applications.read',
+    'platform.tenant_applications.review',
+    'platform.tenant_applications.request_changes',
+    'platform.tenant_applications.approve',
+    'platform.tenant_applications.reject',
+  ]),
+  support_inbox: Object.freeze(['platform.support.read']),
+});
+
+module.exports = {
+  PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS,
+  PLATFORM_WIDE_CONTEXT_SOURCE,
+  PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE,
+  PLATFORM_OPERATOR_CAPABILITIES,
+  PLATFORM_OPERATOR_STATUSES,
+  PLATFORM_VIEW_EXCLUDED_CAPABILITIES,
+  PLATFORM_VIEW_REQUIRED_CAPABILITIES,
+};

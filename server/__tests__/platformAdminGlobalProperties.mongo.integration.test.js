@@ -9,6 +9,7 @@ const PlatformOperator = require('../models/PlatformOperator');
 const propertyRoutes = require('../routes/propertyRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 
 jest.setTimeout(180000);
 
@@ -66,6 +67,7 @@ let independentOwner;
 let reader;
 let wrongCapability;
 let inactiveOperator;
+let partialReader;
 let legacyAdmin;
 let propertyA1;
 let propertyA2;
@@ -94,8 +96,12 @@ beforeAll(async () => {
   reader = await makeUser({ label: 'properties-reader' });
   wrongCapability = await makeUser({ label: 'wrong-capability' });
   inactiveOperator = await makeUser({ label: 'inactive-operator' });
+  partialReader = await makeUser({ label: 'partial-reader' });
   legacyAdmin = await makeUser({ role: 'Admin', label: 'legacy-admin' });
-  await grantOperator({ userId: reader._id, actor: tenantAdminA, reason: 'PA03 read', capabilities: ['platform.properties.read'] });
+  // PLATFORM-ADMIN-04A — le registre global relève de la Vue plateforme :
+  // lecteur éligible (toutes les capabilities requises, dont properties.read).
+  await grantOperator({ userId: reader._id, actor: tenantAdminA, reason: 'PA03 read', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await grantOperator({ userId: partialReader._id, actor: tenantAdminA, reason: 'PA04A partial reader', capabilities: ['platform.properties.read'] });
   await grantOperator({ userId: wrongCapability._id, actor: tenantAdminA, reason: 'PA03 wrong capability', capabilities: ['platform.users.read'] });
   await grantOperator({ userId: inactiveOperator._id, actor: tenantAdminA, reason: 'PA03 inactive', capabilities: ['platform.properties.read'] });
   await PlatformOperator.updateOne({ user: inactiveOperator._id }, { $set: { status: 'suspended' } });
@@ -114,6 +120,12 @@ describe('PLATFORM-ADMIN-03 — authority and property populations', () => {
       String(propertyA1._id), String(propertyA2._id), String(propertyB1._id), String(propertyU1._id),
     ]));
     expect(new Set(ids(res)).size).toBe(ids(res).length);
+  });
+
+  test('PA-04A — properties.read seul (opérateur partiel) ne donne plus accès au registre global', async () => {
+    const res = await request(app).get(registry()).set(bearer(partialReader));
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PLATFORM_VIEW_NOT_ELIGIBLE');
   });
 
   test('wrong capability, inactive operator and legacy Admin are denied globally', async () => {

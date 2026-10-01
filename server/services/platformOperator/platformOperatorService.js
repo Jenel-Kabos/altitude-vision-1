@@ -14,7 +14,7 @@ const PlatformOperator = require('../../models/PlatformOperator');
 const PlatformAuthorityLock = require('../../models/PlatformAuthorityLock');
 const User = require('../../models/User');
 const mongoose = require('mongoose');
-const { PLATFORM_OPERATOR_CAPABILITIES } = require('../../constants/platformOperatorConstants');
+const { PLATFORM_OPERATOR_CAPABILITIES, PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../../constants/platformOperatorConstants');
 const { logAction, buildAuteur } = require('../actionLogService');
 
 class PlatformOperatorError extends Error {
@@ -166,6 +166,16 @@ async function resolveActiveOperator(userId) {
 
 function hasCapability(operator, capability) {
   return Boolean(operator && operator.status === 'active' && operator.capabilities?.includes(capability));
+}
+
+// PLATFORM-ADMIN-04A — droit d'ENTRER dans la Vue plateforme (scope global),
+// distinct du droit d'agir (`hasCapability`). Vrai uniquement pour un
+// opérateur actif détenant toutes les PLATFORM_VIEW_REQUIRED_CAPABILITIES.
+// Ne lit jamais User.role : un Admin historique n'est pas un opérateur.
+function isPlatformViewEligible(operator) {
+  if (!operator || operator.status !== 'active' || !Array.isArray(operator.capabilities)) return false;
+  const granted = new Set(operator.capabilities);
+  return PLATFORM_VIEW_REQUIRED_CAPABILITIES.every((capability) => granted.has(capability));
 }
 
 // GRANT — ne fait JAMAIS de promotion automatique : `actor` et `reason` sont
@@ -345,6 +355,7 @@ module.exports = {
   getOperatorByUserId,
   resolveActiveOperator,
   hasCapability,
+  isPlatformViewEligible,
   resolveActiveOperatorsByCapability,
   grantOperator,
   suspendOperator,

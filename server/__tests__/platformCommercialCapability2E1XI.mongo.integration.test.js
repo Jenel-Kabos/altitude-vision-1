@@ -17,6 +17,7 @@ const Transaction = require('../models/Transaction');
 const PlatformOperator = require('../models/PlatformOperator');
 const transactionRoutes = require('../routes/transactionRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -133,7 +134,7 @@ describe('COMM-CAP — canonical registry + Admin+Operator+capability contract',
 
   test('COMM-CAP-08 (Admin + PlatformOperator + platform.commercial.manage → ALLOWED)', async () => {
     const { txId } = await scenario();
-    const op = await makeOperator(['platform.commercial.manage']);
+    const op = await makeOperator(/* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES]);
     const res = await request(app).patch(`/api/transactions/${txId}/notes`).set(bearer(op)).send({ notes: 'Note commerciale légitime' });
     // La couche autorité laisse passer ; le résultat métier est renvoyé par
     // le controller. L'invariant testé est NON-403 côté autorité.
@@ -186,7 +187,7 @@ describe('COMM-NOTE — PATCH /api/transactions/:id/notes requires platform.comm
 
   test('COMM-NOTE-07 (Admin + PlatformOperator + platform.commercial.manage → ALLOWED)', async () => {
     const { txId } = await scenario();
-    const op = await makeOperator(['platform.commercial.manage']);
+    const op = await makeOperator(/* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES]);
     const res = await request(app).patch(`/api/transactions/${txId}/notes`).set(bearer(op)).send({ notes: 'ok' });
     expect(res.status).not.toBe(403);
   });
@@ -238,7 +239,7 @@ describe('FIN-CAP — platform.commercial.manage does NOT imply platform.finance
 
   test('FIN-CAP-05 (finance.manage retains finalize authority)', async () => {
     const { txId } = await scenario();
-    const op = await makeOperator(['platform.finance.manage']);
+    const op = await makeOperator(/* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES]);
     const res = await request(app).post(`/api/transactions/${txId}/finalize`).set(bearer(op));
     expect(res.status).not.toBe(403);
   });

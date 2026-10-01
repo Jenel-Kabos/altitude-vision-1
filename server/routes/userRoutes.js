@@ -5,7 +5,9 @@ const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
 const { upload } = require('../config/cloudinary');
 const { protect } = require('../middleware/authMiddleware');
-const { requireTenantScope } = require('../middleware/tenantContext');
+const {
+  requireTenantScope, isPlatformWideRequest, isPlatformViewForbiddenRequest, platformViewNotEligibleError,
+} = require('../middleware/tenantContext');
 const { attachTenantContext } = require('../middleware/tenantContext');
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
 const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
@@ -70,6 +72,12 @@ router.use(attachTenantContext);
 // explicit users.read capability may use the same resource in platform mode.
 const requireUsersReadScope = async (req, res, next) => {
   if (req.isPlatformOperatorContext) {
+    // PLATFORM-ADMIN-04A — opérateur partiel sans tenant : jamais de lecture
+    // globale du registre utilisateurs.
+    if (isPlatformViewForbiddenRequest(req)) {
+      res.status(403);
+      return next(platformViewNotEligibleError());
+    }
     if (req.tenantContextSource === 'platform_operator_tenant_not_found') {
       return res.status(403).json({
         status: 'fail',
@@ -124,7 +132,7 @@ router.param('id', async (req, res, next, userId) => {
   if (!mongoose.isValidObjectId(userId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
   const scopeUserIds = await expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || [])
     .catch(() => req.tenantScopeUserIds || []);
-  const globalPlatformRead = req.isPlatformOperatorContext && !req.platformTenant
+  const globalPlatformRead = isPlatformWideRequest(req)
     && hasCapability(req.platformOperator, 'platform.users.read');
   const inScope = globalPlatformRead || scopeUserIds.some((id) => String(id) === String(userId));
   if (!inScope) return res.status(404).json({ status: 'fail', message: 'Utilisateur introuvable.' });
@@ -146,6 +154,12 @@ router.get('/owners',  userController.getAllOwners);
 // donne l'accès. Sur un contexte tenant, le second gate ferme sur les tests
 // LEGACY-01..LEGACY-12 ci-dessous.
 const requireGlobalUsersManage = requirePlatformOperatorCapability('platform.users.manage');
+// PLATFORM-ADMIN-04A — mutations ciblant un `:id` : `router.param('id')`
+// ci-dessus borne déjà la cible au tenant sélectionné (tenantScopeUserIds) ;
+// un opérateur partiel avec tenant sélectionné garde ce comportement. Sans
+// tenant, la requête relève de la Vue plateforme (éligibilité requise).
+// `create-by-admin` ne cible aucun tenant : reste strictement platform-native.
+const requireUsersManageOnScopedTarget = requirePlatformOperatorCapability('platform.users.manage', { allowTenantSelection: true });
 
 // ✅ Création d'utilisateur par admin — ne cible aucune ressource existante
 //    d'un autre tenant, donc hors périmètre de la garde `:id` ci-dessus.
@@ -155,16 +169,16 @@ router.post('/create-by-admin', requireGlobalUsersManage, userController.createB
 // renvoyerContrat restent sous le garde legacy (utilisateurs propriétaires
 // vérifiés dans leur tenant — hors périmètre 1F ; on ne les rouvre pas ici).
 router.patch('/:id/verify',             requireUsersManageForPlatformOperator, userController.verifyOwner);
-router.patch('/:id/suspend',            requireGlobalUsersManage, userController.suspendUser);
-router.patch('/:id/activate',           requireGlobalUsersManage, userController.activateUser);
-router.patch('/:id/role',               requireGlobalUsersManage, userController.updateUserRole);
+router.patch('/:id/suspend',            requireUsersManageOnScopedTarget, userController.suspendUser);
+router.patch('/:id/activate',           requireUsersManageOnScopedTarget, userController.activateUser);
+router.patch('/:id/role',               requireUsersManageOnScopedTarget, userController.updateUserRole);
 router.post( '/:id/renvoyer-contrat',   requireUsersManageForPlatformOperator, userController.renvoyerContrat);
 router.get(  '/:id/contract-document',  userController.downloadContractDocument);
 
 router
   .route('/:id')
   .get(userController.getUser)
-  .put(requireGlobalUsersManage, userController.updateUser)
-  .delete(requireGlobalUsersManage, userController.deleteUser);
+  .put(requireUsersManageOnScopedTarget, userController.updateUser)
+  .delete(requireUsersManageOnScopedTarget, userController.deleteUser);
 
 module.exports = router;

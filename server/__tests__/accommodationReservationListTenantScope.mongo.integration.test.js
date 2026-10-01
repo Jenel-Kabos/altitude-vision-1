@@ -10,6 +10,7 @@ const Reservation = require('../models/AccommodationReservation');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 const routes = require('../routes/accommodationReservationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -101,7 +102,8 @@ beforeAll(async () => {
   proprietor = await User.create({ name: 'HZ03 Owner', email: 'hz03-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   client = await User.create({ name: 'HZ03 Client', email: 'hz03-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   outsider = await User.create({ name: 'HZ03 Outsider', email: 'hz03-outsider@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Prestataire', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ03 list certification', capabilities: [] });
+  // PLATFORM-ADMIN-04A — la portée globale exige un opérateur éligible à la Vue plateforme.
+  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ03 list certification', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   accommodationA = await makeAccommodation(tenantA, proprietor, 'A');
   accommodationB = await makeAccommodation(tenantB, adminB, 'B');
   reservationA1 = await makeReservation({ tenant: tenantA, accommodation: accommodationA, owner: proprietor, guest: client, suffix: 'A1', status: 'pending', createdAt: new Date('2028-01-01') });

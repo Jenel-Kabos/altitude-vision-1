@@ -141,9 +141,13 @@ describe('Reconnaissance runtime — Conversations', () => {
 });
 
 describe('Reconnaissance runtime — Reporting (mode plateforme natif)', () => {
-  test('opérateur bootstrappé, sans tenant sélectionné → rapport consolidé accessible', async () => {
+  // PLATFORM-ADMIN-04A — l'opérateur bootstrappé (3 capabilities) est reconnu
+  // comme opérateur mais n'est pas éligible à la Vue plateforme : jamais de
+  // rapport consolidé global ; la sélection d'un tenant reste son chemin.
+  test('opérateur bootstrappé partiel, sans tenant sélectionné → Vue plateforme refusée (PLATFORM_VIEW_NOT_ELIGIBLE)', async () => {
     const res = await request(app).get('/api/reporting/executive').set(bearer(bootstrappedOperator));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('PLATFORM_VIEW_NOT_ELIGIBLE');
   });
 });
 

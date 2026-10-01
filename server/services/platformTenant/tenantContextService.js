@@ -19,7 +19,7 @@ const OrgUnit = require('../../models/OrgUnit');
 const PlatformTenant = require('../../models/PlatformTenant');
 const User = require('../../models/User');
 const { getScopeUserIds } = require('../organizationService');
-const { resolveActiveOperator } = require('../platformOperator/platformOperatorService');
+const { resolveActiveOperator, isPlatformViewEligible } = require('../platformOperator/platformOperatorService');
 
 // Remonte `ancestors` (déjà matérialisé par OrgUnit, voir models/OrgUnit.js)
 // jusqu'à la racine (type:'organization') — au maximum une lecture, aucune
@@ -97,6 +97,15 @@ async function resolveLegacyTenantForUser(userId) {
 //     reporting exécutif) ; un appelant qui l'ignore traite `tenant: null`
 //     exactement comme avant (fail-closed inchangé pour tout code qui ne
 //     connaît pas encore cette distinction).
+// PLATFORM-ADMIN-04A — la seconde issue est désormais réservée à un opérateur
+// ÉLIGIBLE à la Vue plateforme (`isPlatformViewEligible`). Un opérateur
+// partiel sans tenant demandé reçoit la source explicite
+// `platform_operator_platform_view_forbidden` (tenant null) : elle n'est
+// JAMAIS un scope global (`isPlatformWideRequest` ne reconnaît que
+// `platform_operator_unscoped`). La sélection explicite d'un tenant reste
+// inchangée pour tout opérateur actif.
+const { PLATFORM_WIDE_CONTEXT_SOURCE, PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE } = require('../../constants/platformOperatorConstants');
+
 async function resolvePlatformOperatorTenantContext(userId, requestedTenantId) {
   const operator = await resolveActiveOperator(userId).catch(() => null);
   if (!operator) return undefined; // undefined = « pas un opérateur », laisse la résolution normale se poursuivre
@@ -104,7 +113,9 @@ async function resolvePlatformOperatorTenantContext(userId, requestedTenantId) {
     const tenant = await PlatformTenant.findById(requestedTenantId).lean().catch(() => null);
     return tenant ? { tenant, source: 'platform_operator_selection', operator } : { tenant: null, source: 'platform_operator_tenant_not_found', operator };
   }
-  return { tenant: null, source: 'platform_operator_unscoped', operator };
+  return isPlatformViewEligible(operator)
+    ? { tenant: null, source: PLATFORM_WIDE_CONTEXT_SOURCE, operator }
+    : { tenant: null, source: PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE, operator };
 }
 
 async function resolveEffectiveTenantContext(userId, requestedTenantId = null) {

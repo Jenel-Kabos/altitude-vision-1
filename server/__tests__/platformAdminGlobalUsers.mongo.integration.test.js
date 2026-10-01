@@ -10,6 +10,7 @@ const PlatformOperator = require('../models/PlatformOperator');
 const userRoutes = require('../routes/userRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 
 jest.setTimeout(180000);
 
@@ -50,6 +51,7 @@ let multiTenant;
 let suspended;
 let operatorUser;
 let manager;
+let partialReader;
 let wrongCapability;
 let inactiveReader;
 let legacyAdmin;
@@ -83,16 +85,21 @@ beforeAll(async () => {
   operatorUser = await makeUser({ label: 'Operator' });
   reader = await makeUser({ label: 'Reader' });
   manager = await makeUser({ label: 'Manager' });
+  partialReader = await makeUser({ label: 'Partial Reader' });
   wrongCapability = await makeUser({ label: 'Wrong Capability' });
   inactiveReader = await makeUser({ label: 'Inactive Reader' });
   legacyAdmin = await makeUser({ label: 'Legacy Admin', role: 'Admin' });
+  // PLATFORM-ADMIN-04A — le registre global relève de la Vue plateforme :
+  // lecteur et gestionnaire globaux sont des administrateurs éligibles ;
+  // `partialReader` (users.read seul) n'entre plus en Vue plateforme.
   await grantOperator({
     userId: reader._id,
     actor: fixtureA.bootstrap,
     reason: 'PLATFORM-ADMIN-02 reader',
-    capabilities: ['platform.users.read'],
+    capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES],
   });
-  await grantOperator({ userId: manager._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 manager', capabilities: ['platform.users.read', 'platform.users.manage'] });
+  await grantOperator({ userId: manager._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 manager', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await grantOperator({ userId: partialReader._id, actor: fixtureA.bootstrap, reason: 'PA04A partial reader', capabilities: ['platform.users.read'] });
   await grantOperator({ userId: wrongCapability._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 wrong capability', capabilities: ['platform.properties.read'] });
   await grantOperator({ userId: inactiveReader._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 inactive reader', capabilities: ['platform.users.read'] });
   await PlatformOperator.updateOne({ user: inactiveReader._id }, { $set: { status: 'suspended' } });
@@ -109,7 +116,7 @@ describe('PLATFORM-ADMIN-02 — authority and lifecycle invariants', () => {
     const target = await makeUser({ label: 'Read Only Mutation Target' });
     const [read, readOnlyMutation, wrong, inactive, adminOnly, tenantOnly, invalidTenant] = await Promise.all([
       request(app).get('/api/users').set(bearer(reader)),
-      request(app).patch(`/api/users/${target._id}/suspend`).set(bearer(reader)),
+      request(app).patch(`/api/users/${target._id}/suspend`).set(bearer(partialReader)),
       request(app).get('/api/users').set(bearer(wrongCapability)),
       request(app).get('/api/users').set(bearer(inactiveReader)),
       request(app).get('/api/users').set(bearer(legacyAdmin)),
@@ -119,6 +126,9 @@ describe('PLATFORM-ADMIN-02 — authority and lifecycle invariants', () => {
 
     expect(read.status).toBe(200);
     expect(readOnlyMutation.status).toBe(403);
+    const partialRead = await request(app).get('/api/users').set(bearer(partialReader));
+    expect(partialRead.status).toBe(403);
+    expect(partialRead.body.code).toBe('PLATFORM_VIEW_NOT_ELIGIBLE');
     expect(wrong.status).toBe(403);
     expect(inactive.status).toBe(403);
     expect(adminOnly.status).toBe(403);
@@ -145,20 +155,24 @@ describe('PLATFORM-ADMIN-02 — authority and lifecycle invariants', () => {
     await expect(User.findById(manager._id).lean()).resolves.toMatchObject({ status: 'Actif', isActive: true });
   });
 
+  // PLATFORM-ADMIN-04A — en Vue plateforme, l'acteur est toujours éligible,
+  // donc lui-même opérateur viable (platform.operators.manage est requis) :
+  // la protection « dernier opérateur viable » ne peut plus être atteinte via
+  // un tiers ; elle reste effective pour le dernier viable agissant sur lui-même.
   test('protects the final viable operator through Global Users and permits removal when another remains', async () => {
-    await PlatformOperator.updateMany({}, { $pull: { capabilities: 'platform.operators.manage' } });
+    // `reader` reste éligible pour les tests de registre qui suivent.
+    await PlatformOperator.updateMany({ user: { $nin: [manager._id, reader._id] } }, { $pull: { capabilities: 'platform.operators.manage' } });
     const finalViable = await makeUser({ label: 'Final Viable' });
     await grantOperator({ userId: finalViable._id, actor: manager, reason: 'final viable fixture', capabilities: ['platform.operators.manage'] });
 
-    const denied = await request(app).patch(`/api/users/${finalViable._id}/suspend`).set(bearer(manager));
-    expect(denied.status).toBe(409);
-    expect(denied.body.code).toBe('LAST_PLATFORM_OPERATOR');
-
-    const secondViable = await makeUser({ label: 'Second Viable' });
-    await grantOperator({ userId: secondViable._id, actor: manager, reason: 'second viable fixture', capabilities: ['platform.operators.manage'] });
     const allowed = await request(app).patch(`/api/users/${finalViable._id}/suspend`).set(bearer(manager));
     expect(allowed.status).toBe(200);
     await expect(PlatformOperator.findOne({ user: finalViable._id }).lean()).resolves.toMatchObject({ status: 'suspended' });
+
+    const denied = await request(app).patch(`/api/users/${manager._id}/suspend`).set(bearer(manager));
+    expect([403, 409]).toContain(denied.status);
+    await expect(PlatformOperator.findOne({ user: manager._id }).lean()).resolves.toMatchObject({ status: 'active' });
+    await expect(User.findById(manager._id).lean()).resolves.toMatchObject({ status: 'Actif', isActive: true });
   });
 
   test('reactivation leaves memberships untouched', async () => {

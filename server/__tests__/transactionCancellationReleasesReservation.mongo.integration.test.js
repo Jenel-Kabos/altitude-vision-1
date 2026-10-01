@@ -20,6 +20,7 @@ const transactionRoutes = require('../routes/transactionRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { acceptApplication } = require('../services/realEstateApplicationService');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(120000);
 
@@ -47,7 +48,7 @@ async function setupActiveTransaction() {
   // `PATCH /:id/cancel`) exigent désormais l'autorité canonique
   // plateforme : Admin + PlatformOperator + `platform.finance.manage`.
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: admin._id, actor: granter, reason: 'test cancellation setup', capabilities: ['platform.finance.manage'] });
+  await grantOperator({ userId: admin._id, actor: granter, reason: 'test cancellation setup', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   const owner = await makeUser({ role: 'Proprietaire' });
   const client = await makeUser({ role: 'Client' });
   const property = await Property.create({

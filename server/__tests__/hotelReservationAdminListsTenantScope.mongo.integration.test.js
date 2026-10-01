@@ -10,6 +10,7 @@ const HotelReservation = require('../models/HotelReservation');
 const PlatformOperator = require('../models/PlatformOperator');
 const routes = require('../routes/hotelReservationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 
@@ -31,6 +32,7 @@ let operator;
 let operatorNoRead;
 let suspendedOperator;
 let managingOperator;
+let platformAdmin;
 let client;
 let proprietor;
 let hotelA;
@@ -80,12 +82,15 @@ beforeAll(async () => {
   ({ user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' } }));
   ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } }));
   operator = await User.create({ name: 'HZ05 Operator', email: 'hz05-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+  platformAdmin = await User.create({ name: 'HZ05 Platform Admin', email: 'hz05-platform-admin@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   operatorNoRead = await User.create({ name: 'HZ05 Operator No Read', email: 'hz05-operator-no-read@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   suspendedOperator = await User.create({ name: 'HZ05 Suspended Operator', email: 'hz05-suspended-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   managingOperator = await User.create({ name: 'HZ05 Managing Operator', email: 'hz05-managing-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   client = await User.create({ name: 'HZ05 Client', email: 'hz05-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   proprietor = await User.create({ name: 'HZ05 Owner', email: 'hz05-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ05 admin lists certification', capabilities: ['platform.hotels.read'] });
+  // PLATFORM-ADMIN-04A — la portée globale exige un opérateur éligible.
+  await grantOperator({ userId: platformAdmin._id, actor: adminA, reason: 'PA04A eligible platform admin', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   await grantOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ05 missing read certification', capabilities: [] });
   await grantOperator({ userId: suspendedOperator._id, actor: adminA, reason: 'HZ05 suspended certification', capabilities: ['platform.hotels.read'] });
   await grantOperator({ userId: managingOperator._id, actor: adminA, reason: 'HZ05 manage certification', capabilities: ['platform.hotels.read', 'platform.hotels.manage'] });
@@ -153,12 +158,13 @@ test.each(['Admin', 'GestionnaireImmobilier', 'Collaborateur'])(
 );
 
 test('PlatformOperator global conserve records et total globaux', async () => {
-  const list = await request(app).get('/api/hotel-reservations/admin/list').set(bearer(operator));
+  expect((await request(app).get('/api/hotel-reservations/admin/list').set(bearer(operator))).status).toBe(403);
+  const list = await request(app).get('/api/hotel-reservations/admin/list').set(bearer(platformAdmin));
   expect(list.status).toBe(200);
   expect(new Set(ids(list))).toEqual(new Set(expectedIds([...reservationsA, ...reservationsB])));
   expect(list.body.data.total).toBe(5);
 
-  const pending = await request(app).get('/api/hotel-reservations/status/pending').set(bearer(operator));
+  const pending = await request(app).get('/api/hotel-reservations/status/pending').set(bearer(platformAdmin));
   expect(new Set(ids(pending))).toEqual(new Set(expectedIds([...reservationsA, ...reservationsB].filter((item) => item.status === 'pending'))));
 });
 

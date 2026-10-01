@@ -12,7 +12,13 @@ exports.listOperators = asyncHandler(async (req, res) => {
 
 exports.getMyOperatorStatus = asyncHandler(async (req, res) => {
   const operator = await service.getOperatorByUserId(req.user._id || req.user.id);
-  res.json({ status: 'success', data: { operator: operator || null } });
+  // PLATFORM-ADMIN-04A — seul le booléen d'éligibilité est exposé (calculé
+  // par le backend, jamais recalculé côté client) : aucune liste de
+  // capabilities manquantes, aucune explication d'autorité.
+  res.json({
+    status: 'success',
+    data: { operator: operator || null, platformViewEligible: service.isPlatformViewEligible(operator) },
+  });
 });
 
 exports.grantOperator = asyncHandler(async (req, res) => {

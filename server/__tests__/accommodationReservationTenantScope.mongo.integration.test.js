@@ -21,6 +21,7 @@ const PlatformOperator = require('../models/PlatformOperator');
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
 const routes = require('../routes/accommodationReservationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
 
 jest.setTimeout(180000);
 const app = express(); app.use(express.json()); app.use('/api/accommodation-reservations', routes); app.use(errorHandler);
@@ -87,7 +88,8 @@ describe('Phase 7B — retenues et remboursements adversariaux', () => {
     const deduction = await deductionFor(reservation, adminB._id, 'operator');
     const denied = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/approve`).set({ ...bearer(operator), 'Idempotency-Key': 'operator-denied' }).send({ approvedAmountMinor: 40000 });
     expect(denied.status).toBe(403);
-    await PlatformOperator.updateOne({ user: operator._id }, { $set: { capabilities: ['platform.finance.manage'] } });
+    // PLATFORM-ADMIN-04A — la portée globale exige un opérateur éligible (finance.manage inclus).
+    await PlatformOperator.updateOne({ user: operator._id }, { $set: { capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] } });
     const scoped = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/approve`).set({ ...bearer(operator, tenantA), 'Idempotency-Key': 'operator-scoped' }).send({ approvedAmountMinor: 40000, tenant: tenantB._id });
     expect(scoped.status).toBe(404);
     const global = await request(app).post(`/api/accommodation-reservations/deductions/${deduction._id}/approve`).set({ ...bearer(operator), 'Idempotency-Key': 'operator-global' }).send({ approvedAmountMinor: 40000, tenant: tenantA._id });
