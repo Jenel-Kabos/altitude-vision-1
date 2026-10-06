@@ -29,11 +29,22 @@ jest.mock('../services/platformTenant/tenantResourceAttributionService', () => (
   resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
   assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
 }));
+jest.mock('../services/tenantMembershipService', () => ({
+  resolveTenantMembership: jest.fn(async (userId) => (
+    String(userId) === '507f1f77bcf86cd799439012'
+      ? { businessRole: 'Admin', roleInUnit: 'owner', status: 'active', source: 'membership_business_role' }
+      : null
+  )),
+}));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
 jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(),
   notifyStaff: jest.fn().mockResolvedValue(),
   notifyMany: jest.fn().mockResolvedValue(),
+}));
+jest.mock('../services/platformTenant/organizationAssetInvariantService', () => ({
+  ...jest.requireActual('../services/platformTenant/organizationAssetInvariantService'),
+  resolvePropertyCreationTenant: jest.fn().mockImplementation(async ({ contextualTenantId }) => contextualTenantId || null),
 }));
 jest.mock('../config/cloudinary', () => ({
   ...jest.requireActual('../config/cloudinary'),
@@ -241,6 +252,7 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
   // nominal ; le cas incomplet est testé séparément ci-dessous.
   const submitted = (overrides = {}) => ({
     _id: ACCOMMODATION_ID,
+    tenant: TENANT_ID,
     publicationStatus: 'soumis',
     accommodationType: 'villa_meublee',
     capacity: { maxAdults: 4 },
@@ -995,7 +1007,7 @@ describe('POST /api/accommodations/admin — rattachement à un Hôtel (Sprint H
   });
 
   const mockPropertyAndAccommodation = () => {
-    const property = { _id: PROPERTY_ID, title: 'Hôtel Le Panorama', status: 'hebergement' };
+    const property = { _id: PROPERTY_ID, tenant: TENANT_ID, title: 'Hôtel Le Panorama', status: 'hebergement' };
     const accommodation = {
       _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'hotel', hotel: HOTEL_ID,
       toObject() { return { _id: this._id, property: this.property, accommodationType: this.accommodationType, hotel: this.hotel }; },
@@ -1065,7 +1077,7 @@ describe('POST /api/accommodations/admin — rattachement à un Hôtel (Sprint H
   test('201 — rattachement à un Hôtel existant', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
     mockPropertyAndAccommodation();
-    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, tenant: TENANT_ID, name: 'Le Panorama' });
 
     const res = await request(app)
       .post('/api/accommodations/admin')
@@ -1201,7 +1213,7 @@ describe('POST /api/accommodations/admin — rattachement à un Hôtel (Sprint H
 
   test("compensation — un Hôtel nouvellement créé est supprimé si l'Accommodation échoue ensuite", async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
-    const property = { _id: PROPERTY_ID, title: 'Hôtel', status: 'hebergement' };
+    const property = { _id: PROPERTY_ID, tenant: TENANT_ID, title: 'Hôtel', status: 'hebergement' };
     Property.create = jest.fn().mockResolvedValue(property);
     Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
     Hotel.create = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
@@ -1220,7 +1232,7 @@ describe('POST /api/accommodations/admin — rattachement à un Hôtel (Sprint H
 
   test("compensation — un Hôtel nouvellement créé est supprimé si le RatePlan échoue ensuite", async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
-    const property = { _id: PROPERTY_ID, title: 'Hôtel', status: 'hebergement' };
+    const property = { _id: PROPERTY_ID, tenant: TENANT_ID, title: 'Hôtel', status: 'hebergement' };
     const accommodation = { _id: ACCOMMODATION_ID, property: PROPERTY_ID, toObject() { return { _id: this._id }; } };
     Property.create = jest.fn().mockResolvedValue(property);
     Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
@@ -1243,10 +1255,10 @@ describe('POST /api/accommodations/admin — rattachement à un Hôtel (Sprint H
 
   test("un Hôtel EXISTANT sélectionné par l'utilisateur n'est jamais supprimé, même si l'Accommodation échoue ensuite", async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
-    const property = { _id: PROPERTY_ID, title: 'Hôtel', status: 'hebergement' };
+    const property = { _id: PROPERTY_ID, tenant: TENANT_ID, title: 'Hôtel', status: 'hebergement' };
     Property.create = jest.fn().mockResolvedValue(property);
     Property.findByIdAndDelete = jest.fn().mockResolvedValue({});
-    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Le Panorama' });
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, tenant: TENANT_ID, name: 'Le Panorama' });
     Hotel.findByIdAndDelete = jest.fn().mockResolvedValue({});
     Accommodation.create = jest.fn().mockRejectedValue(new Error('DB down'));
 
@@ -1284,6 +1296,7 @@ describe('PUT /api/accommodations/admin/:propertyId — édition complète (dash
 
   const existingProperty = (overrides = {}) => ({
     _id: PROPERTY_ID,
+    tenant: TENANT_ID,
     title: 'Villa existante',
     status: 'hebergement',
     save: jest.fn().mockResolvedValue(),
@@ -1330,6 +1343,7 @@ describe('PUT /api/accommodations/admin/:propertyId — édition complète (dash
     Property.findById = jest.fn().mockResolvedValue(property);
     const existingAccommodation = {
       _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'villa_meublee',
+      tenant: TENANT_ID,
       publicationStatus: 'brouillon',
       save: jest.fn().mockResolvedValue(),
       toObject() { return { _id: this._id, accommodationType: this.accommodationType }; },
@@ -1368,7 +1382,7 @@ describe('PUT /api/accommodations/admin/:propertyId — édition complète (dash
     mockUserAuth(ADMIN_ID, 'Admin');
     Property.findById = jest.fn().mockResolvedValue(existingProperty());
     Accommodation.findOne = jest.fn().mockResolvedValue({
-      _id: ACCOMMODATION_ID, save: jest.fn().mockResolvedValue(),
+      _id: ACCOMMODATION_ID, tenant: TENANT_ID, save: jest.fn().mockResolvedValue(),
       toObject() { return { _id: this._id }; },
     });
 
@@ -1386,7 +1400,7 @@ describe('PUT /api/accommodations/admin/:propertyId — édition complète (dash
     mockUserAuth(ADMIN_ID, 'Admin');
     Property.findById = jest.fn().mockResolvedValue(existingProperty());
     Accommodation.findOne = jest.fn().mockResolvedValue({
-      _id: ACCOMMODATION_ID, save: jest.fn().mockResolvedValue(),
+      _id: ACCOMMODATION_ID, tenant: TENANT_ID, save: jest.fn().mockResolvedValue(),
       toObject() { return { _id: this._id }; },
     });
     RatePlan.updateMany = jest.fn().mockResolvedValue({});
@@ -1410,6 +1424,7 @@ describe('PUT /api/accommodations/admin/:propertyId — édition complète (dash
     Property.findById = jest.fn().mockResolvedValue(existingProperty());
     const existingAccommodation = {
       _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'hotel', hotel: HOTEL_ID,
+      tenant: TENANT_ID,
       save: jest.fn().mockResolvedValue(),
       toObject() { return { _id: this._id, accommodationType: this.accommodationType, hotel: this.hotel }; },
     };
@@ -1432,12 +1447,13 @@ describe('PUT /api/accommodations/admin/:propertyId — édition complète (dash
     const previousHotelId = '707f1f77bcf86cd799439066';
     const existingAccommodation = {
       _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'hotel', hotel: previousHotelId,
+      tenant: TENANT_ID,
       save: jest.fn().mockResolvedValue(),
       toObject() { return { _id: this._id, accommodationType: this.accommodationType, hotel: this.hotel }; },
     };
     Accommodation.findOne = jest.fn().mockResolvedValue(existingAccommodation);
     Accommodation.countDocuments = jest.fn().mockResolvedValue(1); // encore référencé ailleurs
-    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Nouvel hôtel' });
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, tenant: TENANT_ID, name: 'Nouvel hôtel' });
 
     const res = await request(app)
       .put(`/api/accommodations/admin/${PROPERTY_ID}`)
@@ -1455,6 +1471,7 @@ describe('PUT /api/accommodations/admin/:propertyId — édition complète (dash
     Property.findById = jest.fn().mockResolvedValue(existingProperty());
     const existingAccommodation = {
       _id: ACCOMMODATION_ID, property: PROPERTY_ID, accommodationType: 'hotel', hotel: HOTEL_ID,
+      tenant: TENANT_ID,
       save: jest.fn().mockResolvedValue(),
       toObject() { return { _id: this._id, accommodationType: this.accommodationType, hotel: this.hotel }; },
     };
@@ -1503,6 +1520,6 @@ describe('GET /api/hotels — liste des établissements (sélecteur admin)', () 
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.data.hotels).toHaveLength(1);
-    expect(Hotel.find).toHaveBeenCalledWith({ status: 'actif' });
+    expect(Hotel.find).toHaveBeenCalledWith({ status: 'actif', tenant: TENANT_ID });
   });
 });

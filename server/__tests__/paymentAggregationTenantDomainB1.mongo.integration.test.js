@@ -83,11 +83,11 @@ test('PAY-AGG-06: explicit tenant wins even without owner membership there', asy
   expect(await list(a)).toEqual([String(p._id)]);
   expect(await list(b)).toEqual([]);
 });
-test('PAY-AGG-07: null tenant keeps uniquely attributable owner compatibility', async () => {
+test('PAY-AGG-07: null tenant remains individual even with one active owner membership', async () => {
   const OrgMembership = require('../models/OrgMembership');
   await OrgMembership.updateOne({ user: owner._id, orgUnit: b.tenant.rootOrgUnit }, { $set: { status: 'revoked' } });
-  const p = await payment(null);
-  expect(await list(a)).toEqual([String(p._id)]);
+  await payment(null);
+  expect(await list(a)).toEqual([]);
   expect(await list(b)).toEqual([]);
 });
 test('PAY-AGG-08: ambiguous legacy owner is excluded from both tenant lists', async () => {

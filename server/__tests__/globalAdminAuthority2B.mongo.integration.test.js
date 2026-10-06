@@ -268,8 +268,14 @@ describe('USER-TENANT-MEMBERSHIP-ARCHITECTURE-2B.2-B — certain global tenant-a
     expect((await request(app).get(endpoint).set(bearer(getUser()))).status).toBe(403);
   });
 
-  test('GR-09 / GLOBAL-05: non-Admin operator with exact capability is denied', async () => {
-    expect((await request(app).get(endpoint).set(bearer(nonAdminOperator))).status).toBe(403);
+  // PLATFORM-ADMIN-04C1 — contrat PA-01 (« neither User.role=Admin nor
+  // businessRole grants platform access ») + décision H3 de PA-04A : la revue
+  // des demandes tenant est un workflow platform-native spécialisé ouvert à la
+  // capability exacte, quel que soit User.role. Elle ne donne jamais accès au
+  // registre global des tenants (Vue plateforme, éligibilité requise).
+  test('GR-09 / GLOBAL-05: operator with exact capability is authorised whatever User.role, without platform registry access', async () => {
+    expect((await request(app).get(endpoint).set(bearer(nonAdminOperator))).status).toBe(200);
+    expect((await request(app).get('/api/platform-tenants').set(bearer(nonAdminOperator))).status).toBe(403);
   });
 
   test('GR-10: forged tenant/header/body/query authority cannot elevate a Client', async () => {

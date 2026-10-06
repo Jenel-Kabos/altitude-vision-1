@@ -11,11 +11,11 @@ const staffCtrl = require('../controllers/hotelStaffAssignmentController');
 const inventoryCtrl = require('../controllers/hotelInventoryController');
 const { requireHotelCapability } = require('../middleware/hotelAccessMiddleware');
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
-const { ROLES_ALTIMMO, ROLES_MODERATION } = require('../utils/roles');
 const { upload } = require('../config/cloudinary');
-const { attachTenantScopeIfResolvable, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
+const { attachTenantScopeIfResolvable, requireTenantScope, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 
 const router = express.Router();
+const markHotelAdministrationRequest = (req, res, next) => { req.hotelAdministrationRequest = true; next(); };
 
 // Public — liste et fiche hôtel (pages publiques), AVANT auth.protect.
 router.get('/public', ctrl.listPublic);
@@ -76,15 +76,15 @@ router.post('/:hotelId/staff-assignments/:assignmentId/revoke', staffManage, sta
 
 // Staff (dashboard admin) — placées AVANT '/:id' pour ne jamais être
 // capturées par le paramètre générique.
-router.post('/admin', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.createFull);
-router.put('/admin/:hotelId', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.updateFull);
-router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, ctrl.listAdmin);
-router.get('/status/pending', auth.restrictTo(...ROLES_MODERATION), requireTenantScopeForStaffAllowPlatformWide, ctrl.pending);
+router.post('/admin', markHotelAdministrationRequest, requireTenantScope, upload.array('images', 10), ctrl.createFull);
+router.put('/admin/:hotelId', markHotelAdministrationRequest, upload.array('images', 10), ctrl.updateFull);
+router.get('/admin/list', requireTenantScopeForStaffAllowPlatformWide, ctrl.listAdmin);
+router.get('/status/pending', requireTenantScopeForStaffAllowPlatformWide, ctrl.pending);
 // Contrôle final (audit Sprint B2) — réconciliation manuelle en cas de
 // désynchronisation Hotel↔Accommodation constatée (voir hotelService.
 // resyncLinkedAccommodations). Réservé au staff : action de récupération
 // d'incident, jamais un levier de cycle de vie normal.
-router.post('/:id/resync', auth.restrictTo(...ROLES_ALTIMMO), ctrl.resync);
+router.post('/:id/resync', ctrl.resync);
 
 // Propriétaire — "Mes hôtels" (mêmes contrôleurs que le dashboard admin ;
 // ownership vérifiée dans le contrôleur, jamais uniquement côté route).
@@ -147,10 +147,10 @@ router.patch('/room-assignments/change', roomAssignmentCtrl.change);
 router.patch('/room-assignments/release', roomAssignmentCtrl.release);
 
 // Staff — validate|reject|suspend|unsuspend (même convention qu'Accommodation)
-router.patch('/:id/:action', auth.restrictTo(...ROLES_MODERATION), ctrl.reviewDecision);
+router.patch('/:id/:action', ctrl.reviewDecision);
 
 // Sélecteur admin (Sprint Hôtel, inchangé) — routes génériques en dernier
-router.get('/', auth.restrictTo(...ROLES_ALTIMMO), ctrl.list);
+router.get('/', requireTenantScopeForStaffAllowPlatformWide, ctrl.list);
 router.get('/:id', ctrl.getOne);
 
 module.exports = router;

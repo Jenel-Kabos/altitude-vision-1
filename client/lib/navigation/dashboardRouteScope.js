@@ -3,6 +3,36 @@ export const DASHBOARD_SCOPE = Object.freeze({
   PLATFORM_ONLY: 'PLATFORM_ONLY',
 });
 
+const CORE_ADMINISTRATION_REQUIREMENTS = Object.freeze([
+  ['/dashboard/properties', 'platform.properties.read'],
+  ['/dashboard/sales', 'platform.properties.read'],
+  ['/dashboard/rentals', 'platform.properties.read'],
+]);
+
+const HOME_ADMINISTRATION_REQUIREMENT = Object.freeze({
+  kind: 'administration',
+  platform: Object.freeze({ capability: 'platform.reporting.read' }),
+  tenant: Object.freeze({ allowed: true }),
+});
+
+export const dashboardRequirementForRoute = (pathname = '') => {
+  if (pathname === '/dashboard') return HOME_ADMINISTRATION_REQUIREMENT;
+  const core = CORE_ADMINISTRATION_REQUIREMENTS.find(
+    ([route]) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+  if (core) {
+    return {
+      kind: 'administration',
+      platform: { capability: core[1] },
+      tenant: { allowed: true },
+    };
+  }
+  const legacyScope = dashboardScopeForRoute(pathname);
+  if (legacyScope === DASHBOARD_SCOPE.PLATFORM_ONLY) return { kind: 'specialized-platform' };
+  if (legacyScope === DASHBOARD_SCOPE.GLOBAL_FIRST) return { kind: 'legacy-global-first' };
+  return { kind: 'tenant-only' };
+};
+
 const DASHBOARD_ROUTE_SCOPES = Object.freeze([
   ['/dashboard/properties', DASHBOARD_SCOPE.GLOBAL_FIRST],
   ['/dashboard/sales', DASHBOARD_SCOPE.GLOBAL_FIRST],
@@ -26,5 +56,6 @@ export const dashboardScopeForRoute = (pathname = '') => (
 );
 
 export const isPlatformScopedDashboardRoute = (pathname = '') => (
-  [DASHBOARD_SCOPE.GLOBAL_FIRST, DASHBOARD_SCOPE.PLATFORM_ONLY].includes(dashboardScopeForRoute(pathname))
+  dashboardRequirementForRoute(pathname).kind === 'administration'
+  || [DASHBOARD_SCOPE.GLOBAL_FIRST, DASHBOARD_SCOPE.PLATFORM_ONLY].includes(dashboardScopeForRoute(pathname))
 );

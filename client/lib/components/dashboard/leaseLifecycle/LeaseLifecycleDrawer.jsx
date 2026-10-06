@@ -14,9 +14,12 @@ import CautionPanel from "./CautionPanel";
 import ExitInspectionSummary from "./ExitInspectionSummary";
 import RenewalModal from "./RenewalModal";
 import AvenantModal from "./AvenantModal";
+import { useRentalOperationContext } from "../../../context/RentalOperationContext";
+import { isIndividualRentalContext } from "../../../services/rentalRequestContext";
 
 const LeaseLifecycleDrawer = ({ contrat, onClose, onChanged }) => {
   const { user } = useAuth();
+  const rentalContext = useRentalOperationContext();
   const [showRenewal, setShowRenewal] = useState(false);
   const [showAvenant, setShowAvenant] = useState(false);
 
@@ -34,7 +37,7 @@ const LeaseLifecycleDrawer = ({ contrat, onClose, onChanged }) => {
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
           <LeaseLifecycleCard contratId={contrat._id} onChanged={onChanged} />
 
-          {isStaffImmo(user) && (
+          {(isStaffImmo(user) || isIndividualRentalContext(rentalContext)) && (
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => setShowRenewal(true)} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50">Préparer un renouvellement</button>
               <button onClick={() => setShowAvenant(true)} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50">Créer un avenant</button>

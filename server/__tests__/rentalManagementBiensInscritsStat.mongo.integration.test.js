@@ -65,7 +65,8 @@ const baseProperty = (overrides = {}) => ({
   pole: 'Altimmo', type: 'Maison', status: 'location', price: 300000,
   address: { arrondissement: 'Moungali', city: 'Brazzaville' }, latitude: -4.25, longitude: 15.27,
   images: ['https://placehold.co/1200x800/png?text=Test'], surface: 90, bedrooms: 2, bathrooms: 1,
-  statusAdmin: 'Validée', ...overrides,
+  // C2.10A — population canonique de la Gestion locative : Property.tenant = T.
+  statusAdmin: 'Validée', tenant: currentTenant?._id || null, ...overrides,
 });
 
 test('biensInscrits compte toutes les annonces location, distinct de "total" (sous gestion active)', async () => {

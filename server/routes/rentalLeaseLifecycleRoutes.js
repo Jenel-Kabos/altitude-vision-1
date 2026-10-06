@@ -29,6 +29,7 @@ const { requireTenantScope } = require('../middleware/tenantContext');
 const { requireTenantModule } = require('../middleware/tenantModuleGate');
 const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 const ctrl = require('../controllers/rentalLeaseLifecycleController');
+const { selectIndividualRoute, requireIndividualRentalScope } = require('../middleware/rentalScopeAccess');
 
 const router = express.Router();
 const GL_MANAGE = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
@@ -44,6 +45,18 @@ const tenantAuth = [
 // pour que `req.user` soit déjà défini au moment du contrôle tenant.
 router.use(auth.protect);
 router.param('id', ctrl.assertContratTenantAccessParam);
+
+const individualAuth = [selectIndividualRoute, requireIndividualRentalScope];
+router.get('/dashboard', ...individualAuth, ctrl.dashboard);
+router.get('/:id/available-transitions', ...individualAuth, ctrl.availableTransitions);
+router.post('/:id/transition', ...individualAuth, ctrl.transition);
+router.post('/:id/renew/preview', ...individualAuth, ctrl.previewRenew);
+router.post('/:id/renew', ...individualAuth, ctrl.renew);
+router.post('/:id/avenants', ...individualAuth, ctrl.addAvenant);
+router.post('/:id/caution/encaisser', ...individualAuth, ctrl.encaisserCaution);
+router.post('/:id/caution/bloquer', ...individualAuth, ctrl.bloquerCaution);
+router.post('/:id/caution/retenue', ...individualAuth, ctrl.appliquerRetenueCaution);
+router.post('/:id/caution/restituer', ...individualAuth, ctrl.restituerCaution);
 
 router.get('/dashboard', ...tenantAuth, ctrl.dashboard);
 router.get('/:id/available-transitions', ...tenantAuth, ctrl.availableTransitions);

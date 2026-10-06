@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
+
+// C2.9 (Users) — appartenance organisationnelle canonique = OrgMembership ACTIVE
+// (même règle que tenantContextService.resolveAvailableTenantsForUser). Une
+// membership suspendue ou révoquée ne rattache plus le User à une organisation.
+async function activeMemberUserIds() {
+  return OrgMembership.distinct('user', { status: 'active' });
+}
 const OrgUnit = require('../models/OrgUnit');
 const PlatformTenant = require('../models/PlatformTenant');
 const PlatformOperator = require('../models/PlatformOperator');
@@ -73,7 +80,7 @@ async function buildUserFilter(query = {}) {
 
   if (query.organization !== undefined) {
     if (!['with', 'without'].includes(query.organization)) fail('GLOBAL_USERS_ORGANIZATION_FILTER_INVALID', 'Filtre organisation invalide.');
-    const memberIds = await OrgMembership.distinct('user');
+    const memberIds = await activeMemberUserIds();
     if (query.organization === 'with') addIdIntersection(filter, memberIds);
     else filter._id = { $nin: memberIds };
   }
@@ -173,7 +180,7 @@ const projectUser = (user, context) => {
 };
 
 async function countWithoutOrganization(filter) {
-  const memberIds = await OrgMembership.distinct('user');
+  const memberIds = await activeMemberUserIds();
   return User.countDocuments({ $and: [filter, { _id: { $nin: memberIds } }] });
 }
 

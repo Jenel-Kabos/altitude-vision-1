@@ -17,6 +17,7 @@ const Property = require('../models/Property');
 const Contrat = require('../models/Contrat');
 const Locataire = require('../models/Locataire');
 const Hotel = require('../models/Hotel');
+const { resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
 const FinancialLedgerEntry = require('../models/FinancialLedgerEntry');
 const Notification = require('../models/Notification');
 const OrgMembership = require('../models/OrgMembership');
@@ -214,6 +215,36 @@ describe('Classification C — contradiction (fail closed, jamais un choix arbit
     expect(entry.classification).toBe('C');
     expect(entry.targetTenant).toBeNull();
     expect(entry.recommendedAction).toBe('HUMAN_REVIEW_REQUIRED_CONTRADICTION_FAIL_CLOSED');
+  });
+
+  // PA-04C2 — séparation AUTORITÉ / SIGNAL D'AUDIT. L'autorité Hotel reste
+  // `Hotel.tenant` seul (jamais le manager) ; l'audit peut seulement SIGNALER
+  // la divergence, sans réattribuer ni écrire.
+  test('PA-04C2 — contradiction signalée par l\'audit, autorité inchangée (Hotel.tenant seul) et aucune écriture', async () => {
+    const memberB = await createTenantUser({ tenant: tenantB, bootstrap: (await User.findOne({ role: 'Admin' })) });
+    const hotel = await Hotel.create({ name: 'Hotel Autorite Vs Audit', tenant: tenantA._id, manager: memberB.user._id, createdBy: memberB.user._id });
+    const before = await Hotel.findById(hotel._id).lean();
+    const res = await runScript(['--confirm-database=' + dbName, '--resource=Hotel'], mongoUri);
+    const entry = parseOutput(res.stdout).manifest.find((m) => m.resourceId === String(hotel._id));
+    expect(entry.classification).toBe('C');
+    expect(entry.targetTenant).toBeNull();
+    expect(entry.auditSignals.some((signal) => signal.includes(`→membership→${tenantB._id}`))).toBe(true);
+    const authority = await resolveResourceTenant({ resourceType: 'Hotel', resource: before });
+    expect(authority.status).toBe('resolved');
+    expect(String(authority.tenantId)).toBe(String(tenantA._id));
+    const after = await Hotel.findById(hotel._id).lean();
+    expect(String(after.tenant)).toBe(String(tenantA._id));
+    expect(String(after.manager)).toBe(String(memberB.user._id));
+    expect(after.updatedAt.getTime()).toBe(before.updatedAt.getTime());
+  });
+
+  test('PA-04C2 — Hotel cohérent (manager membre du même tenant) → A, jamais une fausse contradiction', async () => {
+    const memberA = await createTenantUser({ tenant: tenantA, bootstrap: (await User.findOne({ role: 'Admin' })) });
+    const hotel = await Hotel.create({ name: 'Hotel Coherent', tenant: tenantA._id, manager: memberA.user._id, createdBy: memberA.user._id });
+    const res = await runScript(['--confirm-database=' + dbName, '--resource=Hotel'], mongoUri);
+    const entry = parseOutput(res.stdout).manifest.find((m) => m.resourceId === String(hotel._id));
+    expect(entry.classification).toBe('A');
+    expect(String(entry.targetTenant)).toBe(String(tenantA._id));
   });
 
   test('Locataire lié à deux contrats pointant vers des Property de tenants différents → C', async () => {

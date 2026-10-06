@@ -24,9 +24,11 @@ describe('LEGACY-18 · MembersPanel has no legacy /users administrative call', (
     expect(src).toMatch(/['"]\/members/);
   });
 
-  test('users/page.jsx renders the platform UsersPanel, not tenant MembersPanel', () => {
+  // C2.9 — la page délègue au routeur de contexte : plateforme → UsersPanel
+  // (registre User), tenant → MembersPanel (OrgMembership).
+  test('users/page.jsx renders the context router, never a panel directly', () => {
     const src = readFile('../../app/dashboard/users/page.jsx');
-    expect(src).toMatch(/UsersPanel/);
-    expect(src).not.toMatch(/MembersPanel/);
+    expect(src).toMatch(/UsersContextPanel/);
+    expect(src).not.toMatch(/import\s+(UsersPanel|MembersPanel)\b/);
   });
 });

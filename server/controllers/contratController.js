@@ -1,6 +1,8 @@
 const Contrat  = require('../models/Contrat');
 const Paiement = require('../models/Paiement');
 const Property = require('../models/Property');
+const Locataire = require('../models/Locataire');
+const Proprietaire = require('../models/Proprietaire');
 const RentalManagement = require('../models/RentalManagement');
 const rentalSync = require('../services/rentalListingSyncService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
@@ -20,8 +22,11 @@ const leaseLifecycle = require('../services/rentalLeaseLifecycleService');
 const saleLifecycle = require('../services/saleContractLifecycleService');
 const { generatePaiements } = require('../services/rentalPaymentScheduleService');
 const { assertResourceTenant, assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant, tenantRentalPropertyIds } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { isModuleAvailable } = require('../middleware/tenantModuleGate');
+const { individualRentalPropertyIds, assertIndividualRentalPropertyAccess } = require('../services/rentalIndividualAccessService');
+const { assertIndividualRentalResourceAccess } = require('../services/rentalIndividualResourceAccessService');
 
 // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIV — CONTRAT-DOMAIN-SPLIT.
 // Sur la surface POLYMORPHIQUE legacy `/api/contrats/:id` (PUT/DELETE),
@@ -47,7 +52,11 @@ async function ensureModuleAvailableForContratType(req, contratType) {
 // canonique que `router.param('id', …)` de contratRoutes.js (TENANT-CERT-2) :
 // `POST /` créait un Contrat sur `req.body.bien` sans jamais vérifier que
 // cette Property appartienne au tenant de l'acteur.
-async function assertPropertyTenantAccess(req, property) {
+async function assertPropertyTenantAccess(req, property, contractType) {
+  if (contractType === 'location' && req.rentalScope?.mode === 'individual') {
+    await assertIndividualRentalPropertyAccess({ property, userId: req.user._id || req.user.id });
+    return;
+  }
   const explicitTenantId = req.get?.('X-Platform-Tenant-Id') || req.get?.('X-Tenant-Id') || null;
   const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
   // PLATFORM-ADMIN-04A CLOSURE — un PlatformOperator agissant via un tenant
@@ -55,6 +64,15 @@ async function assertPropertyTenantAccess(req, property) {
   // positivement attribuée à ce tenant : attribution stricte (une ressource
   // non attribuée / tenant:null est refusée). Le chemin staff tenant (PATH A)
   // reste inchangé — sa politique `unresolved` relève de PA-04B.
+  // C2.10A — en contexte tenant (staff, ou PlatformOperator ayant sélectionné un
+  // tenant), un bail (location) ne se crée que sur un bien dont Property.tenant
+  // est EXACTEMENT ce tenant. Le flux PLATEFORME (opérateur sans tenant
+  // sélectionné — conclusion marketplace) et la vente gardent leur garde historique.
+  const platformWide = req.isPlatformOperatorContext && !tenant?._id;
+  if (contractType === 'location' && !platformWide) {
+    await assertRentalResourceInTenant({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
+    return;
+  }
   const assertAttribution = req.isPlatformOperatorContext && tenant?._id ? assertResourceTenant : assertResourceTenantOrUnattributed;
   await assertAttribution({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
 }
@@ -64,15 +82,24 @@ async function assertPropertyTenantAccess(req, property) {
 // (SECURITY-CLOSURE-P0-WAVE-1) : `Contrat.bien.owner → OrgMembership`, plus
 // PROPERTY-DIRECT-TENANT — `Property.tenant` prend la précédence quand il
 // est renseigné (canonique 2E.1.X), fallback historique via `owner`.
+//
+// C2.10A — la population des BAUX (type location) est exclusivement
+// `Property.tenant = tenant sélectionné`. Le repli historique `tenant:null +
+// owner ∈ membres` ne subsiste que pour les contrats de VENTE (hors périmètre
+// C2.10A) : un bail sur un bien tenant:null n'apparaît dans aucune organisation.
 async function scopedContratFilterForTenant(req) {
+  if (req.rentalScope?.mode === 'individual') {
+    return { type: 'location', bien: { $in: await individualRentalPropertyIds(req.user._id || req.user.id) } };
+  }
   if (!req.platformTenant) return {};
-  const propertyIds = await Property.find({
-    $or: [
-      { tenant: req.platformTenant._id },
-      { tenant: null, owner: { $in: req.tenantScopeUserIds || [] } },
-    ],
-  }).distinct('_id');
-  return { bien: { $in: propertyIds } };
+  const [tenantPropertyIds, legacySalePropertyIds] = await Promise.all([
+    tenantRentalPropertyIds(req.platformTenant._id),
+    Property.find({ tenant: null, owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id'),
+  ]);
+  return { $or: [
+    { bien: { $in: tenantPropertyIds } },
+    { type: { $ne: 'location' }, bien: { $in: legacySalePropertyIds } },
+  ] };
 }
 
 // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIII (B2) — PUT allow-list schema-
@@ -142,12 +169,27 @@ exports.create = async (req, res) => {
     if (!req.body?.bien || !['location', 'vente'].includes(req.body?.type)) {
       return res.status(400).json({ status: 'fail', code: 'INVALID_CONTRACT_INPUT', message: 'Le bien et le type de contrat sont requis.' });
     }
-    const property = await Property.findById(req.body.bien).select('status statusAdmin availability owner price reservationLock');
+    const property = await Property.findById(req.body.bien).select('status statusAdmin availability owner tenant price reservationLock');
     if (!property) return res.status(404).json({ status: 'fail', code: 'PROPERTY_NOT_FOUND', message: 'Bien introuvable.' });
     try {
-      await assertPropertyTenantAccess(req, property);
+      await assertPropertyTenantAccess(req, property, req.body.type);
     } catch (error) {
       return res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Bien introuvable.' });
+    }
+    if (req.body.type === 'location' && req.rentalScope?.mode === 'individual') {
+      for (const [field, Model, resourceType] of [
+        ['locataire', Locataire, 'Locataire'],
+        ['proprietaire', Proprietaire, 'Proprietaire'],
+      ]) {
+        if (!req.body[field]) continue;
+        const party = await Model.findById(req.body[field]);
+        if (!party) return res.status(404).json({ status: 'fail', message: 'Partie locative introuvable.' });
+        try {
+          await assertIndividualRentalResourceAccess({ resourceType, resource: party, userId: req.user._id || req.user.id });
+        } catch (_error) {
+          return res.status(404).json({ status: 'fail', message: 'Partie locative introuvable.' });
+        }
+      }
     }
     if (property.status !== req.body.type) {
       return res.status(409).json({ status: 'fail', code: 'CONTRACT_TYPE_MISMATCH', message: 'Le type de contrat ne correspond pas au bien.' });

@@ -17,9 +17,10 @@ const Contrat = require('../models/Contrat');
 const logger = require('../utils/logger');
 const { ROLES_DOCS } = require('../utils/roles');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant } = require('../services/platformTenant/rentalScopeService');
 const { readPrivateAsset } = require('../services/storage/secureStorageService');
 const { safeFilename, streamRemoteDocument } = require('../services/storage/documentStreamingService');
+const { assertIndividualRentalResourceAccess } = require('../services/rentalIndividualResourceAccessService');
 
 const isStaffDoc = (role) => ROLES_DOCS.includes(role);
 
@@ -32,7 +33,7 @@ exports.download = async (req, res) => {
 
   const contrat = await Contrat.findOne({ 'documents._id': documentId })
     .select('+documents.asset.publicId +documents.asset.resourceType +documents.asset.deliveryType +documents.asset.version +documents.asset.format')
-    .populate('bien', 'owner title')
+    .populate('bien', 'owner tenant title')
     .populate('locataire', 'user');
   if (!contrat) return fail(res, 404, 'Document introuvable.');
 
@@ -48,12 +49,20 @@ exports.download = async (req, res) => {
   const isOwnerMatch = user.role === 'Proprietaire' && contrat.bien?.owner && String(contrat.bien.owner) === userId;
   const isTenantMatch = Boolean(contrat.locataire?.user) && String(contrat.locataire.user) === userId;
   let staffTenantMatch = false;
+  if (isOwnerMatch && !contrat.bien?.tenant) {
+    try {
+      await assertIndividualRentalResourceAccess({ resourceType: 'Contrat', resource: contrat, userId });
+    } catch (error) {
+      return fail(res, error.statusCode || 403, error.message || 'Accès refusé à ce document.');
+    }
+  }
   if (isStaffDoc(user.role)) {
     try {
       // PLATFORM-ADMIN-CERT-1 — voir accommodationController.js pour la même justification.
       const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
       const tenant = await resolveTenantForUser(user._id || user.id, explicitTenantId);
-      await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
+      // C2.10A — staff : frontière locative stricte (tenant:null → refus).
+      await assertRentalResourceInTenant({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
       staffTenantMatch = true;
     } catch {
       staffTenantMatch = false;

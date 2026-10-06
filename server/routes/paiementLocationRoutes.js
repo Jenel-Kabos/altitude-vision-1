@@ -38,12 +38,15 @@ const { markPaymentDomain, assertRentalPaymentDomain } = require('../middleware/
 const { upload } = require('../config/cloudinary');
 const ctrl = require('../controllers/paiementController');
 const Paiement = require('../models/Paiement');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const Contrat = require('../models/Contrat');
 const { verifierPaiementsEnRetard } = require('../services/alerteService');
+const { selectIndividualRoute, requireIndividualRentalScope } = require('../middleware/rentalScopeAccess');
+const { assertIndividualRentalResourceAccess, individualRentalDomainIds } = require('../services/rentalIndividualResourceAccessService');
 
 const router = express.Router();
+const individualIdPath = '/:id([0-9a-fA-F]{24})';
 
 const PAY_READ = ['Admin', 'Secretaire', 'Collaborateur'];
 const PAY_MANAGE = ['Admin', 'Secretaire', 'Collaborateur'];
@@ -83,14 +86,42 @@ router.param('id', async (req, res, next, paiementId) => {
     if (!mongoose.isValidObjectId(paiementId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const paiement = await Paiement.findById(paiementId);
     if (!paiement) return res.status(404).json({ status: 'fail', message: 'Paiement introuvable.' });
+    if (req.query?.scope === 'individual') {
+      await assertIndividualRentalResourceAccess({ resourceType: 'Paiement', resource: paiement, userId: req.user._id || req.user.id });
+      return next();
+    }
     const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
     const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-    await assertResourceTenantOrUnattributed({ resourceType: 'Paiement', resource: paiement, tenantId: tenant?._id });
+    // C2.10A — Paiement → Contrat.bien → Property.tenant = tenant de la requête.
+    await assertRentalResourceInTenant({ resourceType: 'Paiement', resource: paiement, tenantId: tenant?._id });
     next();
   } catch (error) {
     res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Paiement introuvable.' });
   }
 });
+
+const individualRead = [selectIndividualRoute, requireIndividualRentalScope, markPaymentDomain('location')];
+const individualManage = [selectIndividualRoute, requireIndividualRentalScope, markPaymentDomain('location')];
+router.get('/alertes', ...individualRead, ctrl.getAlertes);
+router.get('/stats', ...individualRead, ctrl.getStats);
+router.post('/encaisser-multiple', ...individualManage, upload.single('preuve'), ctrl.encaisserMultiple);
+router.post('/calculer-penalites', ...individualManage, async (req, res) => {
+  try {
+    const { contractIds } = await individualRentalDomainIds(req.user._id || req.user.id);
+    const result = await verifierPaiementsEnRetard({ contratIds: contractIds });
+    res.json({ status: 'success', data: result });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ status: (err.statusCode || 500) >= 500 ? 'error' : 'fail', message: err.message });
+  }
+});
+router.get('/', ...individualRead, ctrl.getAll);
+router.get(individualIdPath, ...individualRead, assertRentalPaymentDomain, ctrl.getOne);
+router.get(`${individualIdPath}/proof`, ...individualRead, assertRentalPaymentDomain, ctrl.downloadProof);
+router.put(individualIdPath, ...individualManage, assertRentalPaymentDomain, ctrl.update);
+router.post(`${individualIdPath}/marquer-paye`, ...individualManage, assertRentalPaymentDomain, upload.single('preuve'), ctrl.marquerPaye);
+router.get(`${individualIdPath}/receipts`, ...individualRead, assertRentalPaymentDomain, ctrl.listReceipts);
+router.post(`${individualIdPath}/receipts/:receiptId/cancel`, ...individualManage, assertRentalPaymentDomain, ctrl.cancelReceipt);
+router.delete(individualIdPath, ...individualManage, assertRentalPaymentDomain, ctrl.delete);
 
 // ── Routes spécifiques avant `:id` ──────────────────────────────────────────
 router.get('/alertes', ...tenantAuthRead, ctrl.getAlertes);

@@ -12,12 +12,15 @@ import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { CreditCard, Wallet, AlertTriangle, Clock, RefreshCw } from "lucide-react";
 import {
-  getPaiementsPage, getPaiementsStats, marquerPaiementPaye, calculerPenalites,
+  getPaiementsPage, getPaiementsStats, marquerPaiementPaye, calculerPenalites, encaisserPaiementsMultiples,
 } from "../../services/gestionLocativeService";
 import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
 import {
   DashboardPage, DashboardPageHeader, DashboardToolbar, DashboardCard, DashboardState, DashboardPagination,
 } from "../../components/dashboard/DashboardUI";
+import { useRentalOperationContext } from "../../context/RentalOperationContext";
+import { callWithRentalContext, rentalBasePath } from "../../services/rentalRequestContext";
+import { generateQuittance } from "../../services/documentService";
 
 const KPI_ITEMS = [
   { key: 'totalAttendu', label: 'Attendu', Icon: Wallet, color: '#2563EB', format: (s) => formatCurrencyXAF(s.totalAttendu) },
@@ -35,6 +38,7 @@ const STATUT_CLASSES = {
 const STATUT_LABELS = { 'payé': 'Payé', 'partiel': 'Partiel', 'en_retard': 'En retard', 'impayé': 'Impayé' };
 
 const RentalPaymentsPage = () => {
+  const rentalContext = useRentalOperationContext();
   const [data, setData] = useState({ paiements: [], total: 0 });
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,14 +46,17 @@ const RentalPaymentsPage = () => {
   const [page, setPage] = useState(1);
   const [payingId, setPayingId] = useState(null);
   const [payForm, setPayForm] = useState({ montantRecu: '', datePaiement: '', modePaiement: 'espèces', reference: '', preuve: null });
+  const [selected, setSelected] = useState([]);
+  const [batching, setBatching] = useState(false);
+  const [generatingReceiptId, setGeneratingReceiptId] = useState(null);
   const limit = 20;
 
   const load = async () => {
     setLoading(true);
     try {
       const [pageRes, statsRes] = await Promise.all([
-        getPaiementsPage({ statut: statut || undefined, page, limit }),
-        getPaiementsStats(),
+        callWithRentalContext(getPaiementsPage, rentalContext, { statut: statut || undefined, page, limit }),
+        callWithRentalContext(getPaiementsStats, rentalContext, {}),
       ]);
       setData(pageRes);
       setStats(statsRes);
@@ -66,7 +73,7 @@ const RentalPaymentsPage = () => {
 
   const handleMarquerPaye = async (id) => {
     try {
-      await marquerPaiementPaye(id, {
+      await callWithRentalContext(marquerPaiementPaye, rentalContext, id, {
         montantRecu: Number(payForm.montantRecu) || undefined,
         datePaiement: payForm.datePaiement || undefined,
         modePaiement: payForm.modePaiement,
@@ -84,12 +91,48 @@ const RentalPaymentsPage = () => {
 
   const handleRecalculerPenalites = async () => {
     try {
-      await calculerPenalites();
+      await callWithRentalContext(calculerPenalites, rentalContext);
       toast.success("Pénalités recalculées.");
       load();
     } catch (err) {
       toast.error("Erreur lors du calcul des pénalités.");
     }
+  };
+
+  const handleBatch = async () => {
+    const rows = data.paiements.filter((payment) => selected.includes(payment._id));
+    const contractIds = [...new Set(rows.map((payment) => String(payment.contrat?._id || payment.contrat)))];
+    if (!rows.length || contractIds.length !== 1) {
+      toast.error('Sélectionnez des échéances appartenant au même bail.');
+      return;
+    }
+    setBatching(true);
+    try {
+      await callWithRentalContext(encaisserPaiementsMultiples, rentalContext, {
+        contrat: contractIds[0],
+        allocations: rows.map((payment) => ({
+          paiementId: payment._id,
+          montant: Math.max(0, Number(payment.montantTotal ?? payment.montant ?? 0) - Number(payment.montantRecu || 0)),
+        })),
+        datePaiement: new Date().toISOString().slice(0, 10),
+        modePaiement: 'virement',
+        idempotencyKey: `web-${Date.now()}-${selected.slice().sort().join('-')}`,
+      });
+      toast.success('Encaissement multiple enregistré.');
+      setSelected([]);
+      load();
+    } catch (err) { toast.error(err.response?.data?.message || "Erreur lors de l'encaissement multiple."); }
+    finally { setBatching(false); }
+  };
+
+  const handleGenerateReceipt = async (paymentId) => {
+    setGeneratingReceiptId(paymentId);
+    try {
+      await callWithRentalContext(generateQuittance, rentalContext, paymentId);
+      toast.success('Quittance générée.');
+      load();
+    } catch (err) { toast.error(err.response?.data?.message || 'Impossible de générer la quittance.'); }
+    finally { setGeneratingReceiptId(null); }
   };
 
   return (
@@ -99,7 +142,7 @@ const RentalPaymentsPage = () => {
         title="Paiements locatifs"
         description="Loyers et échéances par bail — distinct des paiements de visite et hôteliers."
         actions={(
-          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+          <Link href={rentalBasePath(rentalContext)} className="text-sm text-blue-600 underline">
             Vue d'ensemble Gestion Locative
           </Link>
         )}
@@ -134,6 +177,10 @@ const RentalPaymentsPage = () => {
             <RefreshCw size={14} />
             Recalculer les pénalités
           </button>
+          <button onClick={handleBatch} disabled={!selected.length || batching}
+            className="inline-flex items-center gap-1.5 bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50">
+            Encaisser la sélection ({selected.length})
+          </button>
         </div>
       </DashboardToolbar>
 
@@ -146,6 +193,7 @@ const RentalPaymentsPage = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b">
+                <th className="py-2 pr-3">Sélection</th>
                 <th className="py-2 pr-3">Locataire</th>
                 <th className="py-2 pr-3">Échéance</th>
                 <th className="py-2 pr-3">Montant</th>
@@ -158,6 +206,7 @@ const RentalPaymentsPage = () => {
             <tbody>
               {data.paiements.map((p) => (
                 <tr key={p._id} className="border-b hover:bg-gray-50">
+                  <td className="py-2 pr-3"><input type="checkbox" aria-label={`Sélectionner ${p.mois}/${p.annee}`} disabled={p.statut === 'payé'} checked={selected.includes(p._id)} onChange={() => setSelected((current) => current.includes(p._id) ? current.filter((id) => id !== p._id) : [...current, p._id])} /></td>
                   <td className="py-2 pr-3">{p.contrat?.locataire ? `${p.contrat.locataire.prenom || ''} ${p.contrat.locataire.nom || ''}` : '—'}</td>
                   <td className="py-2 pr-3">{p.mois}/{p.annee}</td>
                   <td className="py-2 pr-3">{formatCurrencyXAF(p.montantTotal || p.montant)}</td>
@@ -167,6 +216,11 @@ const RentalPaymentsPage = () => {
                   </td>
                   <td className="py-2 pr-3 text-xs text-gray-500">{p.reference || '—'}</td>
                   <td className="py-2 pr-3">
+                    {p.statut === 'payé' && (
+                      <button disabled={generatingReceiptId === p._id} onClick={() => handleGenerateReceipt(p._id)} className="bg-emerald-700 text-white px-2 py-1 rounded text-xs disabled:opacity-50">
+                        Générer quittance
+                      </button>
+                    )}
                     {p.statut !== 'payé' && (
                       payingId === p._id ? (
                         <div className="flex flex-wrap gap-1 items-center">

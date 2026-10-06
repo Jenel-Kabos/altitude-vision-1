@@ -59,10 +59,11 @@ function MenuRow({ icon, label, onPress, danger, toggle, toggleVal, onToggle, st
 }
 
 // ─── ProfilScreen ────────────────────────────────────────────────────────────
-export default function ProfilScreen({ navigation }) {
+export default function ProfilScreen({ navigation, route }) {
   const { user, logout, updateUser, businessProfiles, isProprietaireImmobilier, isExploitantEtablissement } = useAuth();
   const { themeColors: c, preference, setPreference } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const settingsOnly = route?.params?.settingsOnly === true;
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [stats, setStats] = useState({ biens: 0, vues: 0 });
@@ -232,8 +233,25 @@ export default function ProfilScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
+        {settingsOnly ? (
+          <View style={styles.settingsHeader}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack?.()}
+              accessibilityRole="button"
+              accessibilityLabel="Retour à Mon espace"
+              style={styles.settingsBack}
+            >
+              <Ionicons name="arrow-back" size={22} color={c.text} />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.settingsTitle}>Réglages du compte</Text>
+              <Text style={styles.settingsSubtitle}>Compte, apparence, préférences et support</Text>
+            </View>
+          </View>
+        ) : null}
+
         {/* ─── Hero ──────────────────────────────────────────── */}
-        <View style={styles.hero}>
+        {!settingsOnly && <View style={styles.hero}>
           <LinearGradient
             colors={['#0A0A0A', '#1C1408', '#2D1E04']}
             style={StyleSheet.absoluteFillObject}
@@ -272,10 +290,10 @@ export default function ProfilScreen({ navigation }) {
           <View style={[styles.roleBadge, { backgroundColor: roleColor }]}>
             <Text style={styles.roleBadgeText}>{roleLabel}</Text>
           </View>
-        </View>
+        </View>}
 
         {/* ─── Stats propriétaire ────────────────────────────── */}
-        {isProprietaire && (
+        {!settingsOnly && isProprietaire && (
           <Animated.View
             entering={FadeInDown.delay(60).springify().damping(18)}
             style={styles.statsRow}
@@ -295,7 +313,7 @@ export default function ProfilScreen({ navigation }) {
         )}
 
         {/* ─── Mes biens ─────────────────────────────────────── */}
-        {canSeeMyBiens && (
+        {!settingsOnly && canSeeMyBiens && (
           <Animated.View entering={FadeInDown.delay(100).springify().damping(18)}>
             <Text style={styles.sectionTitle}>Mes biens</Text>
             <View style={styles.menuGroup}>
@@ -325,7 +343,7 @@ export default function ProfilScreen({ navigation }) {
         )}
 
         {/* ─── Favoris & Transactions ────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(140).springify().damping(18)}>
+        {!settingsOnly && <Animated.View entering={FadeInDown.delay(140).springify().damping(18)}>
           <Text style={styles.sectionTitle}>Activité</Text>
           <View style={styles.menuGroup}>
             <MenuRow
@@ -368,7 +386,7 @@ export default function ProfilScreen({ navigation }) {
               if (target?.screen === 'Profil' && target.params?.screen) navigation.navigate(target.params.screen, target.params.params);
             }} styles={styles} c={c} />
           </View>
-        </Animated.View>
+        </Animated.View>}
 
         {/* ─── Compte ────────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(180).springify().damping(18)}>
@@ -522,6 +540,36 @@ export default function ProfilScreen({ navigation }) {
 const makeStyles = (c) => StyleSheet.create({
   safe:   { flex: 1, backgroundColor: c.bg },
   scroll: { paddingBottom: spacing.xxl },
+
+  settingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  settingsBack: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.bgCard,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  settingsTitle: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.lg,
+    color: c.text,
+  },
+  settingsSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: c.textSub,
+    marginTop: 2,
+  },
 
   // ─── Hero ───
   hero: {

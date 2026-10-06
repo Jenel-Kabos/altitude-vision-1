@@ -1,11 +1,19 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ManageAccommodationsPage from '../pages/dashboard/ManageAccommodationsPage';
 import { deactivateAccommodation, getAccommodationsAdmin } from '../services/accommodationService';
+import { getDashboardAnalytics } from '../services/dashboardAnalyticsService';
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'Admin' }, canEdit: true }) }));
+const runtimeState = {
+  scope: { mode: 'tenant', tenantId: 'TENANT-A', key: 'tenant:TENANT-A' },
+  tenantBusinessRole: 'Admin',
+  can: () => false,
+};
+vi.mock('../context/PlatformTenantRuntimeContext', () => ({
+  usePlatformTenantRuntime: () => runtimeState,
+}));
 vi.mock('next/link', () => ({ default: ({ children, href, ...props }) => <a href={href} {...props}>{children}</a> }));
 vi.mock('../services/accommodationService', () => ({ getAccommodationsAdmin: vi.fn(), deactivateAccommodation: vi.fn(), createFullAccommodation: vi.fn(), updateFullAccommodation: vi.fn() }));
 vi.mock('../components/dashboard/AccommodationPropertyForm', () => ({
@@ -20,13 +28,33 @@ const validatedAccommodation = {
 };
 
 describe('ManageAccommodationsPage — gestion des hébergements validés', () => {
-  beforeEach(() => { vi.clearAllMocks(); getAccommodationsAdmin.mockResolvedValue({ accommodations: [validatedAccommodation], total: 1 }); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(runtimeState, {
+      scope: { mode: 'tenant', tenantId: 'TENANT-A', key: 'tenant:TENANT-A' },
+      tenantBusinessRole: 'Admin',
+      can: () => false,
+    });
+    getAccommodationsAdmin.mockResolvedValue({ accommodations: [validatedAccommodation], total: 1 });
+    getDashboardAnalytics.mockResolvedValue({ kpis: {} });
+  });
+
+  test('C2.8 — le compteur Hébergements reflète la population visible et conserve le total workflow séparé', async () => {
+    getDashboardAnalytics.mockResolvedValue({ kpis: { total: 9, visibleTotal: 1 } });
+
+    render(<ManageAccommodationsPage />);
+
+    await screen.findByText('Villa Test');
+    const label = await screen.findByText('Hébergements', { selector: '.dashboard-kpi-label' });
+    expect(label.parentElement).toHaveTextContent('1');
+    expect(label.parentElement).not.toHaveTextContent('9');
+  });
 
   test('la liste des biens est l’unique vue principale et demande uniquement les hébergements indépendants validés', async () => {
     render(<ManageAccommodationsPage />);
     expect(await screen.findByText('Villa Test')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Sections Hébergements' })).not.toBeInTheDocument();
-    expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ status: 'publie', independentOnly: true, validatedOnly: true, activeOnly: true }));
+    expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ status: 'publie', independentOnly: true, validatedOnly: true, activeOnly: true }), { platformScoped: false });
     expect(screen.queryByRole('button', { name: /Valider|Rejeter|Suspendre/ })).not.toBeInTheDocument();
     expect(screen.getByTestId('accommodation-grid')).toHaveClass('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-4');
     expect(screen.getByText(/35.000 XAF \/ nuit/)).toBeInTheDocument();
@@ -48,7 +76,7 @@ describe('ManageAccommodationsPage — gestion des hébergements validés', () =
     fireEvent.change(screen.getByLabelText('Ville'), { target: { value: 'Pointe-Noire' } });
     fireEvent.change(screen.getByLabelText('Disponibilité'), { target: { value: 'Maintenance' } });
     fireEvent.change(screen.getByLabelText('Trier par'), { target: { value: 'prix_desc' } });
-    await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ search: 'Villa', city: 'Pointe-Noire', availability: 'Maintenance', sort: 'prix_desc' })));
+    await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ search: 'Villa', city: 'Pointe-Noire', availability: 'Maintenance', sort: 'prix_desc' }), { platformScoped: false }));
     expect(screen.queryByLabelText(/modération/i)).not.toBeInTheDocument();
   });
 
@@ -88,7 +116,7 @@ describe('ManageAccommodationsPage — gestion des hébergements validés', () =
       expect(await screen.findByText('Pointe-Noire')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Retirer le filtre Pointe-Noire' }));
-      await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ city: undefined })));
+      await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ city: undefined }), { platformScoped: false }));
       expect(screen.queryByText('Pointe-Noire')).not.toBeInTheDocument();
     });
 
@@ -102,7 +130,7 @@ describe('ManageAccommodationsPage — gestion des hébergements validés', () =
 
       const resetButton = await screen.findByRole('button', { name: 'Réinitialiser' });
       fireEvent.click(resetButton);
-      await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ sort: 'recent', search: 'Villa' })));
+      await waitFor(() => expect(getAccommodationsAdmin).toHaveBeenCalledWith(expect.objectContaining({ sort: 'recent', search: 'Villa' }), { platformScoped: false }));
       expect(screen.getByPlaceholderText('Rechercher un hébergement…')).toHaveValue('Villa');
       expect(screen.queryByRole('button', { name: 'Réinitialiser' })).not.toBeInTheDocument();
     });
@@ -149,6 +177,22 @@ describe('ManageAccommodationsPage — gestion des hébergements validés', () =
     render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
     fireEvent.click(screen.getByRole('button', { name: 'Archiver' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Archiver' }));
-    await waitFor(() => expect(deactivateAccommodation).toHaveBeenCalledWith('ACC-1'));
+    await waitFor(() => expect(deactivateAccommodation).toHaveBeenCalledWith('ACC-1', { platformScoped: false }));
+  });
+
+  test('refuse création, modification et archivage au CommunityManager du tenant', async () => {
+    runtimeState.tenantBusinessRole = 'CommunityManager';
+    render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+    expect(screen.queryByRole('button', { name: /Ajouter un hébergement/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Modifier' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Archiver' })).not.toBeInTheDocument();
+  });
+
+  test('accorde les actions depuis le businessRole tenant', async () => {
+    runtimeState.tenantBusinessRole = 'GestionnaireImmobilier';
+    render(<ManageAccommodationsPage />); await screen.findByText('Villa Test');
+    expect(screen.getByRole('button', { name: /Ajouter un hébergement/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Modifier' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Archiver' })).toBeInTheDocument();
   });
 });

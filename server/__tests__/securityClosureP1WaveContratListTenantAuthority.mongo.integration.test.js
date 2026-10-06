@@ -60,7 +60,8 @@ async function buildTenantWithContrat(label, montantLoyer) {
     pole: 'Altimmo', type: 'Villa', status: 'location', price: 300000,
     address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.24,
     images: ['https://placehold.co/1200x800/png?text=Test'], surface: 90,
-    statusAdmin: 'Validée', availability: 'Loué', owner: owner._id,
+    statusAdmin: 'Validée', availability: 'Loué', owner: owner._id, tenant: tenant._id, // C2.10A — provenance canonique Property.tenant
+
   });
   const proprietaire = await Proprietaire.create({ nom: `Prop${label}${seq}`, prenom: 'Test', telephone: `+2420602${seq}0001` });
   const locataire = await Locataire.create({ nom: `Loc${label}${seq}`, prenom: 'Test', telephone: `+2420602${seq}0002` });

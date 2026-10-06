@@ -11,31 +11,47 @@ const { runFinancialOperation } = require('../services/finance/financialTransact
 const logger = require('../utils/logger');
 const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant, tenantRentalPropertyIds } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const {
+  assertIndividualRentalResourceAccess,
+  assertIndividualRentalResourceSetAccess,
+  individualRentalDomainIds,
+} = require('../services/rentalIndividualResourceAccessService');
 
 // Paiement → Contrat → Property : l'attribution explicite est prioritaire.
 // Les memberships du propriétaire ne servent qu'à présélectionner les
 // biens legacy sans tenant ; le résolveur canonique tranche ensuite et
 // exclut toute attribution ambiguë/non résolue.
+//
+// C2.10A — loyers (contrats de location) : population exclusivement
+// `Property.tenant = tenant sélectionné`. Le repli legacy `tenant:null + owner
+// ∈ membres` (validé par le résolveur historique) ne subsiste que pour les
+// paiements de contrats hors location (hors périmètre C2.10A).
 async function scopedContratIdsForTenant(req) {
+  if (req.rentalScope?.mode === 'individual') {
+    return (await individualRentalDomainIds(req.user._id || req.user.id)).contractIds;
+  }
   if (!req.platformTenant) return null; // pas de restriction — tenant non résolu (mode plateforme) ou route non tenant-scopée.
-  const properties = await Property.find({ $or: [
-    { tenant: req.platformTenant._id },
-    { tenant: null, owner: { $in: req.tenantScopeUserIds || [] } },
-  ] }).select('_id owner tenant').lean();
-  const propertyIds = [];
-  for (const property of properties) {
+  const tenantPropertyIds = await tenantRentalPropertyIds(req.platformTenant._id);
+  const legacyProperties = await Property.find({ tenant: null, owner: { $in: req.tenantScopeUserIds || [] } })
+    .select('_id owner tenant').lean();
+  const legacyPropertyIds = [];
+  for (const property of legacyProperties) {
     const attribution = await resolveResourceTenant({ resourceType: 'Property', resource: property });
     if (attribution.status === 'resolved' && String(attribution.tenantId) === String(req.platformTenant._id)) {
-      propertyIds.push(property._id);
+      legacyPropertyIds.push(property._id);
     }
   }
-  if (propertyIds.length === 0) return [];
+  if (tenantPropertyIds.length === 0 && legacyPropertyIds.length === 0) return [];
   // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TENANT-CONTEXT-B.2 —
   // quand le middleware `markPaymentDomain('location')` a posé
   // `req.paymentDomain`, on filtre canoniquement par `Contrat.type`.
   // Sans domaine explicite, comportement inchangé (compat legacy).
-  const contractFilter = { bien: { $in: propertyIds } };
+  const contractFilter = { $or: [
+    { bien: { $in: tenantPropertyIds } },
+    { type: { $ne: 'location' }, bien: { $in: legacyPropertyIds } },
+  ] };
   if (req.paymentDomain === 'location') contractFilter.type = 'location';
   return Contrat.find(contractFilter).distinct('_id');
 }
@@ -354,11 +370,19 @@ exports.encaisserMultiple = async (req, res) => {
     if (!contratDoc) {
       return res.status(404).json({ status: 'fail', message: 'Contrat introuvable.' });
     }
-    {
+    if (req.rentalScope?.mode === 'individual') {
+      try {
+        await assertIndividualRentalResourceAccess({ resourceType: 'Contrat', resource: contratDoc, userId: req.user._id || req.user.id });
+      } catch (error) {
+        return res.status(error.statusCode || 404).json({ status: 'fail', message: 'Contrat introuvable.' });
+      }
+    } else {
       const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
       const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
       try {
-        await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contratDoc, tenantId: tenant?._id });
+        // C2.10A — encaissement d'un loyer : frontière locative stricte.
+        const assertScope = contratDoc.type === 'location' ? assertRentalResourceInTenant : assertResourceTenantOrUnattributed;
+        await assertScope({ resourceType: 'Contrat', resource: contratDoc, tenantId: tenant?._id });
       } catch (error) {
         return res.status(error.statusCode || 404).json({ status: 'fail', message: 'Contrat introuvable.' });
       }
@@ -376,6 +400,23 @@ exports.encaisserMultiple = async (req, res) => {
       return res.status(422).json({ status: 'fail', message: 'Une même échéance ne peut apparaître qu\'une seule fois dans un encaissement.' });
     }
 
+    const paiements = await Paiement.find({ _id: { $in: paiementIds } });
+    if (paiements.length !== paiementIds.length) {
+      return res.status(404).json({ status: 'error', message: 'Une ou plusieurs échéances sont introuvables.' });
+    }
+    if (paiements.some((p) => String(p.contrat) !== String(contrat))) {
+      return res.status(422).json({ status: 'fail', message: 'Toutes les échéances doivent appartenir au même contrat.' });
+    }
+    if (req.rentalScope?.mode === 'individual') {
+      try {
+        await assertIndividualRentalResourceSetAccess({
+          resourceType: 'Paiement', resources: paiements, userId: req.user._id || req.user.id,
+        });
+      } catch (error) {
+        return res.status(error.statusCode || 404).json({ status: 'fail', message: 'Une ou plusieurs échéances sont introuvables.' });
+      }
+    }
+
     // Idempotence : un rejeu réseau avec la même clé renvoie le résultat déjà
     // enregistré plutôt que de retraiter (et donc potentiellement doubler) l'encaissement.
     if (idempotencyKey) {
@@ -386,13 +427,6 @@ exports.encaisserMultiple = async (req, res) => {
       }
     }
 
-    const paiements = await Paiement.find({ _id: { $in: paiementIds } });
-    if (paiements.length !== paiementIds.length) {
-      return res.status(404).json({ status: 'error', message: 'Une ou plusieurs échéances sont introuvables.' });
-    }
-    if (paiements.some((p) => String(p.contrat) !== String(contrat))) {
-      return res.status(422).json({ status: 'fail', message: 'Toutes les échéances doivent appartenir au même contrat.' });
-    }
     const byId = new Map(paiements.map((p) => [String(p._id), p]));
     for (const { paiementId, montant } of cleanAllocations) {
       const p = byId.get(String(paiementId));

@@ -6,6 +6,11 @@
 
 const HOTEL_ASSIGNMENT_ROLES = ['hotel_manager', 'reception', 'housekeeping', 'inspector', 'maintenance', 'finance', 'viewer'];
 const HOTEL_ASSIGNMENT_STATUSES = ['active', 'suspended', 'revoked', 'expired'];
+const HOTEL_TENANT_ROLES = Object.freeze({
+  read: ['Admin', 'Collaborateur', 'GestionnaireImmobilier'],
+  manage: ['Admin', 'Collaborateur', 'GestionnaireImmobilier'],
+  moderate: ['Admin', 'Collaborateur'],
+});
 
 const HOTEL_OPERATIONAL_CAPABILITIES = Object.freeze({
   HOTEL_VIEW: 'hotel.view',
@@ -82,6 +87,7 @@ const DEFAULT_CAPABILITIES_BY_ASSIGNMENT_ROLE = Object.freeze({
 
 module.exports = {
   HOTEL_ASSIGNMENT_ROLES, HOTEL_ASSIGNMENT_STATUSES,
+  HOTEL_TENANT_ROLES,
   HOTEL_OPERATIONAL_CAPABILITIES, HOTEL_FINANCIAL_CAPABILITY_VALUES, ALL_HOTEL_CAPABILITY_VALUES,
   DEFAULT_CAPABILITIES_BY_ASSIGNMENT_ROLE,
 };

@@ -67,12 +67,16 @@ const setRole = (userId, tenant, businessRole) => OrgMembership.updateOne(
   { $set: { businessRole } },
 );
 
+// C2.10A — le tenant d'un bail dérive EXCLUSIVEMENT de Contrat.bien →
+// Property.tenant (le schéma Contrat n'a pas de champ `tenant`).
 const insertContrat = async ({ tenant, docs = [] }) => {
   const _id = new mongoose.Types.ObjectId();
+  const bien = new mongoose.Types.ObjectId();
+  await mongoose.connection.collection('properties').insertOne({ _id: bien, title: 'PDOC bien', tenant: tenant._id, owner: new mongoose.Types.ObjectId(), status: 'location' });
   await Contrat.collection.insertOne({
     _id,
     type: 'location',
-    tenant: tenant._id,
+    bien,
     documents: docs.map((d) => ({ _id: new mongoose.Types.ObjectId(), nom: d.nom || 'doc', type: d.type || 'bail', dateGeneration: new Date() })),
     createdAt: new Date(), updatedAt: new Date(),
   });

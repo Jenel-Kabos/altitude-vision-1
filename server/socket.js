@@ -9,6 +9,10 @@ const User = require('./models/User');
 const Conversation = require('./models/Conversation');
 const { resolveEffectiveTenantContext } = require('./services/platformTenant/tenantContextService');
 const { hasCapability } = require('./services/platformOperator/platformOperatorService');
+const {
+  PLATFORM_WIDE_CONTEXT_SOURCE,
+  PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE,
+} = require('./constants/platformOperatorConstants');
 const logger = require('./utils/logger');
 
 // MESSAGING-PLATFORM-INBOX-AGGREGATION-1C — room canonique pour les
@@ -169,8 +173,16 @@ const initSocket = (httpServer, corsOptions) => {
       // plateforme). L'ancien fail-closed sur `!tenantContext?.tenant`
       // empêchait tout realtime en mode plateforme. Le platform:support
       // room reste gated en aval par la capability `platform.support.read`.
-      const isPlatformUnscoped = tenantContext?.source === 'platform_operator_unscoped';
-      if (!tenantContext?.tenant && !isPlatformUnscoped) return next(new Error('Contexte tenant requis'));
+      const isPlatformUnscoped = tenantContext?.source === PLATFORM_WIDE_CONTEXT_SOURCE;
+      // PA-04A H3 — l'inbox support est un workflow platform-native fermé,
+      // distinct de la Vue plateforme. Un opérateur partiel peut donc ouvrir
+      // un socket sans tenant uniquement s'il détient la capability exacte ;
+      // cela ne transforme jamais sa source en scope plateforme réutilisable.
+      const isSpecializedSupportSocket = tenantContext?.source === PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE
+        && hasCapability(tenantContext?.operator, 'platform.support.read');
+      if (!tenantContext?.tenant && !isPlatformUnscoped && !isSpecializedSupportSocket) {
+        return next(new Error('Contexte tenant requis'));
+      }
       socket.platformTenantId = tenantContext?.tenant ? String(tenantContext.tenant._id) : null;
       socket.user.platformTenant = tenantContext?.tenant?._id || null;
       socket.tenantContextSource = tenantContext?.source;

@@ -3,7 +3,7 @@ jest.mock('../models/User', () => ({ countDocuments: jest.fn() }));
 jest.mock('../models/portfolioItemModel', () => ({ countDocuments: jest.fn() }));
 jest.mock('../models/Property', () => ({ find: jest.fn() }));
 jest.mock('../models/Contrat', () => ({ countDocuments: jest.fn() }));
-jest.mock('../services/userKpiService', () => ({ getUserKpiSummary: jest.fn() }));
+jest.mock('../services/userKpiService', () => ({ getUserKpiSummary: jest.fn(), getProprietaireUserIds: jest.fn() }));
 jest.mock('../services/propertyPortfolioService', () => ({ getPropertyPortfolioForTenantScope: jest.fn() }));
 
 const Event = require('../models/Event');
@@ -46,6 +46,29 @@ describe('dashboardKpiQueryService', () => {
     expect(PortfolioItem.countDocuments).toHaveBeenCalledWith({ isPublished: true });
     expect(Property.find).toHaveBeenCalledWith({ owner: { $in: ['staff-1'] } });
     expect(Contrat.countDocuments).toHaveBeenCalledWith({ bien: { $in: ['property-1'] }, type: 'location', statut: 'actif' });
+  });
+
+  test('avec tenantId, aucun KPI global non attribuable ne fuite dans le Home tenant', async () => {
+    getPropertyPortfolioForTenantScope.mockResolvedValue({ stats: { total: 2 } });
+    User.countDocuments.mockResolvedValue(3);
+    userKpiService.getProprietaireUserIds.mockResolvedValue(['owner-a', 'owner-outside']);
+    Property.find.mockReturnValue({ distinct: jest.fn().mockResolvedValue(['property-a']) });
+    Contrat.countDocuments.mockResolvedValue(1);
+
+    await expect(getDashboardKpis({ scopeUserIds: ['owner-a', 'staff-a'], tenantId: 'tenant-a' })).resolves.toEqual({
+      Altimmo: 2,
+      MilaEvents: 0,
+      Altcom: 0,
+      Users: 3,
+      Owners: 1,
+      RentalActiveContracts: 1,
+    });
+    expect(getPropertyPortfolioForTenantScope).toHaveBeenCalledWith({
+      scopeUserIds: ['owner-a', 'staff-a'], tenantId: 'tenant-a',
+    });
+    expect(Event.countDocuments).not.toHaveBeenCalled();
+    expect(PortfolioItem.countDocuments).not.toHaveBeenCalled();
+    expect(User.countDocuments).toHaveBeenCalledWith({ _id: { $in: ['owner-a', 'staff-a'] } });
   });
 
   test('retourne six zéros lorsque les sources sont vides', async () => {

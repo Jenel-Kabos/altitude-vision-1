@@ -1,4 +1,12 @@
 import api from './api';
+import {
+  INDIVIDUAL_RENTAL_CONTEXT,
+  isIndividualRentalContext,
+  rentalRequestConfig,
+} from './rentalRequestContext';
+
+const rentalPaymentsBase = (context) => (isIndividualRentalContext(context) ? '/paiements/location' : '/paiements');
+const rentalContractsBase = (context) => (isIndividualRentalContext(context) ? '/contrats/location' : '/contrats');
 
 // GL-DEBT-1 (Phase 3) — accès contrôlé aux documents Gestion Locative.
 // Remplace l'exposition directe de l'URL Cloudinary (Sprint GL-UX1) : le
@@ -6,8 +14,8 @@ import api from './api';
 // avant de proxy-streamer le fichier. Même pattern que
 // tenantPortalService.downloadTenantDocument (portail locataire, non
 // modifié ici).
-export const downloadRentalDocument = async (documentId, filename = 'document') => {
-  const response = await api.get(`/rental-documents/${documentId}/download`, { responseType: 'blob' });
+export const downloadRentalDocument = async (documentId, filename = 'document', rentalContext) => {
+  const response = await api.get(`/rental-documents/${documentId}/download`, rentalRequestConfig(rentalContext, {}, { responseType: 'blob' }));
   const url = URL.createObjectURL(response.data);
   const anchor = document.createElement('a');
   anchor.href = url; anchor.download = filename; anchor.click();
@@ -21,8 +29,8 @@ export const downloadRentalDocument = async (documentId, filename = 'document') 
 // laisse le navigateur l'afficher nativement (PDF/image), sans
 // téléchargement obligatoire — même endpoint sécurisé, même vérification
 // d'accès, seule la présentation change.
-export const previewRentalDocument = async (documentId) => {
-  const response = await api.get(`/rental-documents/${documentId}/download`, { responseType: 'blob' });
+export const previewRentalDocument = async (documentId, rentalContext) => {
+  const response = await api.get(`/rental-documents/${documentId}/download`, rentalRequestConfig(rentalContext, {}, { responseType: 'blob' }));
   const url = URL.createObjectURL(response.data);
   window.open(url, '_blank', 'noopener,noreferrer');
 };
@@ -34,30 +42,38 @@ export const previewSecureDocumentEndpoint = async (endpoint) => {
 };
 
 // ── Dossiers locatifs synchronisés avec Property ─────────────
-export const getRentalManagement = async (params = {}) => {
-  const res = await api.get('/rental-management', { params });
+export const getRentalManagement = async (params = {}, rentalContext) => {
+  const res = await api.get('/rental-management', rentalRequestConfig(rentalContext, params));
   return res.data.data;
 };
-export const getRentalManagementStats = async () => {
-  const res = await api.get('/rental-management/stats');
+export const getRentalManagementStats = async (rentalContext) => {
+  const res = await api.get('/rental-management/stats', rentalRequestConfig(rentalContext));
   return res.data.data.stats;
 };
-export const getRentalManagementDetail = async (id) => {
-  const res = await api.get(`/rental-management/${id}`);
+// C2.10B — l'en-tête tenant éventuellement conservé par le runtime plateforme
+// est explicitement supprimé. Le backend recalcule toujours owner + tenant:null.
+export const getIndividualRentalManagement = async (params = {}) => {
+  return getRentalManagement(params, INDIVIDUAL_RENTAL_CONTEXT);
+};
+export const getIndividualRentalManagementStats = async () => {
+  return getRentalManagementStats(INDIVIDUAL_RENTAL_CONTEXT);
+};
+export const getRentalManagementDetail = async (id, rentalContext) => {
+  const res = await api.get(`/rental-management/${id}`, rentalRequestConfig(rentalContext));
   return res.data.data.rental;
 };
-export const enableRentalManagement = async (data) => {
-  const res = await api.post('/rental-management', data);
+export const enableRentalManagement = async (data, rentalContext) => {
+  const res = await api.post('/rental-management', data, rentalRequestConfig(rentalContext));
   return res.data.data.rental;
 };
 export const getRentalOnboardingOptions = async () => (await api.get('/rental-management/onboarding/options')).data.data;
 export const onboardRentalProperty = async (data) => (await api.post('/rental-management/onboarding', data)).data.data;
-export const runRentalAction = async (id, action, data = {}) => {
-  const res = await api.post(`/rental-management/${id}/${action}`, data);
+export const runRentalAction = async (id, action, data = {}, rentalContext) => {
+  const res = await api.post(`/rental-management/${id}/${action}`, data, rentalRequestConfig(rentalContext));
   return res.data.data;
 };
-export const deactivateRentalManagement = async (id, comment = '') => {
-  const res = await api.post(`/rental-management/${id}/deactivate`, { comment });
+export const deactivateRentalManagement = async (id, comment = '', rentalContext) => {
+  const res = await api.post(`/rental-management/${id}/deactivate`, { comment }, rentalRequestConfig(rentalContext));
   return res.data.data;
 };
 export const getMyRentalManagement = async () => {
@@ -122,36 +138,36 @@ export const importBienIntoGestionLocative = async (proprietaireId, bienIndex, o
 
 // ── Locataires ────────────────────────────────────────────────
 
-export const getLocataires = async () => {
-  const res = await api.get('/locataires');
+export const getLocataires = async (rentalContext) => {
+  const res = await api.get('/locataires', rentalRequestConfig(rentalContext));
   return res.data.data.locataires;
 };
 
 // Sprint GL-B2 — liste enrichie (bien, bail, paiements, préavis actif).
-export const getLocataireDossiers = async (params = {}) => {
-  const res = await api.get('/locataires/dossiers', { params });
+export const getLocataireDossiers = async (params = {}, rentalContext) => {
+  const res = await api.get('/locataires/dossiers', rentalRequestConfig(rentalContext, params));
   return res.data.data; // { locataires, total, page, totalPages }
 };
 
-export const getLocataireDossier = async (id) => {
-  const res = await api.get(`/locataires/${id}/dossier`);
+export const getLocataireDossier = async (id, rentalContext) => {
+  const res = await api.get(`/locataires/${id}/dossier`, rentalRequestConfig(rentalContext));
   return res.data.data.locataire;
 };
 
-export const createLocataire = async (data) => {
+export const createLocataire = async (data, rentalContext) => {
   const fd = toFormData(data);
-  const res = await api.post('/locataires', fd);
+  const res = await api.post('/locataires', fd, rentalRequestConfig(rentalContext));
   return res.data.data.locataire;
 };
 
-export const updateLocataire = async (id, data) => {
+export const updateLocataire = async (id, data, rentalContext) => {
   const fd = toFormData(data);
-  const res = await api.put(`/locataires/${id}`, fd);
+  const res = await api.put(`/locataires/${id}`, fd, rentalRequestConfig(rentalContext));
   return res.data.data.locataire;
 };
 
-export const deleteLocataire = async (id) => {
-  await api.delete(`/locataires/${id}`);
+export const deleteLocataire = async (id, rentalContext) => {
+  await api.delete(`/locataires/${id}`, rentalRequestConfig(rentalContext));
 };
 
 export const inviteLocataire = async (id) => (await api.post(`/locataires/${id}/invite`)).data.data;
@@ -179,13 +195,13 @@ export const resendTenantInvitation = async (requestId) => (await api.post(`/loc
 // les surfaces UI polymorphiques (GestionLocativePage affiche location
 // + vente) — décision B (POLYMORPHIC_READ_STILL_REQUIRED=YES).
 
-export const getContrats = async (params = {}) => {
-  const res = await api.get('/contrats', { params });
+export const getContrats = async (params = {}, rentalContext) => {
+  const res = await api.get(rentalContractsBase(rentalContext), rentalRequestConfig(rentalContext, params));
   return res.data.data.contrats;
 };
 
-export const getRentalContracts = async (params = {}) => {
-  const res = await api.get('/contrats/location', { params });
+export const getRentalContracts = async (params = {}, rentalContext) => {
+  const res = await api.get('/contrats/location', rentalRequestConfig(rentalContext, params));
   return res.data.data.contrats;
 };
 
@@ -194,13 +210,17 @@ export const getSaleContracts = async (params = {}) => {
   return res.data.data.contrats;
 };
 
-export const createContrat = async (data) => {
-  const res = await api.post('/contrats', data);
+export const createContrat = async (data, rentalContext) => {
+  const res = isIndividualRentalContext(rentalContext)
+    ? await api.post(rentalContractsBase(rentalContext), data, rentalRequestConfig(rentalContext))
+    : await api.post('/contrats', data);
   return res.data.data.contrat;
 };
 
-export const updateRentalContract = async (id, data) => {
-  const res = await api.put(`/contrats/location/${id}`, data);
+export const updateRentalContract = async (id, data, rentalContext) => {
+  const res = isIndividualRentalContext(rentalContext)
+    ? await api.put(`/contrats/location/${id}`, data, rentalRequestConfig(rentalContext))
+    : await api.put(`/contrats/location/${id}`, data);
   return res.data.data.contrat;
 };
 
@@ -209,8 +229,12 @@ export const updateSaleContract = async (id, data) => {
   return res.data.data.contrat;
 };
 
-export const deleteRentalContract = async (id) => {
-  await api.delete(`/contrats/location/${id}`);
+export const deleteRentalContract = async (id, rentalContext) => {
+  if (isIndividualRentalContext(rentalContext)) {
+    await api.delete(`/contrats/location/${id}`, rentalRequestConfig(rentalContext));
+  } else {
+    await api.delete(`/contrats/location/${id}`);
+  }
 };
 
 export const deleteSaleContract = async (id) => {
@@ -244,10 +268,10 @@ export const revertRentalRegularization = async (contractId, reason) => (await a
 // La surface typée `/api/contrats/location/:id/paiements` applique déjà le
 // module `location` en amont — un contrat de vente y renvoie 404 domain
 // mismatch, comportement attendu.
-export const getRentalContractPayments = async (contratId, annee) => {
+export const getRentalContractPayments = async (contratId, annee, rentalContext) => {
   const params = {};
   if (annee) params.annee = annee;
-  const res = await api.get(`/contrats/location/${contratId}/paiements`, { params });
+  const res = await api.get(`/contrats/location/${contratId}/paiements`, rentalRequestConfig(rentalContext, params));
   return res.data.data.paiements;
 };
 
@@ -255,69 +279,79 @@ export const getRentalContractPayments = async (contratId, annee) => {
 // casser les callers existants pendant la migration progressive.
 export const getPaiements = getRentalContractPayments;
 
-export const updatePaiement = async (id, data) => {
-  const res = await api.put(`/paiements/${id}`, data);
+export const updatePaiement = async (id, data, rentalContext) => {
+  const res = await api.put(`${rentalPaymentsBase(rentalContext)}/${id}`, data, rentalRequestConfig(rentalContext));
   return res.data.data.paiement;
 };
 
-export const deletePaiement = async (id) => {
-  await api.delete(`/paiements/${id}`);
+export const deletePaiement = async (id, rentalContext) => {
+  await api.delete(`${rentalPaymentsBase(rentalContext)}/${id}`, rentalRequestConfig(rentalContext));
 };
 
-export const marquerPaiementPaye = async (id, { preuve, ...data } = {}) => {
+export const marquerPaiementPaye = async (id, { preuve, ...data } = {}, rentalContext) => {
   if (!preuve) {
-    const res = await api.post(`/paiements/${id}/marquer-paye`, data);
+    const res = await api.post(`${rentalPaymentsBase(rentalContext)}/${id}/marquer-paye`, data, rentalRequestConfig(rentalContext));
     return res.data.data.paiement;
   }
   const form = new FormData();
   Object.entries(data).forEach(([key, value]) => { if (value !== undefined && value !== null && value !== '') form.append(key, value); });
   form.append('preuve', preuve);
-  const res = await api.post(`/paiements/${id}/marquer-paye`, form);
+  const res = await api.post(`${rentalPaymentsBase(rentalContext)}/${id}/marquer-paye`, form, rentalRequestConfig(rentalContext));
   return res.data.data.paiement;
 };
 
-export const calculerPenalites = async () => {
-  const res = await api.post('/paiements/calculer-penalites');
+export const encaisserPaiementsMultiples = async (data, rentalContext) => {
+  const res = await api.post(`${rentalPaymentsBase(rentalContext)}/encaisser-multiple`, data, rentalRequestConfig(rentalContext));
   return res.data.data;
 };
 
-export const getAlertesPaiements = async () => {
-  const res = await api.get('/paiements/alertes');
+export const calculerPenalites = async (rentalContext) => {
+  const res = await api.post(`${rentalPaymentsBase(rentalContext)}/calculer-penalites`, {}, rentalRequestConfig(rentalContext));
+  return res.data.data;
+};
+
+export const getAlertesPaiements = async (rentalContext) => {
+  const res = await api.get(`${rentalPaymentsBase(rentalContext)}/alertes`, rentalRequestConfig(rentalContext));
   return res.data.data;
 };
 
 // Sprint GL-B2 — liste paginée (tableau de bord Paiements locatifs) et
 // statistiques d'encaissement (calculées côté serveur).
-export const getPaiementsPage = async (params = {}) => {
-  const res = await api.get('/paiements', { params });
+export const getPaiementsPage = async (params = {}, rentalContext) => {
+  const res = await api.get(rentalPaymentsBase(rentalContext), rentalRequestConfig(rentalContext, params));
   return res.data.data; // { paiements, total, page, totalPages }
 };
 
-export const getPaiementsStats = async (params = {}) => {
-  const res = await api.get('/paiements/stats', { params });
+export const getPaiementsStats = async (params = {}, rentalContext) => {
+  const res = await api.get(`${rentalPaymentsBase(rentalContext)}/stats`, rentalRequestConfig(rentalContext, params));
   return res.data.data.stats;
 };
 
 // ── Sprint GL-B2 — Préavis (actions sur RentalManagement) ────────
 
-export const acknowledgeNotice = async (rentalManagementId, comment) => {
-  const res = await api.post(`/rental-management/${rentalManagementId}/acknowledge-notice`, { comment });
+export const acknowledgeNotice = async (rentalManagementId, comment, rentalContext) => {
+  const res = await api.post(`/rental-management/${rentalManagementId}/acknowledge-notice`, { comment }, rentalRequestConfig(rentalContext));
   return res.data.data.rental;
 };
 
-export const cancelNotice = async (rentalManagementId, comment) => {
-  const res = await api.post(`/rental-management/${rentalManagementId}/cancel-notice`, { comment });
+export const cancelNotice = async (rentalManagementId, comment, rentalContext) => {
+  const res = await api.post(`/rental-management/${rentalManagementId}/cancel-notice`, { comment }, rentalRequestConfig(rentalContext));
   return res.data.data.rental;
 };
 
-export const startNotice = async (rentalManagementId, plannedExitAt, comment) => {
-  const res = await api.post(`/rental-management/${rentalManagementId}/start-notice`, { plannedExitAt, comment });
+export const startNotice = async (rentalManagementId, plannedExitAt, comment, rentalContext) => {
+  const res = await api.post(`/rental-management/${rentalManagementId}/start-notice`, { plannedExitAt, comment }, rentalRequestConfig(rentalContext));
   return res.data.data.rental;
 };
 
-export const validateExit = async (rentalManagementId, data = {}) => {
-  const res = await api.post(`/rental-management/${rentalManagementId}/validate-exit`, data);
+export const validateExit = async (rentalManagementId, data = {}, rentalContext) => {
+  const res = await api.post(`/rental-management/${rentalManagementId}/validate-exit`, data, rentalRequestConfig(rentalContext));
   return res.data.data;
+};
+
+export const getIndividualSubscription = async () => {
+  const res = await api.get('/individual-subscriptions/me', { platformScoped: true });
+  return res.data.data.subscription;
 };
 
 // ── Helpers ───────────────────────────────────────────────────

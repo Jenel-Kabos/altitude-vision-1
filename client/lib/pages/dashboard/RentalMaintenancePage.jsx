@@ -17,6 +17,8 @@ import {
 import {
   DashboardPage, DashboardPageHeader, DashboardCard, DashboardState,
 } from "../../components/dashboard/DashboardUI";
+import { useRentalOperationContext } from "../../context/RentalOperationContext";
+import { callWithRentalContext, rentalBasePath } from "../../services/rentalRequestContext";
 
 const CATEGORIES = [
   { v: 'plomberie', l: 'Plomberie' }, { v: 'electricite', l: 'Électricité' }, { v: 'structure', l: 'Structure' },
@@ -30,6 +32,7 @@ const STATUS_CLASSES = {
 const STATUS_LABELS = { ouvert: 'Ouvert', assigne: 'Assigné', planifie: 'Planifié', en_cours: 'En cours', resolu: 'Résolu', cloture: 'Clôturé' };
 
 const RentalMaintenancePage = () => {
+  const rentalContext = useRentalOperationContext();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -42,7 +45,7 @@ const RentalMaintenancePage = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const list = await getRentalMaintenanceTickets({ status: status || undefined });
+      const list = await callWithRentalContext(getRentalMaintenanceTickets, rentalContext, { status: status || undefined });
       setTickets(list || []);
     } catch (err) {
       toast.error("Erreur lors du chargement des tickets de maintenance.");
@@ -56,32 +59,32 @@ const RentalMaintenancePage = () => {
   const handleAssign = async (id) => {
     const assignedToUserId = assignInputs[id];
     if (!assignedToUserId?.trim()) { toast.error("Identifiant technicien requis."); return; }
-    try { await assignRentalMaintenanceTicket(id, assignedToUserId); toast.success("Ticket assigné."); load(); }
+    try { await callWithRentalContext(assignRentalMaintenanceTicket, rentalContext, id, assignedToUserId); toast.success("Ticket assigné."); load(); }
     catch (err) { toast.error(err.response?.data?.message || "Erreur."); }
   };
 
   const handleSchedule = async (id) => {
     const date = scheduleInputs[id];
     if (!date) { toast.error("Date de planification requise."); return; }
-    try { await scheduleRentalMaintenanceTicket(id, date); toast.success("Intervention planifiée."); load(); }
+    try { await callWithRentalContext(scheduleRentalMaintenanceTicket, rentalContext, id, date); toast.success("Intervention planifiée."); load(); }
     catch (err) { toast.error(err.response?.data?.message || "Erreur."); }
   };
 
   const handleStart = async (id) => {
-    try { await startRentalMaintenanceWork(id); toast.success("Intervention démarrée."); load(); }
+    try { await callWithRentalContext(startRentalMaintenanceWork, rentalContext, id); toast.success("Intervention démarrée."); load(); }
     catch (err) { toast.error(err.response?.data?.message || "Erreur."); }
   };
 
   const handleResolve = async (id) => {
     try {
-      await resolveRentalMaintenanceTicket(id, costInputs[id] ? Number(costInputs[id]) : undefined);
+      await callWithRentalContext(resolveRentalMaintenanceTicket, rentalContext, id, costInputs[id] ? Number(costInputs[id]) : undefined);
       toast.success("Ticket résolu.");
       load();
     } catch (err) { toast.error(err.response?.data?.message || "Erreur."); }
   };
 
   const handleClose = async (id) => {
-    try { await closeRentalMaintenanceTicket(id); toast.success("Ticket clôturé."); load(); }
+    try { await callWithRentalContext(closeRentalMaintenanceTicket, rentalContext, id); toast.success("Ticket clôturé."); load(); }
     catch (err) { toast.error(err.response?.data?.message || "Erreur."); }
   };
 
@@ -89,7 +92,7 @@ const RentalMaintenancePage = () => {
     e.preventDefault();
     if (!form.propertyId.trim() || !form.description.trim()) { toast.error("Bien et description requis."); return; }
     try {
-      await createRentalMaintenanceTicket({
+      await callWithRentalContext(createRentalMaintenanceTicket, rentalContext, {
         propertyId: form.propertyId, category: form.category, description: form.description,
         estimatedCost: form.estimatedCost ? Number(form.estimatedCost) : undefined,
       });
@@ -109,7 +112,7 @@ const RentalMaintenancePage = () => {
         title="Maintenance locative"
         description="Tickets de maintenance sur les biens en gestion locative — distinct de la maintenance hôtelière."
         actions={(
-          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+          <Link href={rentalBasePath(rentalContext)} className="text-sm text-blue-600 underline">
             Vue d'ensemble Gestion Locative
           </Link>
         )}

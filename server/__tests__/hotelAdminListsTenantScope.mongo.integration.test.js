@@ -40,10 +40,11 @@ let client;
 let ownerA;
 let hotelsA;
 let hotelsB;
+let hotelNull;
 
 async function makeProperty({ tenant, owner, suffix, price, city, createdAt }) {
   return Property.create({
-    tenant: tenant._id,
+    tenant: tenant?._id || null,
     title: `HZ06 Property ${suffix}`,
     description: `Description synthétique suffisamment longue pour le test HZ06 ${suffix}.`,
     pole: 'Altimmo', type: 'Villa', status: 'location', statusAdmin: 'Validée', isPublished: true,
@@ -85,10 +86,10 @@ beforeAll(async () => {
   const fixtureB = await createTenantFixture({ label: 'HZ06 B' });
   tenantA = fixtureA.tenant;
   tenantB = fixtureB.tenant;
-  ({ user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Admin' } }));
-  ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } }));
-  ({ user: staffA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Collaborateur' } }));
-  ({ user: staffB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Collaborateur' } }));
+  ({ user: adminA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, businessRole: 'Admin', overrides: { role: 'Admin' } }));
+  ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, businessRole: 'Admin', overrides: { role: 'Admin' } }));
+  ({ user: staffA } = await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, businessRole: 'Collaborateur', overrides: { role: 'Collaborateur' } }));
+  ({ user: staffB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, businessRole: 'Collaborateur', overrides: { role: 'Collaborateur' } }));
   ownerA = (await createTenantUser({ tenant: tenantA, bootstrap: fixtureA.bootstrap, overrides: { role: 'Proprietaire' } })).user;
   const ownerB = (await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Proprietaire' } })).user;
   proprietor = await User.create({ name: 'HZ06 Owner', email: 'hz06-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
@@ -110,6 +111,8 @@ beforeAll(async () => {
     await makeHotel({ tenant: tenantB, manager: staffB, createdBy: adminB, property: propertyB1, suffix: 'B1', publicationStatus: 'soumis', rate: 777, createdAt: new Date('2028-02-01') }),
     await makeHotel({ tenant: tenantB, manager: staffB, createdBy: adminB, property: propertyB2, suffix: 'B2', publicationStatus: 'publie', rate: 778, createdAt: new Date('2028-02-02') }),
   ];
+  const propertyNull = await makeProperty({ tenant: null, owner: ownerA, suffix: 'NULL', price: 999, city: 'Brazzaville', createdAt: new Date('2028-03-01') });
+  hotelNull = await makeHotel({ tenant: { _id: null }, manager: staffA, createdBy: adminA, property: propertyNull, suffix: 'NULL', publicationStatus: 'publie', rate: 999, createdAt: new Date('2028-03-01') });
 });
 
 afterAll(stopFinancialMongo);
@@ -164,11 +167,18 @@ test('staff autorisé sans tenant échoue fermé sur les trois listes', async ()
   }
 });
 
-test('PlatformOperator global conserve la portée globale historique', async () => {
-  for (const [path, expected] of [['/admin/list', [...hotelsA, ...hotelsB]], ['/portfolio', [hotelsA[1], hotelsB[1]]], ['/status/pending', [hotelsA[0], hotelsB[0]]]]) {
+test('PlatformOperator global inclut Tenant A, Tenant B et tenant:null sans rattachement artificiel', async () => {
+  for (const [path, expected] of [['/admin/list', [...hotelsA, ...hotelsB, hotelNull]], ['/portfolio', [hotelsA[1], hotelsB[1], hotelNull]], ['/status/pending', [hotelsA[0], hotelsB[0]]]]) {
     const response = await request(app).get(`/api/hotels${path}`).set(bearer(operator));
     expect(response.status).toBe(200);
     expect(new Set(hotelIds(response))).toEqual(new Set(ids(expected)));
+  }
+});
+
+test('Hotel tenant:null reste invisible à Tenant A malgré manager/createdBy/owner de Tenant A', async () => {
+  for (const path of ['/admin/list', '/portfolio', '/status/pending']) {
+    const response = await request(app).get(`/api/hotels${path}`).set(bearer(adminA, tenantA));
+    expect(hotelIds(response)).not.toContain(String(hotelNull._id));
   }
 });
 

@@ -11,20 +11,26 @@ const { logAction, buildAuteur } = require('../services/actionLogService');
 const tenantLinkService = require('../services/tenantLinkService');
 const tenantPortalEmailService = require('../services/tenantPortalEmailService');
 const User = require('../models/User');
-const Property = require('../models/Property');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant, tenantRentalPartyIds } = require('../services/platformTenant/rentalScopeService');
+const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
+const { individualRentalDomainIds, assertIndividualRentalResourceAccess } = require('../services/rentalIndividualResourceAccessService');
 
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-J, finding RA-15) — `Locataire` n'a aucun
 // champ tenant/property direct ; sa frontière tenant canonique (déjà
 // utilisée par `assertLocataireInScope`, routes/locataireRoutes.js) est
 // dérivée des `Contrat` qui le référencent -> leur `Property` -> son
 // `owner`. Réutilisé ici pour les listes plutôt qu'un champ tenant inventé.
+// C2.10A — population = biens dont Property.tenant = tenant sélectionné (plus
+// jamais `owner ∈ membres`), identique à la garde `assertLocataireInScope`.
 async function scopedLocataireIdsForTenant(req) {
+  if (req.rentalScope?.mode === 'individual') {
+    const domain = await individualRentalDomainIds(req.user._id || req.user.id);
+    const direct = await Locataire.find({ individualOwner: req.user._id || req.user.id }).distinct('_id');
+    return [...new Map([...domain.tenantPartyIds, ...direct].map((value) => [String(value), value])).values()];
+  }
   if (!req.platformTenant) return null;
-  const propertyIds = await Property.find({ owner: { $in: req.tenantScopeUserIds || [] } }).distinct('_id');
-  if (propertyIds.length === 0) return [];
-  return Contrat.find({ bien: { $in: propertyIds } }).distinct('locataire');
+  return tenantRentalPartyIds(req.platformTenant._id, { Model: Locataire, field: 'locataire' });
 }
 
 const uploadPiece = async (file) => {
@@ -87,7 +93,11 @@ exports.downloadIdentityDocument = async (req, res) => {
     const locataire = await Locataire.findById(req.params.id)
       .select('+pieceIdentiteAsset.publicId +pieceIdentiteAsset.resourceType +pieceIdentiteAsset.deliveryType +pieceIdentiteAsset.version +pieceIdentiteAsset.format');
     if (!locataire) return res.status(404).json({ status: 'fail', message: 'Locataire introuvable' });
-    await assertResourceTenantOrUnattributed({ resourceType: 'Locataire', resource: locataire, tenantId: req.platformTenant?._id });
+    if (req.rentalScope?.mode === 'individual') {
+      await assertIndividualRentalResourceAccess({ resourceType: 'Locataire', resource: locataire, userId: req.user._id || req.user.id });
+    } else {
+      await assertRentalResourceInTenant({ resourceType: 'Locataire', resource: locataire, tenantId: req.platformTenant?._id });
+    }
     if (!locataire.pieceIdentiteAsset && locataire.pieceIdentite) {
       return streamRemoteDocument({ url: locataire.pieceIdentite, name: 'identity-document', res, context: { locataireId: locataire._id } });
     }
@@ -238,6 +248,18 @@ exports.create = async (req, res) => {
   let piece = null;
   try {
     const data = { ...req.body };
+    // C2.10A — provenance posée par le serveur (tenant de la requête), jamais
+    // par le client.
+    delete data.tenant;
+    delete data.individualOwner;
+    if (req.rentalScope?.mode === 'individual') {
+      data.tenant = null;
+      data.individualOwner = req.user._id || req.user.id;
+    } else {
+      const explicitTenantId = req.get?.('X-Platform-Tenant-Id') || req.get?.('X-Tenant-Id') || null;
+      const tenant = req.platformTenant || await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
+      data.tenant = tenant?._id || null;
+    }
     if (req.file) {
       piece = await uploadPiece(req.file);
       data.pieceIdentiteAsset = piece.asset;
@@ -274,6 +296,8 @@ exports.update = async (req, res) => {
   let piece = null;
   try {
     const data = { ...req.body };
+    delete data.tenant; // C2.10A — provenance immuable.
+    delete data.individualOwner; // C2.10B — provenance individuelle immuable.
     if (req.file) {
       piece = await uploadPiece(req.file);
       data.pieceIdentiteAsset = piece.asset;

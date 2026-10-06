@@ -126,33 +126,63 @@ beforeEach(async () => {
 
 // ─── P-PROPERTY-01/02/03/04 — cross-tenant listing + null exclusion ────────
 
+// Contrat réel de GET /api/properties/portfolio (propertyPortfolioController.list
+// → propertyPortfolioService) : `data: { items, stats }`. Un bien n'est listé
+// que s'il satisfait PROPERTY_PUBLICATION_FILTER (Altimmo, vente|location,
+// Validée, publié, Disponible), `owner ∈ scope tenant` et `tenant = tenant
+// sélectionné`. Les fixtures partagées ci-dessus (En attente, owner hors
+// membership) ne sont jamais listables : sans biens listables dédiés, ces
+// tests itéraient un tableau vide. On sème donc des biens listables, possédés
+// par des membres réels de chaque tenant, et on exige leur présence.
+async function seedListablePortfolio() {
+  const ownerMemberB = (await createTenantUser({ tenant: tenantB, bootstrap: bootstrapB, businessRole: 'Admin', overrides: { role: 'Admin' } })).user;
+  const mk = (owner, tenant, title) => ({
+    _id: new (require('mongoose').Types.ObjectId)(),
+    title, owner, tenant, status: 'location', price: 100000,
+    pole: 'Altimmo', type: 'Villa', statusAdmin: 'Validée', isPublished: true, availability: 'Disponible',
+    createdAt: new Date(), updatedAt: new Date(),
+  });
+  const listA = mk(tenantAdminA._id, tenantA._id, 'LISTABLE A');
+  const listB = mk(ownerMemberB._id, tenantB._id, 'LISTABLE B');
+  // Legacy tenant:null listable par ailleurs, possédé par un membre de A.
+  const listNullA = mk(tenantAdminA._id, null, 'LISTABLE NULL');
+  await Property.collection.insertMany([listA, listB, listNullA]);
+  return { listA, listB, listNullA };
+}
+
+function portfolioItems(res) {
+  const items = res.body.data?.items;
+  expect(Array.isArray(items)).toBe(true);
+  return items;
+}
+
 test('P-PROPERTY-01: PlatformOperator + platform.properties.read lists Tenant A portfolio', async () => {
+  const { listA } = await seedListablePortfolio();
   const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorRead, tenantA._id));
   expect(res.status).toBe(200);
-  const list = res.body.data?.properties || res.body.data || [];
-  const arr = Array.isArray(list) ? list : (list.properties || []);
-  // At least one Tenant A property returned; every returned property belongs to Tenant A.
-  for (const p of arr) {
-    expect(String(p.tenant)).toBe(String(tenantA._id));
-  }
+  const items = portfolioItems(res);
+  expect(items.map((p) => p.title)).toContain(listA.title);
+  for (const p of items) expect(String(p.tenant)).toBe(String(tenantA._id));
 });
 
 test('P-PROPERTY-02: same operator lists Tenant B portfolio after explicit switch', async () => {
+  const { listB } = await seedListablePortfolio();
   const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorRead, tenantB._id));
   expect(res.status).toBe(200);
-  const list = res.body.data?.properties || res.body.data || [];
-  const arr = Array.isArray(list) ? list : (list.properties || []);
-  for (const p of arr) {
-    expect(String(p.tenant)).toBe(String(tenantB._id));
-  }
+  const items = portfolioItems(res);
+  expect(items.map((p) => p.title)).toContain(listB.title);
+  for (const p of items) expect(String(p.tenant)).toBe(String(tenantB._id));
 });
 
-test('P-PROPERTY-03: Tenant A response contains no Tenant B property', async () => {
+test('P-PROPERTY-03: Tenant A response contains no Tenant B property and no tenant:null property', async () => {
+  const { listA, listB, listNullA } = await seedListablePortfolio();
   const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorRead, tenantA._id));
   expect(res.status).toBe(200);
-  const list = res.body.data?.properties || res.body.data || [];
-  const arr = Array.isArray(list) ? list : (list.properties || []);
-  expect(arr.some((p) => String(p._id) === String(propertyB1._id))).toBe(false);
+  const titles = portfolioItems(res).map((p) => p.title);
+  expect(titles).toContain(listA.title);
+  expect(titles).not.toContain(listB.title);
+  expect(titles).not.toContain(listNullA.title);
+  expect(titles).not.toContain('B1 Prop');
 });
 
 test('P-PROPERTY-04: Tenant A response contains no tenant:null property (hotfix Rental Portfolio preserved)', async () => {

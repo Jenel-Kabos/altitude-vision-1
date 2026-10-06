@@ -16,9 +16,6 @@ const Contrat = require('../models/Contrat');
 const RentalManagement = require('../models/RentalManagement');
 const Paiement = require('../models/Paiement');
 const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
-const OrgUnit = require('../models/OrgUnit');
-const OrgMembership = require('../models/OrgMembership');
-const PlatformTenant = require('../models/PlatformTenant');
 const propertyAssetRoutes = require('../routes/propertyAssetRoutes');
 const dossierRoutes = require('../routes/dossierRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -36,9 +33,21 @@ const signToken = (userId, tokenVersion = 0) => jwt.sign({ id: userId, tokenVers
 
 let counter = 0;
 let portfolioTenant = null;
-const makeUser = (overrides = {}) => {
+let assetTenant = null;
+let assetBootstrap = null;
+const makeUser = async (overrides = {}) => {
   counter += 1;
-  return User.create({ name: 'Test User', email: `propasset${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
+  const user = await User.create({ name: 'Test User', email: `propasset${counter}${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', ...overrides });
+  const staffRole = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'].includes(user.role) ? user.role : null;
+  if (staffRole && assetTenant) {
+    await addTenantMember({
+      tenant: assetTenant,
+      user,
+      bootstrap: assetBootstrap,
+      businessRole: staffRole,
+    });
+  }
+  return user;
 };
 
 async function buildManagedProperty(overrides = {}) {
@@ -49,13 +58,18 @@ async function buildManagedProperty(overrides = {}) {
     address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.24,
     images: ['https://placehold.co/1200x800/png?text=Test'], surface: 90,
     statusAdmin: 'Validée', availability: 'Disponible', owner: owner._id,
-    ...(portfolioTenant ? { tenant: portfolioTenant._id } : {}),
+    ...((portfolioTenant || assetTenant) ? { tenant: (portfolioTenant || assetTenant)._id } : {}),
     ...overrides,
   });
   return { owner, property };
 }
 
 beforeAll(startFinancialMongo);
+beforeEach(async () => {
+  const fixture = await createTenantFixture({ label: 'Property Asset Core' });
+  assetTenant = fixture.tenant;
+  assetBootstrap = fixture.bootstrap;
+});
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
 
@@ -401,13 +415,7 @@ describe('GET /portfolio/dashboard?status=vente|location — séparation stricte
 // notification orpheline.
 test('la transition de cycle de vie du bien notifie le staff avec un lien vers sa propre fiche', async () => {
   const admin = await makeUser({ role: 'Admin' });
-  const { owner, property } = await buildManagedProperty({ availability: 'Disponible' });
-  const root = await OrgUnit.create({ name: `Property asset notification ${Date.now()}`, type: 'organization', status: 'active' });
-  const tenant = await PlatformTenant.create({ name: root.name, slug: `property-asset-notification-${Date.now()}`, rootOrgUnit: root._id, status: 'active' });
-  await OrgMembership.create([
-    { user: admin._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
-    { user: owner._id, orgUnit: tenant.rootOrgUnit, status: 'active' },
-  ]);
+  const { property } = await buildManagedProperty({ availability: 'Disponible' });
   await request(app).post(`/api/property-asset/${property._id}/transition`).set('Authorization', `Bearer ${signToken(admin._id)}`).send({ target: 'travaux' });
 
   const Notification = require('../models/Notification');

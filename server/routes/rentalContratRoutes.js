@@ -26,12 +26,14 @@ const router = express.Router();
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/contratController');
 const Contrat = require('../models/Contrat');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { requireTenantScope } = require('../middleware/tenantContext');
 const { requireTenantModule } = require('../middleware/tenantModuleGate');
 const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 const { requireContratType } = require('../middleware/contratTypeGuard');
+const { selectIndividualRoute, requireIndividualRentalScope } = require('../middleware/rentalScopeAccess');
+const { assertIndividualRentalResourceAccess } = require('../services/rentalIndividualResourceAccessService');
 
 const READ_ROLES = ['Admin', 'GestionnaireImmobilier', 'Collaborateur', 'Secretaire'];
 const MUTATE_ROLES = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
@@ -50,14 +52,29 @@ router.param('id', async (req, res, next, contratId) => {
     if (!mongoose.isValidObjectId(contratId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const contrat = await Contrat.findById(contratId);
     if (!contrat) return res.status(404).json({ status: 'fail', message: 'Contrat introuvable.' });
+    if (req.query?.scope === 'individual') {
+      await assertIndividualRentalResourceAccess({ resourceType: 'Contrat', resource: contrat, userId: req.user._id || req.user.id });
+      return next();
+    }
     const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
     const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-    await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
+    // C2.10A — bail : Contrat.bien → Property.tenant doit valoir EXACTEMENT le
+    // tenant de la requête (tenant:null, autre tenant ou bail sans bien → 404).
+    await assertRentalResourceInTenant({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
     next();
   } catch (error) {
     res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Contrat introuvable.' });
   }
 });
+
+const individual = [selectIndividualRoute, requireIndividualRentalScope];
+router.get('/', ...individual, (req, res, next) => { req.query.type = 'location'; return ctrl.getAll(req, res, next); });
+router.post('/', ...individual, (req, res, next) => { req.body.type = 'location'; return ctrl.create(req, res, next); });
+router.get('/:id', ...individual, requireContratType('location'), ctrl.getOne);
+router.put('/:id', ...individual, requireContratType('location'), ctrl.update);
+router.delete('/:id', ...individual, requireContratType('location'), ctrl.delete);
+router.get('/:id/paiements', ...individual, requireContratType('location'), ctrl.getPaiements);
+router.post('/:id/paiements', ...individual, requireContratType('location'), ctrl.createPaiement);
 
 router.get('/', ...tenantRead, (req, res, next) => { req.query.type = 'location'; return ctrl.getAll(req, res, next); });
 router.get('/:id', ...tenantRead, requireContratType('location'), ctrl.getOne);

@@ -13,6 +13,7 @@ const Hotel = require('../models/Hotel');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const { escapeRegex } = require('../utils/regexEscape');
 const logger = require('../utils/logger');
+const { resolvePropertyCreationTenant } = require('./platformTenant/organizationAssetInvariantService');
 
 /**
  * Suppression compensatoire best-effort : ne bloque jamais la propagation de
@@ -163,7 +164,7 @@ function hasValidInitialRate(rateInput) {
  *
  * @returns {Promise<{hotelId: string|null, hotelWasCreated: boolean}>}
  */
-async function resolveHotel({ hotelInput, propertyId, actingUser }) {
+async function resolveHotel({ hotelInput, propertyId, propertyTenant, actingUser }) {
   if (!hotelInput) return { hotelId: null, hotelWasCreated: false };
 
   if (hotelInput.mode === 'existing') {
@@ -178,6 +179,12 @@ async function resolveHotel({ hotelInput, propertyId, actingUser }) {
       err.statusCode = 422;
       throw err;
     }
+    if (!hotel.tenant || !propertyTenant || String(hotel.tenant) !== String(propertyTenant)) {
+      const err = new Error("L'établissement hôtelier sélectionné est introuvable dans ce tenant.");
+      err.statusCode = 404;
+      err.code = 'HOTEL_TENANT_MISMATCH';
+      throw err;
+    }
     return { hotelId: hotel._id, hotelWasCreated: false };
   }
 
@@ -187,7 +194,7 @@ async function resolveHotel({ hotelInput, propertyId, actingUser }) {
       ...hotelInput.hotelData,
       property: propertyId,
       createdBy: actingUser.id,
-      tenant: actingUser.platformTenant?._id || actingUser.platformTenant || null,
+      tenant: propertyTenant || null,
     });
     return { hotelId: hotel._id, hotelWasCreated: true };
   } catch (error) {
@@ -231,13 +238,16 @@ async function compensateHotel(hotelId, hotelWasCreated) {
  * @returns {Promise<{property, accommodation, rate, hotel: ObjectId|null}>}
  */
 async function createFullAccommodation({ propertyData, accommodationData, rateData, hotelInput, actingUser }) {
-  const tenantId = actingUser.platformTenant?._id || actingUser.platformTenant || null;
+  const tenantId = await resolvePropertyCreationTenant({
+    ownerId: propertyData.owner,
+    contextualTenantId: actingUser.platformTenant?._id || actingUser.platformTenant || null,
+  });
   const property = await Property.create({ ...propertyData, tenant: tenantId });
 
   let hotelId = null;
   let hotelWasCreated = false;
   try {
-    ({ hotelId, hotelWasCreated } = await resolveHotel({ hotelInput, propertyId: property._id, actingUser }));
+    ({ hotelId, hotelWasCreated } = await resolveHotel({ hotelInput, propertyId: property._id, propertyTenant: property.tenant, actingUser }));
   } catch (error) {
     await compensateDelete(`Property(${property._id})`, Property.findByIdAndDelete(property._id));
     await cleanupImages(property.images);
@@ -348,14 +358,14 @@ async function updateFullAccommodation({ property, accommodationData, rateData, 
   if (!accommodation) {
     let hotelId = null;
     if (hotelInput) {
-      ({ hotelId } = await resolveHotel({ hotelInput, propertyId: property._id, actingUser }));
+      ({ hotelId } = await resolveHotel({ hotelInput, propertyId: property._id, propertyTenant: property.tenant, actingUser }));
     }
     accommodation = await Accommodation.create({
       ...accommodationData,
       hotel: hotelId,
       property: property._id,
       createdBy: actingUser.id,
-      tenant: actingUser.platformTenant?._id || actingUser.platformTenant || null,
+      tenant: property.tenant || null,
     });
   } else {
     const becomesNonHotel = accommodationData.accommodationType
@@ -369,7 +379,7 @@ async function updateFullAccommodation({ property, accommodationData, rateData, 
     }
 
     if (hotelInput) {
-      const { hotelId } = await resolveHotel({ hotelInput, propertyId: property._id, actingUser });
+      const { hotelId } = await resolveHotel({ hotelInput, propertyId: property._id, propertyTenant: property.tenant, actingUser });
       accommodation.hotel = hotelId;
     } else if (becomesNonHotel) {
       accommodation.hotel = null;
@@ -410,8 +420,14 @@ async function updateFullAccommodation({ property, accommodationData, rateData, 
  * upload : conforme à "Ne pas modifier Cloudinary").
  */
 async function duplicateAccommodation({ accommodation, property, actingUser }) {
+  const propertyTenant = await resolvePropertyCreationTenant({
+    ownerId: property.owner,
+    contextualTenantId: property.tenant || null,
+  });
   const clonedProperty = await Property.create({
     owner: property.owner,
+    tenant: propertyTenant,
+    pole: property.pole,
     title: `${property.title} (copie)`,
     description: property.description,
     price: property.price,
@@ -456,7 +472,7 @@ async function duplicateAccommodation({ accommodation, property, actingUser }) {
     cleaningFee: accommodation.cleaningFee,
     currency: accommodation.currency,
     createdBy: actingUser.id,
-    tenant: actingUser.platformTenant?._id || actingUser.platformTenant || accommodation.tenant || null,
+    tenant: propertyTenant,
   });
 
   const activeRates = await RatePlan.find({ accommodation: accommodation._id, active: true });
@@ -492,8 +508,8 @@ async function deleteAccommodation({ accommodation, property }) {
  * Hébergement) car les statuts filtrés ici (brouillon/soumis/publié/
  * suspendu/rejeté) sont propres à Accommodation, pas à Property.statusAdmin.
  */
-async function listAccommodationsForAdmin({ status, type, city, availability, search, sort, page = 1, limit = 20, tenantId = null, independentOnly = false, validatedOnly = false, activeOnly = false }) {
-  const query = tenantId ? { tenant: tenantId } : {};
+async function listAccommodationsForAdmin({ status, type, city, availability, search, sort, page = 1, limit = 20, tenantId = null, scopeFilter = null, independentOnly = false, validatedOnly = false, activeOnly = false }) {
+  const query = scopeFilter || (tenantId ? { tenant: tenantId } : {});
   if (status && status !== 'tous') query.publicationStatus = status;
   if (type && type !== 'tous') query.accommodationType = type;
   if (independentOnly) {

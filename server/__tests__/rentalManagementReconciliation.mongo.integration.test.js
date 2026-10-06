@@ -171,7 +171,8 @@ describe('GL-ARCH-1.1 — réconciliation (plan + apply) : idempotente, jamais d
       { user: owner._id, orgUnit: root._id, status: 'active' },
     ]);
     const statsContext = { tenant, scopeUserIds: [admin._id, owner._id] };
-    const property = await makeManagedProperty(owner);
+    // C2.10A — le KPI compte la population canonique Property.tenant = T.
+    const property = await makeManagedProperty(owner, { tenant: tenant._id });
     await makeHistoricalActiveContract(property);
 
     expect((await callStats(statsContext)).total).toBe(0);

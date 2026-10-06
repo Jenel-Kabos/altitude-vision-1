@@ -4,7 +4,7 @@ const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const Hotel = require('../models/Hotel');
 const RentalManagement = require('../models/RentalManagement');
-const { getPropertyPortfolio } = require('../services/propertyPortfolioService');
+const { getPropertyPortfolio, getPropertyPortfolioForTenantScope } = require('../services/propertyPortfolioService');
 const { listValidatedHotelPortfolio } = require('../services/hotelService');
 const { listAccommodationsForAdmin } = require('../services/accommodationService');
 const { getImmobilierReportData } = require('../services/reporting/immobilierReportQueryService');
@@ -120,4 +120,19 @@ test('legacy orphelin ne plante pas et la déduplication privilégie la source s
   expect(result.items).toHaveLength(1);
   expect(result.items[0]).toMatchObject({ title: 'Source Hôtel prioritaire', source: 'hotel' });
   expect(result.stats.total).toBe(result.items.length);
+});
+
+test('C2.8 — un owner partagé ne fait jamais entrer le Hotel du Tenant B dans le portefeuille Tenant A', async () => {
+  const tenantA = new mongoose.Types.ObjectId();
+  const tenantB = new mongoose.Types.ObjectId();
+  const sharedOwner = actor();
+  const propertyA = await property({ status: 'hebergement', title: 'C28 Hôtel A', tenant: tenantA, owner: sharedOwner });
+  const propertyB = await property({ status: 'hebergement', title: 'C28 Hôtel B', tenant: tenantB, owner: sharedOwner });
+  await hotel(propertyA._id, { name: 'C28 Hôtel A', tenant: tenantA });
+  await hotel(propertyB._id, { name: 'C28 Hôtel B', tenant: tenantB });
+
+  const result = await getPropertyPortfolioForTenantScope({ scopeUserIds: [sharedOwner], tenantId: tenantA });
+
+  expect(result.items.map((item) => item.title)).toEqual(['C28 Hôtel A']);
+  expect(result.items.every((item) => String(item.tenant) === String(tenantA))).toBe(true);
 });

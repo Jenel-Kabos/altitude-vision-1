@@ -35,10 +35,11 @@ let accommodationA1;
 let accommodationA2;
 let accommodationB1;
 let accommodationB2;
+let accommodationNull;
 
 async function makeAccommodation({ tenant, owner, suffix, status, type = 'villa_meublee', city = 'Brazzaville', submittedAt }) {
   const property = await Property.create({
-    tenant: tenant._id,
+    tenant: tenant?._id || null,
     title: `HZ04 Hébergement ${suffix}`,
     description: 'Sentinelle de certification des listes administratives.',
     pole: 'Altimmo',
@@ -55,7 +56,7 @@ async function makeAccommodation({ tenant, owner, suffix, status, type = 'villa_
     owner: owner._id,
   });
   return Accommodation.create({
-    tenant: tenant._id,
+    tenant: tenant?._id || null,
     property: property._id,
     accommodationType: type,
     publicationStatus: status,
@@ -89,6 +90,7 @@ beforeAll(async () => {
   accommodationA2 = await makeAccommodation({ tenant: tenantA, owner: adminA, suffix: 'A2', status: 'publie', type: 'appartement_meuble', city: 'Pointe-Noire' });
   accommodationB1 = await makeAccommodation({ tenant: tenantB, owner: adminB, suffix: 'B1', status: 'soumis', submittedAt: new Date('2028-01-02') });
   accommodationB2 = await makeAccommodation({ tenant: tenantB, owner: adminB, suffix: 'B2', status: 'publie', type: 'appartement_meuble', city: 'Pointe-Noire' });
+  accommodationNull = await makeAccommodation({ tenant: null, owner: adminA, suffix: 'NULL', status: 'publie' });
 });
 
 afterAll(stopFinancialMongo);
@@ -123,10 +125,17 @@ test.each(['Admin', 'GestionnaireImmobilier', 'Collaborateur'])(
   },
 );
 
-test.each(['/admin/list', '/status/pending'])('PlatformOperator global conserve la lecture globale sur GET %s', async (path) => {
+test.each(['/admin/list', '/status/pending'])('PlatformOperator global inclut A, B et tenant:null sur GET %s', async (path) => {
   const response = await request(app).get(`/api/accommodations${path}`).set(bearer(operator));
   expect(response.status).toBe(200);
-  expect(new Set(ids(response))).toEqual(new Set((path === '/status/pending' ? [accommodationA1, accommodationB1] : [accommodationA1, accommodationA2, accommodationB1, accommodationB2]).map((item) => String(item._id))));
+  expect(new Set(ids(response))).toEqual(new Set((path === '/status/pending' ? [accommodationA1, accommodationB1] : [accommodationA1, accommodationA2, accommodationB1, accommodationB2, accommodationNull]).map((item) => String(item._id))));
+});
+
+test('Accommodation tenant:null reste invisible à Tenant A malgré createdBy/owner de Tenant A', async () => {
+  for (const path of ['/admin/list', '/status/pending']) {
+    const response = await request(app).get(`/api/accommodations${path}`).set(bearer(adminA, tenantA));
+    expect(ids(response)).not.toContain(String(accommodationNull._id));
+  }
 });
 
 test.each(['/admin/list', '/status/pending'])('PlatformOperator sans platform.accommodations.read est refusé sur GET %s', async (path) => {

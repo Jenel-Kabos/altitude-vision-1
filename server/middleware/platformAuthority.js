@@ -1,20 +1,7 @@
 const { resolveActiveOperator, hasCapability, isPlatformViewEligible } = require('../services/platformOperator/platformOperatorService');
 const { resolveTenantMembership } = require('../services/tenantMembershipService');
 const { resolveEffectiveTenantContext } = require('../services/platformTenant/tenantContextService');
-const { PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS } = require('../constants/platformOperatorConstants');
-
-/**
- * Global platform-administrator identity. This guard deliberately reads only
- * the authenticated User identity; tenant context and memberships are not
- * authority inputs for global administration.
- */
-const requireGlobalAdmin = (req, res, next) => {
-  if (req.user?.role === 'Admin') return next();
-  return res.status(403).json({
-    status: 'fail',
-    message: 'Action refusée : identité administrateur plateforme requise.',
-  });
-};
+const { PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS, PLATFORM_WIDE_CONTEXT_SOURCE } = require('../constants/platformOperatorConstants');
 
 const requestedTenantHeader = (req) => req.get?.('X-Platform-Tenant-Id') || req.get?.('X-Tenant-Id') || null;
 
@@ -139,8 +126,35 @@ const requirePlatformOperatorCapabilityWhenPresent = (capability) => (req, res, 
   });
 };
 
+/**
+ * PLATFORM-ADMIN-04C2 (C2.0b, D14) — canonical PLATFORM scope for operator
+ * governance. True only when the caller resolves to the eligible-operator
+ * platform source (`platform_operator_unscoped`) with no tenant. Any tenant
+ * selection header fails closed, resolved or not: PLATFORM is never inferred
+ * from the mere absence of a tenant, and a tenant view never administers
+ * PlatformOperators.
+ */
+const isPlatformGovernanceScope = async (req) => {
+  if (requestedTenantHeader(req) || req.platformTenant) return false;
+  const userId = req.user?._id || req.user?.id;
+  if (!userId) return false;
+  const context = await resolveEffectiveTenantContext(userId, null).catch(() => null);
+  return Boolean(context && !context.tenant && context.source === PLATFORM_WIDE_CONTEXT_SOURCE);
+};
+
+// Mutations of PlatformOperator identities are PLATFORM operations only.
+const requirePlatformGovernanceScope = async (req, res, next) => {
+  if (await isPlatformGovernanceScope(req)) return next();
+  return res.status(403).json({
+    status: 'fail',
+    code: 'PLATFORM_OPERATOR_PLATFORM_SCOPE_REQUIRED',
+    message: 'Action refusée : la gestion des opérateurs plateforme se fait uniquement en Vue plateforme.',
+  });
+};
+
 module.exports = {
-  requireGlobalAdmin,
+  isPlatformGovernanceScope,
+  requirePlatformGovernanceScope,
   requirePlatformNativeCapability,
   requirePlatformOperatorCapability,
   requirePlatformOperatorCapabilityWhenPresent,

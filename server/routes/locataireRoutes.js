@@ -13,9 +13,11 @@ const { requireTenantScope, requireTenantScopeForStaffOrPlatformOperator } = req
 // contratRoutes.js : `router.param('id', …)` + `assertResourceTenantOrUnattributed`,
 // qui supporte déjà nativement `resourceType: 'Locataire'`.
 const Locataire = require('../models/Locataire');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { requireCapability } = require('../middleware/capabilityMiddleware');
+const { selectIndividualRoute, requireIndividualRentalScope } = require('../middleware/rentalScopeAccess');
+const { assertIndividualRentalResourceAccess } = require('../services/rentalIndividualResourceAccessService');
 
 const manageTenants = [auth.protect, requireCapability('tenants.manage')];
 const readTenants = [auth.protect, requireCapability('tenants.read')];
@@ -40,14 +42,31 @@ async function assertLocataireInScope(req, res, next) {
     if (!mongoose.isValidObjectId(locataireId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const locataire = await Locataire.findById(locataireId);
     if (!locataire) return res.status(404).json({ status: 'fail', message: 'Locataire introuvable.' });
+    if (req.rentalScope?.mode === 'individual' || req.query?.scope === 'individual') {
+      await assertIndividualRentalResourceAccess({ resourceType: 'Locataire', resource: locataire, userId: req.user._id || req.user.id });
+      return next();
+    }
     const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
     const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-    await assertResourceTenantOrUnattributed({ resourceType: 'Locataire', resource: locataire, tenantId: tenant?._id });
+    // C2.10A — locataire : chaque bien lié par un bail (et son `tenant` posé à
+    // la création) doit appartenir EXACTEMENT au tenant de la requête.
+    await assertRentalResourceInTenant({ resourceType: 'Locataire', resource: locataire, tenantId: tenant?._id });
     next();
   } catch (error) {
     res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Locataire introuvable.' });
   }
 }
+
+const individual = [selectIndividualRoute, requireIndividualRentalScope];
+router.get('/', ...individual, ctrl.getAll);
+router.get('/dossiers', ...individual, ctrl.listDossiers);
+router.get('/:id/dossier', ...individual, assertLocataireInScope, ctrl.getDossier);
+router.get('/:id/identity-document', ...individual, assertLocataireInScope, ctrl.downloadIdentityDocument);
+router.post('/:id/invite', ...individual, assertLocataireInScope, ctrl.invite);
+router.get('/:id', ...individual, assertLocataireInScope, ctrl.getOne);
+router.post('/', ...individual, fileField, ctrl.create);
+router.put('/:id', ...individual, assertLocataireInScope, fileField, ctrl.update);
+router.delete('/:id', ...individual, assertLocataireInScope, ctrl.delete);
 
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-J, finding RA-15) — `GET /` et
 // `GET /dossiers` n'appliquaient aucune frontière tenant, contrairement aux
@@ -67,7 +86,7 @@ router.post('/invitations/:requestId/resend', manageTenants, ctrl.resendInvitati
 // sœurs `:id` (GET/PUT/DELETE) ci-dessous.
 router.get('/:id/dossier', readTenants, assertLocataireInScope, ctrl.getDossier);
 router.get('/:id/identity-document', requireTenantScope, requireCapability('tenants.read'), ctrl.downloadIdentityDocument);
-router.post('/:id/invite', manageTenants, ctrl.invite);
+router.post('/:id/invite', manageTenants, assertLocataireInScope, ctrl.invite);
 router.get('/:id', readTenants, assertLocataireInScope, ctrl.getOne);
 router.post('/', manageTenants, fileField, ctrl.create);
 router.put('/:id', manageTenants, assertLocataireInScope, fileField, ctrl.update);

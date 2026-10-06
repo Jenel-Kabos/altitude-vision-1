@@ -72,9 +72,10 @@ afterEach(async () => Promise.all([
 ]));
 afterAll(async () => stopFinancialMongo());
 
-async function makeProperty(owner) {
+async function makeProperty(owner, tenant = null) {
   seq += 1;
   return Property.create({
+    ...(tenant ? { tenant: tenant._id } : {}),
     title: `Cert3Pre Property ${seq}`, description: 'Description suffisamment longue pour une fixture TENANT-CERT-3-PRE.',
     pole: 'Altimmo', type: 'Villa', status: 'location', price: 400000,
     address: { city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2,
@@ -83,10 +84,23 @@ async function makeProperty(owner) {
   });
 }
 
+// PLATFORM-ADMIN-04C1 — l'accès d'administration à un hébergement repose
+// désormais sur l'attribution DIRECTE `tenant` (repli propriétaire supprimé
+// par PA-04C). Les hébergements des propriétaires A/B portent donc le tenant
+// de leur propriétaire ; tout autre propriétaire reste sans tenant (ressource
+// plateforme), comme auparavant.
+const tenantOfOwner = (owner) => {
+  if (String(owner._id) === String(ownerA._id)) return tenantA;
+  if (String(owner._id) === String(ownerB._id)) return tenantB;
+  return null;
+};
+
 async function makeAccommodation(owner) {
   seq += 1;
-  const property = await makeProperty(owner);
+  const tenant = tenantOfOwner(owner);
+  const property = await makeProperty(owner, tenant);
   const accommodation = await Accommodation.create({
+    ...(tenant ? { tenant: tenant._id } : {}),
     property: property._id, createdBy: owner._id, accommodationType: 'appartement_meuble',
     capacity: { maxAdults: 2, maxChildren: 0 }, publicationStatus: 'brouillon',
   });
@@ -186,7 +200,8 @@ describe('Accommodation — staff/Admin tenant-bound ne doit jamais agir sur un 
   test('A→B : staff GestionnaireImmobilier du Tenant A valide/rejette (reviewDecision) un Accommodation soumis du Tenant B → refus', async () => {
     const { accommodation } = await makeAccommodation(ownerB);
     accommodation.publicationStatus = 'soumis'; await accommodation.save();
-    const { user: managerA } = await createTenantUser({ tenant: tenantA, bootstrap: adminA, overrides: { role: 'GestionnaireImmobilier' } });
+    // PA-04C1 — gestionnaire canonique de A : le refus provient de la frontière tenant, pas d'un rôle manquant.
+    const { user: managerA } = await createTenantUser({ tenant: tenantA, bootstrap: adminA, overrides: { role: 'GestionnaireImmobilier' }, businessRole: 'GestionnaireImmobilier' });
     const res = await request(app).patch(`/api/accommodations/${accommodation._id}/validate`).set(bearer(managerA));
     expect(res.status).not.toBe(200);
     const fresh = await Accommodation.findById(accommodation._id);
@@ -196,7 +211,8 @@ describe('Accommodation — staff/Admin tenant-bound ne doit jamais agir sur un 
   test('B→B : staff du Tenant B accède au traitement (reject, ne nécessite pas la complétude "validate") d\'un Accommodation soumis du Tenant B → 200 (contrôle positif)', async () => {
     const { accommodation } = await makeAccommodation(ownerB);
     accommodation.publicationStatus = 'soumis'; await accommodation.save();
-    const { user: managerB } = await createTenantUser({ tenant: tenantB, bootstrap: adminB, overrides: { role: 'GestionnaireImmobilier' } });
+    // PA-04C1 — autorité staff = adhésion canonique avec rôle métier (PA-01).
+    const { user: managerB } = await createTenantUser({ tenant: tenantB, bootstrap: adminB, overrides: { role: 'GestionnaireImmobilier' }, businessRole: 'GestionnaireImmobilier' });
     const res = await request(app).patch(`/api/accommodations/${accommodation._id}/reject`).set(bearer(managerB)).send({ reason: 'Fixture de test incomplète, action de contrôle uniquement.' });
     expect(res.status).toBe(200);
   });

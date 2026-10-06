@@ -32,6 +32,7 @@ const RatePlan = require('../../models/RatePlan');
 const Hotel = require('../../models/Hotel');
 const RoomCategory = require('../../models/RoomCategory');
 const { buildMobilePropertyData } = require('../propertyPublicationInputService');
+const { resolvePropertyCreationTenant } = require('../platformTenant/organizationAssetInvariantService');
 const { evaluateReadiness } = require('../accommodationService');
 const { logAction, buildAuteur } = require('../actionLogService');
 const { destroyFromCloudinary } = require('../../config/cloudinary');
@@ -201,7 +202,10 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
     ? analyzeHotelRoomCategories(payload.roomCategories)
     : null;
 
-  const tenantId = user.platformTenant?._id || user.platformTenant || null;
+  const tenantId = await resolvePropertyCreationTenant({
+    ownerId,
+    contextualTenantId: user.platformTenant?._id || user.platformTenant || null,
+  });
   if (hotelAnalysis && !tenantId) {
     fail('HOTEL_SCOPE_REQUIRED', 'Contexte tenant requis.', 403);
   }
@@ -229,7 +233,7 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
           },
           ownerId,
         ),
-        ...(hotelAnalysis ? { tenant: tenantId } : {}),
+        tenant: tenantId || null,
       };
       const [property] = await Property.create([propertyData], { session });
 
@@ -274,7 +278,7 @@ async function createFullMobileAccommodation({ user, payload, publicationRequest
         hotel: hotel?._id,
         property: property._id,
         createdBy: ownerId,
-        tenant: tenantId,
+        tenant: property.tenant || null,
         publicationRequestId,
       }], { session });
 

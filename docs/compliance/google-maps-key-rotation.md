@@ -1,8 +1,8 @@
 # Google Maps API key — rotation & hardening runbook
 
-Cible : `com.altitudevision.altimmo`. Ce document décrit les actions
-**humaines** à réaliser dans Google Cloud Console. Aucune de ces actions
-n'a été effectuée par Claude Code (interdiction explicite du sprint).
+Cible : `com.altitudevision.altimmo`. Ce document consigne les actions
+**humaines** dans Google Cloud Console. Aucune action Google Cloud n'a été
+effectuée par l'agent pendant le sprint de clôture.
 
 Ce runbook ne contient **aucun secret**. La valeur actuelle de la clé
 est référencée dans les logs internes uniquement comme
@@ -21,9 +21,10 @@ git grep -E "AIza[A-Za-z0-9_-]{35}"        # → aucun résultat
 ```
 
 `altimmo-app/.gitignore` ligne `/android` exclut tout le dossier natif.
-La clé n'est présente que sur le **filesystem local** dans le manifest
-généré par `expo prebuild` (ou par le build EAS local) — jamais dans le
-contenu suivi par Git.
+Une clé n'est injectée dans un manifest généré que lorsqu'une variable
+d'environnement de build est fournie. Aucune clé Google API n'est présente
+dans le contenu suivi par Git. Le contrôle de clôture a utilisé exclusivement
+une valeur factice dans une copie temporaire.
 
 **Conséquence** :
 - pas de fuite d'historique Git à corriger (`filter-repo`/BFG interdits
@@ -35,37 +36,23 @@ contenu suivi par Git.
     distribution, upload Play Console non signé), la clé est
     récupérable via `apktool`.
 
-## Étapes humaines
+## État de rotation confirmé humainement (2026-09-29)
 
-1. **Console Google Cloud** → projet Altitude Vision → API et services
-   → Identifiants.
-2. Repérer la clé actuellement utilisée (nom probable : "Google Maps
-   Android SDK — Altimmo").
-3. Considérer cette clé comme compromise. **Ne pas la supprimer avant
-   la mise en service de la nouvelle** pour éviter l'interruption du
-   build actuel.
-4. Créer une nouvelle clé API :
-   - **Restriction d'application** : Android apps.
-   - **Package name** : `com.altitudevision.altimmo`.
-   - **SHA-1 fingerprint** : à récupérer localement via
-     ```bash
-     keytool -list -v -keystore <chemin/vers/keystore.jks> \
-       -alias <alias> -storepass <...>
-     ```
-     ou côté EAS via `eas credentials --platform android`.
-     `SHA_FINGERPRINT = HUMAN_ACTION_REQUIRED` — inconnu au niveau du
-     dépôt.
-   - **Restriction d'API** : uniquement `Maps SDK for Android`.
-5. Injecter la nouvelle valeur dans l'environnement de build :
-   - Local : `export GOOGLE_MAPS_ANDROID_API_KEY=…` avant
-     `expo prebuild` / `expo run:android`.
-   - EAS : `eas secret:create --scope project --name GOOGLE_MAPS_ANDROID_API_KEY --value …`.
-6. Reconstruire l'AAB : `eas build --platform android --profile production`.
-7. Tester la carte dans un build interne (les tuiles doivent se
+- nouvelle clé créée : `HUMAN_CONFIRMED` ;
+- restriction d'application Android : `HUMAN_CONFIRMED` ;
+- package `com.altitudevision.altimmo` : `HUMAN_CONFIRMED` ;
+- empreinte SHA-1 de production configurée : `HUMAN_CONFIRMED` ;
+- restriction à Maps SDK for Android : `HUMAN_CONFIRMED` ;
+- secret EAS `production / GOOGLE_MAPS_ANDROID_API_KEY` : `HUMAN_CONFIRMED` ;
+- ancienne clé supprimée : `NO` — suppression volontairement différée.
+
+## Étapes humaines restantes
+
+1. Après validation humaine du rapport de clôture, reconstruire l'AAB.
+2. Tester la carte dans un build interne signé (les tuiles doivent se
    charger, les marqueurs doivent apparaître).
-8. Déployer / uploader dans Play Console.
-9. **Révoquer** définitivement l'ancienne clé dans Google Cloud
-   Console, une fois la nouvelle validée en production.
+3. Seulement après cette validation, **révoquer** l'ancienne clé dans
+   Google Cloud Console.
 
 ## Vérifications à faire côté code (déjà faites)
 

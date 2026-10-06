@@ -6,6 +6,7 @@ const { buildMobilePropertyData } = require('../services/propertyPublicationInpu
 const createPropertyMobile = async (req, res) => {
   try {
     const propertyData = buildMobilePropertyData(req.body, req.user.id);
+    propertyData.tenant = req.propertyCreationTenantId || null;
     const property = await Property.create(propertyData);
 
     // Notifier les Admin (modération réservée à ce rôle, cf. AdminDashboard

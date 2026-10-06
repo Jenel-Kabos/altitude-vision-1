@@ -7,7 +7,7 @@ import { getLeaseLifecycleDashboard, getAvailableTransitions } from '../services
 // (LeaseLifecycleDashboard + bouton "Piloter" → LeaseLifecycleDrawer) —
 // STAFF_IMMO uniquement, d'où le mock d'AuthContext (rôle Admin par défaut).
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('../services/gestionLocativeService', () => ({ getContrats: vi.fn() }));
+vi.mock('../services/gestionLocativeService', () => ({ getContrats: vi.fn(), createContrat: vi.fn() }));
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'Admin' } }) }));
 vi.mock('../services/rentalLeaseLifecycleService', () => ({
   getLeaseLifecycleDashboard: vi.fn().mockResolvedValue({

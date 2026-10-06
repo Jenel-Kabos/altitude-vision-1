@@ -66,6 +66,26 @@ export const listPropertyRegistry = async (params = {}, { platformScoped = false
   };
 };
 
+const administrationRequestConfig = (platformScoped) => (platformScoped ? { platformScoped: true } : {});
+
+export const approvePropertyAdministration = async (propertyId, { platformScoped = false } = {}) => {
+  const response = await api.patch(
+    `/admin/properties/${encodeURIComponent(propertyId)}/approve`,
+    {},
+    administrationRequestConfig(platformScoped),
+  );
+  return response.data?.data?.property || null;
+};
+
+export const rejectPropertyAdministration = async (propertyId, { platformScoped = false } = {}) => {
+  const response = await api.patch(
+    `/admin/properties/${encodeURIComponent(propertyId)}/reject`,
+    {},
+    administrationRequestConfig(platformScoped),
+  );
+  return response.data?.data?.property || null;
+};
+
 /**
  * Récupère une propriété par son ID
  * @param {String} propertyId - ID de la propriété

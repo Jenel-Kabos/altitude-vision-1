@@ -349,11 +349,11 @@ test('multi-client correctness — plusieurs clients répartis sur 2 serveurs re
 
   const staffMembers = [];
   for (let i = 0; i < 3; i += 1) {
-    // Admin bypass l'assignation hôtel fine (assertOperationalHotelAccess) —
-    // suffisant et volontaire ici : ce test vérifie le fan-out de
-    // l'adaptateur à N clients, pas la matrice RBAC hôtel (déjà couverte par
-    // les tests de sécurité ci-dessus et par socketTenantIsolation).
-    staffMembers.push(await createTenantUser({ tenant, bootstrap, overrides: { role: 'Admin', email: `multi-s${i}-${Date.now()}@example.test` } }));
+    // Admin tenant canonique (membership businessRole Admin) : autorisé sur
+    // l'hôtel du tenant sans assignation fine — suffisant et volontaire ici :
+    // ce test vérifie le fan-out de l'adaptateur à N clients, pas la matrice
+    // RBAC hôtel. PA-04C2 (C2.2) — l'autorité Hotel ne lit plus User.role.
+    staffMembers.push(await createTenantUser({ tenant, bootstrap, businessRole: 'Admin', overrides: { role: 'Admin', email: `multi-s${i}-${Date.now()}@example.test` } }));
   }
   const connections = await Promise.all([
     connect(portA, staffMembers[0].user, tenant),

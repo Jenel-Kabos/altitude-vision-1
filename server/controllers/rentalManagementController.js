@@ -7,7 +7,8 @@ const sync = require('../services/rentalListingSyncService');
 const { notifyStaff } = require('../services/notificationService');
 const { contractAlertWindowDays } = require('../services/rentalFinancialAutomationService');
 const onboarding = require('../services/rentalAssetOnboardingService');
-const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
+const { tenantRentalPropertyIds, assertRentalResourceInTenant } = require('../services/platformTenant/rentalScopeService');
+const { individualRentalPropertyIds, assertIndividualRentalPropertyAccess } = require('../services/rentalIndividualAccessService');
 const { getOwnerPaymentPage } = require('../services/rentalOwnerFinancialService');
 
 // TENANT-SCOPE-AUDIT-1 — `req.tenantScopeUserIds` reste le scope brut
@@ -20,8 +21,30 @@ const { getOwnerPaymentPage } = require('../services/rentalOwnerFinancialService
 // l'absence de contexte tenant" (voir rentalManagementRoutes.js). Réutilise
 // la même fonction canonique que Property Portfolio/HOTFIX-USERS-COUNT-1,
 // jamais dans `resolveTenantScope`.
-const resolveScope = (req) => expandScopeWithUnaffiliatedUsersIfSoleTenant(req.tenantScopeUserIds || [])
-  .catch(() => req.tenantScopeUserIds || []);
+//
+// C2.10A — remplacé : la population organisationnelle de la gestion locative
+// est désormais `Property.tenant = tenant sélectionné` (rentalScopeService),
+// jamais `owner ∈ membres` ni l'extension « tenant unique ». Un bien
+// tenant:null (INDIVIDUAL) n'entre dans aucune organisation ; un bien
+// tenant:T apparaît dans T même si son propriétaire n'en est pas membre.
+// Identique pour le staff (PATH A) et le PlatformOperator (PATH B).
+const scopedPropertyIds = (req) => req.rentalScope?.mode === 'individual'
+  ? individualRentalPropertyIds(req.user._id || req.user.id)
+  : tenantRentalPropertyIds(req.platformTenant?._id);
+
+// BACKEND-TENANT-ISOLATION-CLOSURE-01 — PATH B (PlatformOperator) : l'owner
+// scope seul laissait passer les ressources `tenant:null` (legacy) possédées
+// par un membre du tenant sélectionné. Un PlatformOperator n'accède JAMAIS à
+// une ressource `tenant == null` (INVARIANTS §12) : on exige en plus
+// `tenant == tenant sélectionné`, ce qui exclut null et les autres tenants.
+// Sans tenant sélectionné (déjà refusé en amont), le filtre ne matche rien —
+// jamais `tenant: undefined`, qui matcherait null.
+const selectedTenantPropertyFilter = (req) => {
+  // C2.10A — appliqué aussi au staff tenant (PATH A) : Property.tenant est
+  // l'autorité canonique quel que soit le chemin d'autorité.
+  const tenantId = req.platformTenant?._id;
+  return tenantId ? { tenant: tenantId } : { _id: { $in: [] } };
+};
 
 const fail = (res, error) => res.status(error.statusCode || 500).json({
   status: (error.statusCode || 500) >= 500 ? 'error' : 'fail',
@@ -37,8 +60,14 @@ const fail = (res, error) => res.status(error.statusCode || 500).json({
   }),
 });
 
-exports.onboardingOptions = async (_req, res) => {
-  try { res.json({ status: 'success', data: await onboarding.getOptions() }); }
+exports.onboardingOptions = async (req, res) => {
+  try {
+    // C2.10A — staff (PATH A) comme PlatformOperator (PATH B) : seuls les biens
+    // Property.tenant = tenant sélectionné (et les fiches qui les possèdent)
+    // sont proposés. L'ancien appel sans filtre exposait tout le référentiel.
+    const options = { propertyFilter: selectedTenantPropertyFilter(req) };
+    res.json({ status: 'success', data: await onboarding.getOptions(options) });
+  }
   catch (error) { fail(res, error); }
 };
 
@@ -51,6 +80,12 @@ exports.onboard = async (req, res) => {
         'EXISTING_PROPERTY_REQUIRED',
         ['mode', 'property'],
       );
+    }
+    // C2.10A — seul un bien Property.tenant = tenant de la requête peut être
+    // activé (jamais tenant:null ni un bien d'un autre tenant : 404 sans révéler).
+    if (mongoose.isValidObjectId(req.body.property)) {
+      const property = await Property.findById(req.body.property);
+      if (property) await assertRentalResourceInTenant({ resourceType: 'Property', resource: property, tenantId: req.platformTenant?._id });
     }
     const result = await onboarding.activateExisting({ propertyId: req.body.property, actor: req.user });
     res.status(201).json({ status: 'success', message: 'Le bien a été ajouté à la Gestion locative.', data: result });
@@ -102,7 +137,7 @@ exports.list = async (req, res) => {
     // doit pas apparaître dans le module Gestion Locative tant qu'elle n'a
     // pas été explicitement activée. `?managementActivated=false` permet de
     // consulter les annonces en attente d'activation si un écran futur en a besoin.
-    const filter = { managementActivated: true, owner: { $in: await resolveScope(req) } };
+    const filter = { managementActivated: true, property: { $in: await scopedPropertyIds(req) } };
     ['occupancyStatus', 'availabilityStatus', 'publicationStatus', 'active', 'managementActivated'].forEach((key) => {
       if (req.query[key] !== undefined) {
         filter[key] = key === 'managementActivated' || key === 'active' ? req.query[key] === 'true' : req.query[key];
@@ -134,7 +169,7 @@ exports.stats = async (req, res) => {
   try {
     const windowDays = contractAlertWindowDays();
     const soon = new Date(Date.now() + windowDays * 24 * 60 * 60 * 1000);
-    const propertyIds = await Property.find({ owner: { $in: await resolveScope(req) } }).distinct('_id');
+    const propertyIds = await scopedPropertyIds(req);
     const contractIds = await Contrat.find({ bien: { $in: propertyIds }, type: 'location' }).distinct('_id');
     const [grouped, overduePayments, partialPayments, expiringContracts, expiredContracts, biensInscrits] = await Promise.all([
       // Sprint A : n'agrège que les dossiers réellement activés — une
@@ -183,7 +218,11 @@ exports.getOne = async (req, res) => {
 
 exports.ownerList = async (req, res) => {
   try {
-    const rows = await RentalManagement.find({ owner: req.user.id })
+    // Contrat historique clarifié : ce portail montre les biens du
+    // propriétaire gérés par une organisation. L'autogestion individuelle
+    // passe par `?scope=individual` sur les routes GL canoniques.
+    const organizationPropertyIds = await Property.find({ owner: req.user.id, tenant: { $ne: null } }).distinct('_id');
+    const rows = await RentalManagement.find({ owner: req.user.id, property: { $in: organizationPropertyIds } })
       .populate('property', 'title images address type surface price availability statusAdmin isPublished')
       .populate('activeLease', 'statut dateFinBail montantLoyer')
       .sort({ updatedAt: -1 });
@@ -209,6 +248,15 @@ exports.ownerRequest = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const rental = await RentalManagement.findOne({ _id: req.params.id, owner: req.user.id });
     if (!rental) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
+    const property = await Property.findById(rental.property).select('tenant');
+    if (!property) return res.status(404).json({ status: 'fail', message: 'Bien introuvable.' });
+    if (!property.tenant) {
+      return res.status(409).json({
+        status: 'fail',
+        code: 'INDIVIDUAL_DIRECT_MANAGEMENT_REQUIRED',
+        message: 'Ce bien relève de l’autogestion individuelle et ne possède aucun staff tenant destinataire.',
+      });
+    }
     const typeMap = { 'request-publish': 'publish', 'request-suspension': 'suspend', 'report-maintenance': 'maintenance', 'declare-future-availability': 'future_availability' };
     const type = typeMap[req.params.action];
     if (!type) return res.status(404).json({ status: 'fail', message: 'Action inconnue.' });
@@ -290,6 +338,14 @@ exports.create = async (req, res) => {
     if (!mongoose.isValidObjectId(req.body.property)) return res.status(422).json({ status: 'fail', message: 'Un Property valide est obligatoire.' });
     const property = await Property.findById(req.body.property);
     if (!property) return res.status(404).json({ status: 'fail', message: 'Bien introuvable.' });
+    // PATH B : un PlatformOperator n'active que des biens attribués au tenant
+    // sélectionné (jamais tenant:null ni autre tenant) — 404 sans révéler.
+    // C2.10A — même règle pour le staff tenant (PATH A).
+    if (req.rentalScope?.mode === 'individual') {
+      await assertIndividualRentalPropertyAccess({ property, userId: req.user._id || req.user.id });
+    } else if (!property.tenant || String(property.tenant) !== String(req.platformTenant?._id)) {
+      return res.status(404).json({ status: 'fail', message: 'Bien introuvable.' });
+    }
     if (property.status !== 'location') return res.status(422).json({ status: 'fail', message: 'Seul un bien en location peut être activé en gestion locative.' });
     const allowed = ['monthlyRent', 'charges', 'depositAmount', 'managementFee', 'mandateStartAt', 'mandateEndAt', 'publicationPolicy', 'publicationAuthorized'];
     const details = Object.fromEntries(allowed.filter((key) => req.body[key] !== undefined).map((key) => [key, req.body[key]]));
@@ -313,7 +369,7 @@ exports.create = async (req, res) => {
         rental = await RentalManagement.findOneAndUpdate(
           { property: property._id, managementActivated: { $ne: true } },
           {
-            $setOnInsert: { property: property._id, owner: property.owner, manager: req.user.id },
+            $setOnInsert: { property: property._id, owner: property.owner, manager: req.rentalScope?.mode === 'individual' ? null : req.user.id },
             $set: { ...details, managementActivated: true, tenant: property.tenant || null },
           },
           { new: true, upsert: true, runValidators: true, session: session || undefined },

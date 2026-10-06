@@ -15,6 +15,7 @@ const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
+const Property = require('../models/Property');
 const PlatformOperator = require('../models/PlatformOperator');
 const { safeTestEnv } = require('../test-utils/safeTestEnv');
 
@@ -72,10 +73,26 @@ let mongoUri;
 beforeAll(async () => {
   const { uri } = await startFinancialMongo();
   mongoUri = uri;
-  const fixtureA = await createTenantFixture({ label: 'Bootstrap Runtime A' });
-  const fixtureB = await createTenantFixture({ label: 'Bootstrap Runtime B' });
+  // withAdminMembership : le fondateur (propriétaire des biens ci-dessous) est
+  // membre de son tenant, condition du scope portfolio (tenant + owner) ;
+  // l'opérateur bootstrappé, lui, n'obtient jamais de membership.
+  const fixtureA = await createTenantFixture({ label: 'Bootstrap Runtime A', withAdminMembership: true });
+  const fixtureB = await createTenantFixture({ label: 'Bootstrap Runtime B', withAdminMembership: true });
   tenantA = fixtureA.tenant;
   tenantB = fixtureB.tenant;
+
+  // Un bien par tenant : rend observable le bornage PATH B du portfolio.
+  const propertyData = (title, owner, tenant) => ({
+    title, description: 'Description suffisamment longue pour le registre global Altimmo.',
+    pole: 'Altimmo', type: 'Villa', status: 'vente', statusAdmin: 'Validée', isPublished: true,
+    availability: 'Disponible', price: 100000, owner, tenant,
+    address: { city: 'Brazzaville', arrondissement: 'Centre' },
+    latitude: -4.26, longitude: 15.24, images: ['https://example.test/property.jpg'], surface: 80,
+  });
+  await Property.create([
+    propertyData('Bootstrap Bien Tenant A', fixtureA.bootstrap._id, tenantA._id),
+    propertyData('Bootstrap Bien Tenant B', fixtureB.bootstrap._id, tenantB._id),
+  ]);
 
   grantingAdmin = await User.create({
     name: 'GrantingAdmin Bootstrap', email: `granting-bootstrap-${Date.now()}@example.test`,
@@ -109,23 +126,32 @@ test('l\'opérateur bootstrappé par le script CLI existe réellement en base av
   expect(doc.capabilities.sort()).toEqual(['platform.crm.read', 'platform.properties.read', 'platform.reporting.read']);
 });
 
-describe('Reconnaissance runtime — Property Portfolio (contrat tenant-strict)', () => {
-  // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-I-TEST-CONVERGENCE.1 —
-  // `/api/properties/portfolio` est TENANT_CANONICAL : la chaîne canonique
-  // est protect → requireTenantScope → requireTenantModule('immobilier') →
-  // requireTenantMembershipRole(...). Un PlatformOperator (même
-  // bootstrappé) SANS OrgMembership tenant est refusé, quel que soit
-  // l'entête `X-Platform-Tenant-Id` — la capacité plateforme ne synthétise
-  // jamais une membership tenant (contrat §5 : « Une capability plateforme
-  // ne remplace jamais businessRole »). C'est la même invariante que la
-  // suite CRM Automation ci-dessous, appliquée à Property.
-  test('opérateur bootstrappé, Tenant A sélectionné → refusé faute de membership', async () => {
+describe('Reconnaissance runtime — Property Portfolio (Pattern 1 / Option 3)', () => {
+  // ARCH-AUTH-03 Pattern 1 (INVARIANTS §12) — `/api/properties/portfolio`
+  // compose PATH A (OrgMembership) OU PATH B (PlatformOperator actif +
+  // platform.properties.read + tenant explicitement sélectionné). L'identité
+  // bootstrappée par le CLI doit être reconnue par le PATH B, sans
+  // OrgMembership synthétisée, et strictement bornée au tenant sélectionné.
+  const titles = (res) => {
+    const items = res.body.data?.items;
+    expect(Array.isArray(items)).toBe(true);
+    return items.map((p) => p.title);
+  };
+  test('opérateur bootstrappé, Tenant A sélectionné → PATH B, portfolio strictement Tenant A', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(bootstrappedOperator, tenantA));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect(titles(res)).toContain('Bootstrap Bien Tenant A');
+    expect(titles(res)).not.toContain('Bootstrap Bien Tenant B');
   });
-  test('opérateur bootstrappé, Tenant B sélectionné → refusé faute de membership', async () => {
+  test('opérateur bootstrappé, Tenant B sélectionné → PATH B, portfolio strictement Tenant B', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(bootstrappedOperator, tenantB));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect(titles(res)).toContain('Bootstrap Bien Tenant B');
+    expect(titles(res)).not.toContain('Bootstrap Bien Tenant A');
+  });
+  test('aucune OrgMembership n\'a été synthétisée pour l\'opérateur bootstrappé', async () => {
+    const OrgMembership = require('../models/OrgMembership');
+    expect(await OrgMembership.countDocuments({ user: bootstrappedOperator._id })).toBe(0);
   });
   test('opérateur bootstrappé, sans tenant sélectionné → refusé (registre plateforme non fabriqué ici)', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(bootstrappedOperator));
@@ -152,8 +178,16 @@ describe('Reconnaissance runtime — Reporting (mode plateforme natif)', () => {
 });
 
 describe('Reconnaissance runtime — CRM Automation (mission §24, hérité mais non testé par PLATFORM-ADMIN-CERT-1)', () => {
-  test('2B.2-D — opérateur bootstrappé sans membership reste refusé avec Tenant A sélectionné', async () => {
+  // ARCH-AUTH-03 Pattern 1 — CRM Automation : lecture via platform.crm.read
+  // (PATH B, tenant sélectionné) ; mutations réservées à platform.crm.manage.
+  test('opérateur bootstrappé platform.crm.read, Tenant A sélectionné → lecture PATH B bornée au Tenant A', async () => {
     const res = await request(app).get('/api/crm-automation/rules').set(bearer(bootstrappedOperator, tenantA));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data?.rules)).toBe(true);
+    for (const rule of res.body.data.rules) expect(String(rule.tenant)).toBe(String(tenantA._id));
+  });
+  test('opérateur bootstrappé platform.crm.read seul → mutation CRM Automation refusée (read ≠ manage)', async () => {
+    const res = await request(app).post('/api/crm-automation/rules').set(bearer(bootstrappedOperator, tenantA)).send({});
     expect(res.status).toBe(403);
   });
   test('opérateur bootstrappé, sans tenant sélectionné → refusé (pas de mode plateforme fabriqué)', async () => {

@@ -1,11 +1,12 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { toast } from 'react-hot-toast';
 import RentalTenantsPage from '../pages/dashboard/RentalTenantsPage';
-import { getLocataireDossiers } from '../services/gestionLocativeService';
+import { createLocataire, getLocataireDossiers, updateLocataire } from '../services/gestionLocativeService';
 
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../services/gestionLocativeService', () => ({
   getLocataireDossiers: vi.fn(),
+  createLocataire: vi.fn(), updateLocataire: vi.fn(),
 }));
 
 const tenant = (overrides = {}) => ({
@@ -46,6 +47,19 @@ describe('RentalTenantsPage — Sprint GL-B2 — TEST DATA', () => {
     render(<RentalTenantsPage />);
     fireEvent.click(await screen.findByText('Jean Dupont'));
     expect(await screen.findByText(/Voir dans la Gestion Locative/)).toBeInTheDocument();
+  });
+
+  test('crée et modifie un locataire avec le workflow partagé', async () => {
+    createLocataire.mockResolvedValue({ _id: 'T2' });
+    updateLocataire.mockResolvedValue({ _id: 'T1' });
+    render(<RentalTenantsPage />);
+    await screen.findByText('Jean Dupont');
+    fireEvent.click(screen.getByRole('button', { name: '+ Nouveau locataire' }));
+    fireEvent.change(screen.getByLabelText('Nom du locataire'), { target: { value: 'Moke' } });
+    fireEvent.change(screen.getByLabelText('Prénom du locataire'), { target: { value: 'Paul' } });
+    fireEvent.change(screen.getByLabelText('Téléphone du locataire'), { target: { value: '0600111222' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => expect(createLocataire).toHaveBeenCalled());
   });
 
   test('message vide quand aucun locataire', async () => {

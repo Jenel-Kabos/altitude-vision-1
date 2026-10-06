@@ -307,6 +307,7 @@ app.use('/api/rental-lease-lifecycle', rentalLeaseLifecycleRoutes);
 // lui-même, indépendant de tout bail.
 app.use('/api/property-asset', propertyAssetRoutes);
 app.use('/api/rental-management', rentalManagementRoutes);
+app.use('/api/individual-subscriptions', require('./routes/individualSubscriptionRoutes'));
 app.use('/api/rental-contract-regularization', require('./routes/rentalContractRegularizationRoutes'));
 // 🔧 Maintenance locative (Sprint GL-B2) — distincte de /api/maintenance (hôtelier, Sprint E).
 app.use('/api/rental-maintenance', rentalMaintenanceRoutes);

@@ -191,7 +191,7 @@ const SupprimerMonCompte = () => {
             </li>
             <li>
               Suppression demandée par email&nbsp;: prise en charge sous
-              quelques jours ouvrés après vérification d'identité.
+              réserve d'une vérification d'identité.
             </li>
             <li>
               Les données conservées pour raisons légales, comptables ou
@@ -199,6 +199,10 @@ const SupprimerMonCompte = () => {
               par les obligations applicables.
             </li>
           </ul>
+          <p className="mt-3 text-sm font-medium text-gray-700">
+            Revue juridique humaine requise avant de publier une durée chiffrée
+            de traitement ou de conservation.
+          </p>
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-slate-50 p-6">

@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { Alert, StyleSheet } from 'react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import ProfilScreen from '../ProfilScreen';
 
 // UI-MOB-6 — verrou anti-régression : sur device réel (Samsung SM_S918B), le
@@ -66,10 +66,13 @@ jest.mock('react-native-reanimated', () => {
 jest.mock('../../../services/api', () => ({ get: jest.fn(() => Promise.resolve({ data: {} })) }));
 jest.mock('../../../navigation/navigationSdk', () => ({ resolveMobileDestination: jest.fn() }));
 
+const mockLogout = jest.fn();
+const mockSetPreference = jest.fn();
+
 jest.mock('../../../context/AuthContext', () => ({
   useAuth: () => ({
     user: { name: 'Altitude Vision', email: 'altitudevis3n@gmail.com', role: 'Admin' },
-    logout: jest.fn(),
+    logout: mockLogout,
     updateUser: jest.fn(),
     businessProfiles: null,
     isProprietaireImmobilier: false,
@@ -81,13 +84,18 @@ jest.mock('../../../context/ThemeContext', () => ({
   useTheme: () => ({
     themeColors: require('../../../theme/colors').colors,
     preference: 'light',
-    setPreference: jest.fn(),
+    setPreference: mockSetPreference,
   }),
 }));
 
 const flatten = (style) => StyleSheet.flatten(style);
+const mockAsyncStorage = require('@react-native-async-storage/async-storage');
 
 describe('ProfilScreen — hero identité (régression UI-MOB-6)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   test('le hero a un fond de secours opaque sous le LinearGradient (cause réelle du nom/email invisibles sur device)', () => {
     render(<ProfilScreen navigation={{}} />);
     const name = screen.getByText('Altitude Vision');
@@ -107,5 +115,49 @@ describe('ProfilScreen — hero identité (régression UI-MOB-6)', () => {
     const email = screen.getByText('altitudevis3n@gmail.com');
     expect(flatten(name.props.style).color).toBe('#F0EDE8');
     expect(flatten(email.props.style).color).toBe('rgba(240,237,232,0.75)');
+  });
+
+  test('le mode réglages masque les anciennes sections activité et expose tous les réglages existants', () => {
+    render(<ProfilScreen navigation={{ navigate: jest.fn() }} route={{ params: { settingsOnly: true } }} />);
+
+    expect(screen.getByText('Réglages du compte')).toBeTruthy();
+    expect(screen.queryByText('Activité')).toBeNull();
+    [
+      'Modifier mon profil', 'Changer le mot de passe', 'Mode Clair', 'Mode Système',
+      'Mode Sombre', 'Notifications', 'Aide', 'Signaler un problème',
+      "Partager l'application", "Mettre à jour l'application",
+      'Politique de confidentialité', 'Gestion du cache', 'Se déconnecter',
+    ].forEach((label) => expect(screen.getAllByLabelText(label).length).toBeGreaterThan(0));
+  });
+
+  test('le mode réglages réutilise les routes canoniques et le ThemeContext', () => {
+    const navigation = { navigate: jest.fn(), goBack: jest.fn() };
+    render(<ProfilScreen navigation={navigation} route={{ params: { settingsOnly: true } }} />);
+
+    fireEvent.press(screen.getByLabelText('Modifier mon profil'));
+    fireEvent.press(screen.getByLabelText('Changer le mot de passe'));
+    fireEvent.press(screen.getByLabelText('Politique de confidentialité'));
+    fireEvent.press(screen.getByLabelText('Gestion du cache'));
+    fireEvent.press(screen.getByLabelText('Mode Sombre'));
+
+    expect(navigation.navigate).toHaveBeenNthCalledWith(1, 'EditProfile');
+    expect(navigation.navigate).toHaveBeenNthCalledWith(2, 'ChangePassword');
+    expect(navigation.navigate).toHaveBeenNthCalledWith(3, 'PolitiqueConfidentialite');
+    expect(navigation.navigate).toHaveBeenNthCalledWith(4, 'CacheManagement');
+    expect(mockSetPreference).toHaveBeenCalledWith('dark');
+  });
+
+  test('le mode réglages réutilise la préférence notifications et le logout AuthContext', () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((title, message, buttons) => {
+      if (title === 'Déconnexion') buttons.find((button) => button.text === 'Déconnecter').onPress();
+    });
+    render(<ProfilScreen navigation={{ navigate: jest.fn() }} route={{ params: { settingsOnly: true } }} />);
+
+    fireEvent(screen.getByRole('switch', { name: 'Notifications' }), 'valueChange', false);
+    fireEvent.press(screen.getByLabelText('Se déconnecter'));
+
+    expect(mockAsyncStorage.setItem).toHaveBeenCalledWith('notifications_enabled', 'false');
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+    alertSpy.mockRestore();
   });
 });

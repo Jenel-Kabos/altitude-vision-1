@@ -15,8 +15,10 @@ jest.mock('../controllers/authController', () => ({
 jest.mock('../middleware/tenantContext', () => ({
   requireTenantScope: (req, res, next) => { req.tenantScopeUserIds = ['staff-1']; next(); },
 }));
-jest.mock('../middleware/tenantMembershipRole', () => ({
-  requireTenantMembershipRole: jest.fn(() => (req, res, next) => next()),
+// PLATFORM-ADMIN-04B1 — la garde tenant de la Home est la primitive canonique
+// Pattern 1 (adhésion métier OU capability opérateur exacte, tenant requis).
+jest.mock('../middleware/tenantMembershipRoleOrPlatformCapability', () => ({
+  requireTenantMembershipRoleOrPlatformCapability: jest.fn(() => (req, res, next) => next()),
 }));
 
 const Event = require('../models/Event');
@@ -28,10 +30,11 @@ const userKpiService = require('../services/userKpiService');
 const { getPropertyPortfolioForTenantScope } = require('../services/propertyPortfolioService');
 const authController = require('../controllers/authController');
 const { STAFF_ALL } = require('../utils/roles');
-const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
+const { requireTenantMembershipRoleOrPlatformCapability } = require('../middleware/tenantMembershipRoleOrPlatformCapability');
 const dashboardRoutes = require('../routes/dashboardRoutes');
-const membershipWasConfiguredForAllStaff = requireTenantMembershipRole.mock.calls.some(
-  (roles) => JSON.stringify(roles) === JSON.stringify(STAFF_ALL),
+const membershipWasConfiguredForAllStaff = requireTenantMembershipRoleOrPlatformCapability.mock.calls.some(
+  ([config]) => JSON.stringify(config?.tenantRoles) === JSON.stringify(STAFF_ALL)
+    && JSON.stringify(config?.platformCapabilities) === JSON.stringify(['platform.reporting.read']),
 );
 
 const app = express();
@@ -52,7 +55,7 @@ describe('GET /api/dashboard/stats — contrat de caractérisation ARCH-2F', () 
     jest.clearAllMocks();
   });
 
-  test('utilise la garde businessRole tenant avec tous les rôles staff', () => {
+  test('utilise la garde businessRole tenant (tous les rôles staff) ou la capability exacte platform.reporting.read', () => {
     expect(membershipWasConfiguredForAllStaff).toBe(true);
     expect(authController.restrictTo).not.toHaveBeenCalled();
   });

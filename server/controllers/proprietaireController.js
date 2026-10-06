@@ -1,14 +1,12 @@
 const mongoose = require('mongoose');
 const Proprietaire = require('../models/Proprietaire');
-const Contrat = require('../models/Contrat');
-const Property = require('../models/Property');
 const Document     = require('../models/Document');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const { uploadPrivateAsset, deletePrivateAsset, readPrivateAsset, safePrivateDescriptor } = require('../services/storage/secureStorageService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const logger = require('../utils/logger');
 const { importBienPropreVersGestion, ImportError } = require('../services/proprietaireGestionImportService');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant, tenantRentalPartyIds } = require('../services/platformTenant/rentalScopeService');
 const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
 
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-J, finding RA-15) — `Proprietaire` n'a
@@ -18,15 +16,12 @@ const { streamRemoteDocument } = require('../services/storage/documentStreamingS
 // appartenance directe), soit des `Contrat` qui le référencent -> leur
 // `Property` -> son `owner`. Réutilisé ici pour la liste plutôt qu'un champ
 // tenant inventé.
+// C2.10A — population = biens dont Property.tenant = tenant sélectionné, plus
+// les fiches de provenance T ; plus aucune inférence `Proprietaire.user ∈
+// membres` ni `Property.owner ∈ membres`. Identique à `assertProprietaireInScope`.
 async function scopedProprietaireIdsForTenant(req) {
   if (!req.platformTenant) return null;
-  const scopeUserIds = req.tenantScopeUserIds || [];
-  const propertyIds = await Property.find({ owner: { $in: scopeUserIds } }).distinct('_id');
-  const [viaUser, viaContrat] = await Promise.all([
-    Proprietaire.find({ user: { $in: scopeUserIds } }).distinct('_id'),
-    propertyIds.length === 0 ? [] : Contrat.find({ bien: { $in: propertyIds } }).distinct('proprietaire'),
-  ]);
-  return [...new Set([...viaUser, ...viaContrat].map(String))];
+  return tenantRentalPartyIds(req.platformTenant._id, { Model: Proprietaire, field: 'proprietaire' });
 }
 
 const rollbackUploads = async (urls, tag) => {
@@ -103,7 +98,7 @@ exports.downloadIdentityDocument = async (req, res) => {
     const proprietaire = await Proprietaire.findById(req.params.id)
       .select('+pieceIdentiteAsset.publicId +pieceIdentiteAsset.resourceType +pieceIdentiteAsset.deliveryType +pieceIdentiteAsset.version +pieceIdentiteAsset.format');
     if (!proprietaire) return res.status(404).json({ status: 'fail', message: 'Propriétaire introuvable' });
-    await assertResourceTenantOrUnattributed({ resourceType: 'Proprietaire', resource: proprietaire, tenantId: req.platformTenant?._id });
+    await assertRentalResourceInTenant({ resourceType: 'Proprietaire', resource: proprietaire, tenantId: req.platformTenant?._id });
     if (!proprietaire.pieceIdentiteAsset && proprietaire.pieceIdentite) {
       return streamRemoteDocument({ url: proprietaire.pieceIdentite, name: proprietaire.pieceIdentiteNom || 'identity-document', res, context: { proprietaireId: proprietaire._id } });
     }
@@ -179,6 +174,9 @@ exports.create = async (req, res) => {
     }
     const biens = parseBiens(data.biensPropres);
     if (biens) data.biensPropres = biens;
+    // C2.10A — provenance posée par le serveur (requireTenantScope), jamais
+    // par le client.
+    data.tenant = req.platformTenant?._id || null;
     const p = await Proprietaire.create(data);
     if (piece) {
       await saveIdentiteDocument({
@@ -207,6 +205,7 @@ exports.update = async (req, res) => {
   let piece = null;
   try {
     const data = { ...req.body };
+    delete data.tenant; // C2.10A — provenance immuable.
     if (req.file) {
       piece = await uploadPiece(req.file);
       data.pieceIdentiteAsset = piece.asset;

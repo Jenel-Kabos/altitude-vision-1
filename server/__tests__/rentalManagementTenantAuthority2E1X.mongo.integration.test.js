@@ -288,7 +288,9 @@ describe('DUAL — ownership and tenant authority stay independent', () => {
     // Give outsider a rental they own personally.
     const { rental: outsiderPersonal } = await seedRental({ ownerUser: outsider, tenant: null });
     const denyRes = await request(app).get(`/api/rental-management/${outsiderPersonal._id}`).set(bearer(outsider, tA._id));
-    expect(denyRes.status).toBe(403); // no membership in tA → tenant path refuses
+    // The tenant resource boundary runs before the membership guard and must
+    // conceal an INDIVIDUAL dossier from every tenant context.
+    expect(denyRes.status).toBe(404);
     // Personal ownership does not create authority on someone else's tenant.
     expect(mongoose.isValidObjectId(personalRental._id)).toBe(true);
   });

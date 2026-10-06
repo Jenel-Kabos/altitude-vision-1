@@ -81,8 +81,9 @@ test('multi-tenant sans contexte explicite : Reporting échoue fermé', async ()
 
 test('Gestion locative liste/statistiques : contrôle B positif et aucune ligne B dans A', async () => {
   const t = await threat();
-  const pA = await property(t.ownerA, 'GL_A'); pA.status = 'location'; await pA.save();
-  const pB = await property(t.ownerB, 'GL_B_SECRET'); pB.status = 'location'; await pB.save();
+  // C2.10A — un bien de gestion locative appartient à un tenant par Property.tenant.
+  const pA = await property(t.ownerA, 'GL_A'); pA.status = 'location'; pA.tenant = t.tenantA._id; await pA.save();
+  const pB = await property(t.ownerB, 'GL_B_SECRET'); pB.status = 'location'; pB.tenant = t.tenantB._id; await pB.save();
   await RentalManagement.create({ property: pA._id, owner: t.ownerA._id, managementActivated: true });
   const rB = await RentalManagement.create({ property: pB._id, owner: t.ownerB._id, managementActivated: true });
   const positive = await request(app).get('/api/rental-management').set(bearer(t.adminB, t.tenantB));

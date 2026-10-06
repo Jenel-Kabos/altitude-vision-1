@@ -10,6 +10,8 @@ import React, { useState } from "react";
 import { toast } from "react-hot-toast";
 import { X } from "lucide-react";
 import { addLeaseAvenant } from "../../../services/rentalLeaseLifecycleService";
+import { useRentalOperationContext } from "../../../context/RentalOperationContext";
+import { callWithRentalContext } from "../../../services/rentalRequestContext";
 
 const TYPE_OPTIONS = [
   { value: "loyer", label: "Loyer", champ: "montantLoyer", inputType: "number" },
@@ -27,6 +29,7 @@ const fmtValue = (v) => {
 };
 
 const AvenantModal = ({ contrat, onClose, onDone }) => {
+  const rentalContext = useRentalOperationContext();
   const [type, setType] = useState("loyer");
   const [value, setValue] = useState("");
   const [motif, setMotif] = useState("");
@@ -42,7 +45,7 @@ const AvenantModal = ({ contrat, onClose, onDone }) => {
     setLoading(true);
     try {
       const changes = { [option.champ]: option.inputType === "number" ? Number(value) : value };
-      await addLeaseAvenant(contrat._id, { type, motif, changes });
+      await callWithRentalContext(addLeaseAvenant, rentalContext, contrat._id, { type, motif, changes });
       toast.success("Avenant enregistré.");
       onDone?.();
     } catch (err) {

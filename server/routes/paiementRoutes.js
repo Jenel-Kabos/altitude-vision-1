@@ -10,6 +10,7 @@ const { upload } = require('../config/cloudinary');
 // chargeaient le Paiement sans vérification tenant.
 const Paiement = require('../models/Paiement');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant, loadPaymentContract } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { requireCapability } = require('../middleware/capabilityMiddleware');
 // SECURITY-CLOSURE-P0-WAVE-1 (P0-B/P0-C, findings RA-02/RA-03) — les routes
@@ -87,7 +88,14 @@ router.param('id', async (req, res, next, paiementId) => {
     // `resolveTenantForUser` sans second argument ignore totalement l'en-tête.
     const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
     const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-    await assertResourceTenantOrUnattributed({ resourceType: 'Paiement', resource: paiement, tenantId: tenant?._id });
+    // C2.10A — loyer (contrat de location) : frontière locative stricte ;
+    // tout autre paiement garde sa garde historique (hors périmètre C2.10A).
+    const contrat = await loadPaymentContract(paiement);
+    if (contrat?.type === 'location') {
+      await assertRentalResourceInTenant({ resourceType: 'Paiement', resource: { contrat }, tenantId: tenant?._id });
+    } else {
+      await assertResourceTenantOrUnattributed({ resourceType: 'Paiement', resource: paiement, tenantId: tenant?._id });
+    }
     next();
   } catch (error) {
     res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Paiement introuvable.' });

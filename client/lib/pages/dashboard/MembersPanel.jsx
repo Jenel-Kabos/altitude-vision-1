@@ -333,7 +333,10 @@ const ConfirmSuspendModal = ({ member, tenantName, onCancel, onConfirm, loading 
 
 // ═══════════════════════════════════════════════════════════════
 const MembersPanel = () => {
-  const { selectedTenantId, tenants } = usePlatformTenantRuntime();
+  const { selectedTenantId, tenants, isTenantAdmin, can } = usePlatformTenantRuntime();
+  // C2.9 (Users) — même règle que le serveur (requireTenantMembershipRoleOrPlatformCapability) :
+  // Admin métier du tenant sélectionné OU capability plateforme exacte. Le serveur reste l'autorité.
+  const canManage = Boolean(isTenantAdmin || can?.('platform.users.manage'));
   const tenantScopeKey = selectedTenantId || 'platform';
   const tenant = useMemo(
     () => (tenants || []).find((t) => String(t._id) === String(selectedTenantId)) || null,
@@ -382,10 +385,11 @@ const MembersPanel = () => {
 
   const stats = useMemo(() => {
     const s = {
-      total: members.length, Admin: 0, Collaborateur: 0, Secretaire: 0,
+      total: members.length, active: 0, Admin: 0, Collaborateur: 0, Secretaire: 0,
       GestionnaireImmobilier: 0, CommunityManager: 0, Communicant: 0, suspended: 0,
     };
     members.forEach((m) => {
+      if (m.status === 'active') s.active += 1;
       if (m.status === 'suspended') s.suspended += 1;
       if (m.status === 'active' && s[m.businessRole] !== undefined) s[m.businessRole] += 1;
     });
@@ -420,7 +424,7 @@ const MembersPanel = () => {
     setActionLoading(true);
     try {
       const updated = await changeMemberRole(editMember.membershipId, newRole);
-      setMembers((prev) => prev.map((m) => (m.membershipId === editMember.membershipId ? updated : m)));
+      setMembers((prev) => prev.map((m) => (m.membershipId === editMember.membershipId ? { ...m, ...updated, user: updated?.user || m.user } : m)));
       setEditMember(null);
       showToast('Rôle mis à jour.');
     } catch (err) {
@@ -433,7 +437,7 @@ const MembersPanel = () => {
     setActionLoading(true);
     try {
       const updated = await suspendMember(suspendTarget.membershipId);
-      setMembers((prev) => prev.map((m) => (m.membershipId === suspendTarget.membershipId ? updated : m)));
+      setMembers((prev) => prev.map((m) => (m.membershipId === suspendTarget.membershipId ? { ...m, ...updated, user: updated?.user || m.user } : m)));
       setSuspendTarget(null);
       showToast('Membership suspendue.');
     } catch (err) {
@@ -445,7 +449,7 @@ const MembersPanel = () => {
     setActionLoading(true);
     try {
       const updated = await reactivateMember(member.membershipId);
-      setMembers((prev) => prev.map((m) => (m.membershipId === member.membershipId ? updated : m)));
+      setMembers((prev) => prev.map((m) => (m.membershipId === member.membershipId ? { ...m, ...updated, user: updated?.user || m.user } : m)));
       showToast('Membership réactivée.');
     } catch (err) {
       showToast(messageFromErr(err, 'Erreur lors de la réactivation.'), 'error');
@@ -497,10 +501,10 @@ const MembersPanel = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
-              Membres de {tenantName || "l'organisation"}
+              Membres — {tenantName || "l'organisation"}
             </h1>
             <p className="text-xs text-gray-400" style={{ fontFamily: FONT }}>
-              {stats.total} membre{stats.total !== 1 ? 's' : ''} de cette organisation
+              Gestion des membres et des rôles de l'organisation.
             </p>
           </div>
         </div>
@@ -511,13 +515,29 @@ const MembersPanel = () => {
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Actualiser
           </button>
-          <button onClick={() => setAddOpen(true)}
-            className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl text-white"
-            style={{ background: `linear-gradient(135deg,#1A5A8A,${BLUE})`, fontFamily: FONT }}>
-            <Plus size={14} /> Ajouter un membre
-          </button>
+          {canManage && (
+            <button onClick={() => setAddOpen(true)}
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl text-white"
+              style={{ background: `linear-gradient(135deg,#1A5A8A,${BLUE})`, fontFamily: FONT }}>
+              <Plus size={14} /> Ajouter un membre
+            </button>
+          )}
         </div>
       </div>
+
+      <section aria-label="Statistiques membres" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ['Total membres', stats.total, 'total'],
+          ['Actifs', stats.active, 'active'],
+          ['Suspendus', stats.suspended, 'suspended'],
+          ['Admins', stats.Admin, 'admins'],
+        ].map(([label, value, tone]) => (
+          <div key={tone} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400" style={{ fontFamily: FONT }}>{label}</p>
+            <p data-stat={tone} className="mt-2 text-3xl font-bold text-gray-900">{loading ? '—' : value}</p>
+          </div>
+        ))}
+      </section>
 
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
         <div className="flex flex-wrap gap-1.5">
@@ -563,9 +583,9 @@ const MembersPanel = () => {
           <table className="min-w-full">
             <thead style={{ background: '#F8FAFC' }}>
               <tr>
-                {['Membre', 'Email', 'Rôle', 'Statut', 'Actions'].map((h) => (
+                {['Membre', 'Compte plateforme', "Rôle dans l'organisation", 'Statut', "Date d'ajout", ...(canManage ? ['Actions'] : [])].map((h) => (
                   <th key={h}
-                    className={`px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide ${h === 'Membre' || h === 'Email' ? 'text-left' : 'text-center'}`}
+                    className={`px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide ${h === 'Membre' || h === 'Compte plateforme' ? 'text-left' : 'text-center'}`}
                     style={{ fontFamily: FONT }}>{h}</th>
                 ))}
               </tr>
@@ -582,9 +602,20 @@ const MembersPanel = () => {
                         <p className="font-semibold text-gray-800 text-sm" style={{ fontFamily: FONT }}>{m.user?.name || '—'}</p>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-500" style={{ fontFamily: FONT }}>{m.user?.email || '—'}</td>
+                    <td className="px-5 py-3.5 text-sm text-gray-500" style={{ fontFamily: FONT }}>
+                      <p>{m.user?.email || '—'}</p>
+                      {m.user?.accountStatus && (
+                        <p data-account-status className="text-xs text-gray-400">
+                          {m.user.accountStatus.isActive && m.user.accountStatus.status !== 'Suspendu' ? 'Compte actif' : 'Compte suspendu'}
+                        </p>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5 text-center"><RoleBadge role={m.businessRole} /></td>
                     <td className="px-5 py-3.5 text-center"><StatusBadge status={m.status} /></td>
+                    <td className="px-5 py-3.5 text-center text-xs text-gray-500" style={{ fontFamily: FONT }}>
+                      {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString('fr-FR') : '—'}
+                    </td>
+                    {canManage && (
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-center gap-1.5 flex-wrap">
                         {isActive && (
@@ -618,6 +649,7 @@ const MembersPanel = () => {
                         </button>
                       </div>
                     </td>
+                    )}
                   </tr>
                 );
               })}
@@ -632,7 +664,7 @@ const MembersPanel = () => {
               <p className="font-semibold text-gray-500 text-sm" style={{ fontFamily: FONT }}>
                 {search || filterTab !== 'all' ? 'Aucun membre correspondant.' : 'Aucun membre dans cette organisation.'}
               </p>
-              {!search && filterTab === 'all' && (
+              {canManage && !search && filterTab === 'all' && (
                 <button onClick={() => setAddOpen(true)}
                   className="mt-3 inline-flex items-center gap-2 text-xs font-semibold px-4 py-1.5 rounded-full"
                   style={{ background: `${BLUE}15`, color: BLUE, fontFamily: FONT }}>

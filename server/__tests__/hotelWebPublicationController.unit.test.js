@@ -7,6 +7,16 @@ jest.mock('../services/propertyPublicationInputService', () => ({
   parseAddress: jest.fn(), parseGeoLocation: jest.fn(), buildBasePropertyData: jest.fn(),
 }));
 jest.mock('../services/notificationService', () => ({ notify: jest.fn() }));
+// PA-04C2 — HOTEL ⇒ TENANT : créer un hôtel exige une organisation dont
+// l'acteur est le détenteur canonique (OrgMembership roleInUnit owner +
+// businessRole Admin). Aucun acteur de ce fichier n'est PlatformOperator.
+jest.mock('../services/tenantMembershipService', () => ({
+  resolveTenantMembership: jest.fn(async (userId, tenantId) => (
+    String(userId) === 'u1' && String(tenantId) === 't1'
+      ? { membership: { _id: 'm1', roleInUnit: 'owner' }, roleInUnit: 'owner', businessRole: 'Admin', source: 'membership_business_role' }
+      : null
+  )),
+}));
 jest.mock('../services/actionLogService', () => ({ logAction: jest.fn(), buildAuteur: jest.fn() }));
 
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
@@ -31,7 +41,7 @@ test('le formulaire Web multipart délègue au service transactionnel Mobile et 
     rate: { roomCategory: 'c1' }, idempotent: false,
   };
   createFullMobileAccommodation.mockResolvedValue(result);
-  const req = { user: { id: 'u1' }, files: [{ buffer: Buffer.from('image') }], body: { publicationRequestId: 'web-1', publicationPayload: JSON.stringify(payload) } };
+  const req = { user: { id: 'u1' }, platformTenant: { _id: 't1' }, files: [{ buffer: Buffer.from('image') }], body: { publicationRequestId: 'web-1', publicationPayload: JSON.stringify(payload) } };
   const res = response();
 
   await controller.createFull(req, res);
@@ -49,4 +59,17 @@ test('le formulaire Web multipart délègue au service transactionnel Mobile et 
     property: result.property, accommodation: result.accommodation, hotel: result.hotel,
     roomCategories: result.roomCategories, categoryRates: result.categoryRates,
   }) }));
+});
+
+test('PA-04C2 — sans organisation détenue (owner/Admin), la création d\'hôtel est refusée et le service n\'est jamais appelé', async () => {
+  createFullMobileAccommodation.mockClear();
+  const payload = { publicationRequestId: 'web-2', publicationKind: 'hotel_establishment', property: { titre: 'Indépendant' }, accommodation: { hotel: { name: 'Indépendant' } }, roomCategories: [] };
+  const req = { user: { id: 'independent' }, files: [], body: { publicationRequestId: 'web-2', publicationPayload: JSON.stringify(payload) } };
+  const res = response();
+
+  await controller.createFull(req, res);
+
+  expect(createFullMobileAccommodation).not.toHaveBeenCalled();
+  expect(res.status).toHaveBeenCalledWith(403);
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'HOTEL_ORGANIZATION_REQUIRED' }));
 });

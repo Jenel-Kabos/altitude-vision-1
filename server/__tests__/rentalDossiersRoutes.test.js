@@ -3,6 +3,18 @@
 // pagination/stats sur /api/paiements, et correctif de permission
 // STAFF_DOC sur /api/documents (GestionnaireImmobilier).
 
+// C2.10A — primitive canonique du scope locatif (Property.tenant), mockée
+// comme l'attribution ci-dessus ; la frontière réelle est certifiée par
+// __tests__/rentalScopeC210A.mongo.integration.test.js.
+jest.mock('../services/platformTenant/rentalScopeService', () => ({
+  ...jest.requireActual('../services/platformTenant/rentalScopeService'),
+  assertRentalResourceInTenant: jest.fn().mockResolvedValue({ status: 'resolved', scope: 'ORGANIZATION' }),
+  // Populations mockées vides, comme les chaînes `.distinct()` de ce fichier.
+  tenantRentalPropertyIds: jest.fn().mockResolvedValue([]),
+  tenantRentalPartyIds: jest.fn().mockResolvedValue([]),
+  loadPaymentContract: jest.fn().mockResolvedValue({ type: 'location', bien: '507f1f77bcf86cd7994390aa' }),
+}));
+
 jest.mock('../models/Locataire');
 jest.mock('../models/Contrat');
 jest.mock('../models/Paiement');
@@ -47,6 +59,14 @@ jest.mock('../services/platformTenant/tenantResourceAttributionService', () => (
 // mockés ci-dessus — jamais un mock ad-hoc au niveau du test.
 jest.mock('../services/tenantMembershipService', () => ({
   resolveTenantMembership: jest.fn().mockResolvedValue({ membership: { _id: 'MEMBERSHIP-1', businessRole: 'Admin', status: 'active' }, businessRole: 'Admin', status: 'active' }),
+}));
+// PATH B de requireTenantMembershipRoleOrPlatformCapability : sans stub,
+// `resolveActiveOperator` interroge PlatformOperator sans connexion Mongo et
+// n'échoue qu'au bufferTimeoutMS Mongoose (10 s). Aucun opérateur plateforme
+// ici ; PATH B est certifié sur Mongo réel (platformDocuments*Administration).
+jest.mock('../services/platformOperator/platformOperatorService', () => ({
+  ...jest.requireActual('../services/platformOperator/platformOperatorService'),
+  resolveActiveOperator: jest.fn().mockResolvedValue(null),
 }));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
 jest.mock('../services/notificationService', () => ({
@@ -264,10 +284,21 @@ describe('Contrats — protection de l’historique financier', () => {
 });
 
 describe('GET /api/documents — correctif permission GestionnaireImmobilier (Sprint GL-B2)', () => {
-  afterEach(() => jest.clearAllMocks());
+  // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-8 : l'autorité documents est
+  // l'OrgMembership.businessRole (PATH A), plus User.role. Le mock par défaut
+  // du fichier (businessRole 'Admin' pour tous) ferait passer n'importe quel
+  // appelant : chaque test déclare donc l'adhésion réelle de son scénario,
+  // puis le défaut du fichier est restauré.
+  const { resolveTenantMembership } = require('../services/tenantMembershipService');
+  const membershipAs = (businessRole) => ({ membership: { _id: 'MEMBERSHIP-1', businessRole, status: 'active' }, businessRole, status: 'active' });
+  afterEach(() => {
+    jest.clearAllMocks();
+    resolveTenantMembership.mockResolvedValue(membershipAs('Admin'));
+  });
 
   test('403 — IAM-3 interdit le centre documentaire général au GestionnaireImmobilier', async () => {
     mockUserAuth(GESTIONNAIRE_ID, 'GestionnaireImmobilier');
+    resolveTenantMembership.mockResolvedValue(membershipAs('GestionnaireImmobilier'));
     // Document.find(...).sort(...).populate(...).populate(...) doit résoudre un tableau.
     const chain = { sort: jest.fn(), populate: jest.fn() };
     chain.sort.mockReturnValueOnce(chain);
@@ -279,6 +310,7 @@ describe('GET /api/documents — correctif permission GestionnaireImmobilier (Sp
 
   test('403 — un client n\'a toujours pas accès', async () => {
     mockUserAuth(CLIENT_ID, 'Client');
+    resolveTenantMembership.mockResolvedValue(null);
     const res = await request(app).get('/api/documents').set('Authorization', `Bearer ${makeToken(CLIENT_ID)}`);
     expect(res.statusCode).toBe(403);
   });

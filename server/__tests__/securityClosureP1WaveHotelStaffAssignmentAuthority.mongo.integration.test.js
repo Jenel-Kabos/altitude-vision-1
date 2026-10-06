@@ -42,7 +42,9 @@ async function buildTenantWithHotel(label) {
   const admin = await User.create({ name: `Admin ${label}`, email: `p1h-admin-${label}-${seq}-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   const staffMember = await User.create({ name: `Staff ${label}`, email: `p1h-staff-${label}-${seq}-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Collaborateur', isEmailVerified: true });
   const tenant = await platformTenantService.createTenant({ name: `P1H-${label}-${seq}-${Date.now()}`, actor: admin });
-  await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, actor: admin });
+  // PA-04C2 (C2.2) — Admin tenant canonique : membership avec businessRole Admin
+  // (l'autorité Hotel ne lit plus User.role). Intention du scénario inchangée.
+  await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, businessRole: 'Admin', actor: admin });
   const hotel = await Hotel.create({ name: `Hotel P1H ${label}`, tenant: tenant._id, createdBy: admin._id });
   const assignment = await HotelStaffAssignment.create({ user: staffMember._id, hotel: hotel._id, assignmentRole: 'reception', assignedBy: admin._id });
   return { admin, staffMember, tenant, hotel, assignment };
@@ -80,5 +82,16 @@ describe('SECURITY-CLOSURE-P1-WAVE-1 (P1-H) — GET/PATCH/POST staff-assignments
     expect(get.status).toBe(200);
     const suspend = await request(app).post(`/api/hotels/${a.hotel._id}/staff-assignments/${a.assignment._id}/suspend`).set(bearer(a.admin, a.tenant._id)).send({ reason: 'Motif de suspension valide.' });
     expect(suspend.status).toBe(200);
+  });
+
+  test('5. PA-04C2 (C2.2) — User.role Admin seul (membership sans businessRole) ne peut ni consulter ni suspendre un assignment de l\'Hôtel A', async () => {
+    const a = await buildTenantWithHotel('H');
+    const legacyAdmin = await User.create({ name: 'Legacy Admin H', email: `p1h-legacy-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+    await organizationService.grantMembership({ userId: legacyAdmin._id, orgUnitId: a.tenant.rootOrgUnit, actor: a.admin });
+    const get = await request(app).get(`/api/hotels/${a.hotel._id}/staff-assignments/${a.assignment._id}`).set(bearer(legacyAdmin, a.tenant._id));
+    expect(get.status).toBe(403);
+    const suspend = await request(app).post(`/api/hotels/${a.hotel._id}/staff-assignments/${a.assignment._id}/suspend`).set(bearer(legacyAdmin, a.tenant._id)).send({ reason: 'Tentative legacy role.' });
+    expect(suspend.status).toBe(403);
+    expect((await HotelStaffAssignment.findById(a.assignment._id)).status).toBe('active');
   });
 });

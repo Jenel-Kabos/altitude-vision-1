@@ -35,6 +35,20 @@ jest.mock('../services/platformTenant/tenantContextService', () => ({
   resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }),
   resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012']) }),
 }));
+// PA-04C2 — l'autorité opérationnelle Hotel interroge désormais aussi le
+// PlatformOperator (opérateur en vue TENANT). Ce fichier mocke les modèles
+// (aucune vraie DB) : aucun acteur de ces scénarios n'est opérateur.
+jest.mock('../services/platformOperator/platformOperatorService', () => ({
+  ...jest.requireActual('../services/platformOperator/platformOperatorService'),
+  resolveActiveOperator: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('../services/tenantMembershipService', () => ({
+  resolveTenantMembership: jest.fn(async (userId) => (
+    String(userId) === '507f1f77bcf86cd799439012'
+      ? { membership: { _id: 'membership-admin', roleInUnit: 'owner' }, roleInUnit: 'owner', businessRole: 'Admin', source: 'membership_business_role' }
+      : null
+  )),
+}));
 jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
   assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
   resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
@@ -44,6 +58,10 @@ jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(),
   notifyStaff: jest.fn().mockResolvedValue(),
   notifyMany: jest.fn().mockResolvedValue(),
+}));
+jest.mock('../services/platformTenant/organizationAssetInvariantService', () => ({
+  ...jest.requireActual('../services/platformTenant/organizationAssetInvariantService'),
+  resolvePropertyCreationTenant: jest.fn().mockImplementation(async ({ contextualTenantId }) => contextualTenantId || null),
 }));
 jest.mock('../config/cloudinary', () => ({
   ...jest.requireActual('../config/cloudinary'),
@@ -84,6 +102,10 @@ const FinancialPayment = require('../models/FinancialPayment');
 const FinancialRefund = require('../models/FinancialRefund');
 const SaleManagement = require('../models/SaleManagement');
 const RentalManagement = require('../models/RentalManagement');
+const { syncLinkedAccommodations } = require('../services/hotelService');
+const { resolveTenantMembership } = require('../services/tenantMembershipService');
+
+const ownerAdminMembership = { membership: { _id: 'membership-owner', roleInUnit: 'owner' }, roleInUnit: 'owner', businessRole: 'Admin', source: 'membership_business_role' };
 
 SaleManagement.findOne = jest.fn().mockResolvedValue(null);
 RentalManagement.findOne = jest.fn().mockResolvedValue(null);
@@ -177,6 +199,7 @@ describe('POST /api/hotels/admin vs /api/hotels/mine — permissions de créatio
 
   test("422 — /api/hotels/mine sans nom est refusé", async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
+    resolveTenantMembership.mockResolvedValueOnce(ownerAdminMembership);
     const res = await request(app)
       .post('/api/hotels/mine')
       .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
@@ -185,8 +208,20 @@ describe('POST /api/hotels/admin vs /api/hotels/mine — permissions de créatio
     expect(res.body.message).toMatch(/nom de l'hôtel/i);
   });
 
+  test("403 HOTEL_ORGANIZATION_REQUIRED — un indépendant ne peut pas créer un Hotel tenant:null", async () => {
+    mockUserAuth(OTHER_OWNER_ID, 'Proprietaire');
+    const res = await request(app)
+      .post('/api/hotels/mine')
+      .set('Authorization', `Bearer ${makeToken(OTHER_OWNER_ID)}`)
+      .send({ name: 'Hôtel indépendant', title: 'Annonce', description: 'x', price: 1000 });
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('HOTEL_ORGANIZATION_REQUIRED');
+    expect(Property.create).not.toHaveBeenCalled();
+  });
+
   test("201 — un propriétaire crée son propre hôtel via /mine (owner forcé à req.user.id, jamais au body)", async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
+    resolveTenantMembership.mockResolvedValueOnce(ownerAdminMembership);
     Property.create = jest.fn().mockResolvedValue({ _id: PROPERTY_ID, title: 'Hôtel Test', images: [] });
     Hotel.create = jest.fn().mockResolvedValue({ _id: HOTEL_ID });
     Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, name: 'Hôtel Test' });
@@ -249,6 +284,7 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
 
   const submitted = (overrides = {}) => ({
     _id: HOTEL_ID,
+    tenant: TENANT_ID,
     publicationStatus: 'soumis',
     name: 'Hôtel Test',
     description: 'Un bel hôtel confortable',
@@ -262,6 +298,7 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
 
   test('403 — un propriétaire (non staff) ne peut pas valider', async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
+    Hotel.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(submitted()) });
     const res = await request(app)
       .patch(`/api/hotels/${HOTEL_ID}/validate`)
       .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`)
@@ -307,7 +344,7 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
       { _id: PROPERTY_ID },
       { $set: { statusAdmin: 'Validée', isPublished: true, reviewedAt: expect.any(Date) } },
     );
-    expect(Accommodation.updateMany).toHaveBeenCalledWith({ hotel: HOTEL_ID }, { $set: { publicationStatus: 'publie' } });
+    expect(Accommodation.updateMany).toHaveBeenCalledWith({ hotel: HOTEL_ID, tenant: TENANT_ID }, { $set: { publicationStatus: 'publie' } });
   });
 
   test('200 — rejeter un hôtel soumis dépublie explicitement son Property ancre', async () => {
@@ -327,7 +364,7 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
       { $set: { statusAdmin: 'Rejetée', isPublished: false, reviewedAt: expect.any(Date) } },
     );
     expect(Accommodation.updateMany).toHaveBeenCalledWith(
-      { hotel: HOTEL_ID },
+      { hotel: HOTEL_ID, tenant: TENANT_ID },
       { $set: { publicationStatus: 'rejete' } },
     );
   });
@@ -458,24 +495,36 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
 describe('POST /api/hotels/:id/resync — réconciliation manuelle après incident (Sprint B2)', () => {
   afterEach(() => jest.clearAllMocks());
 
-  test('403 — un propriétaire ne peut pas déclencher une resynchronisation (réservé au staff)', async () => {
+  // PA-04C2 (C2.2) — autorisation resource-first : l'hôtel est chargé AVANT
+  // la décision d'autorité (plus de restrictTo(User.role) au niveau route).
+  test('403 — un propriétaire ne peut pas déclencher une resynchronisation d\'un hôtel existant de son tenant (réservé à l\'administration)', async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, tenant: TENANT_ID, manager: OWNER_ID, publicationStatus: 'publie' });
     const res = await request(app)
       .post(`/api/hotels/${HOTEL_ID}/resync`)
       .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
     expect(res.statusCode).toBe(403);
   });
 
+  test('404 — resynchronisation d\'un hôtel inexistant (ressource chargée avant toute autorité)', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire');
+    Hotel.findById = jest.fn().mockResolvedValue(null);
+    const res = await request(app)
+      .post(`/api/hotels/${HOTEL_ID}/resync`)
+      .set('Authorization', `Bearer ${makeToken(OWNER_ID)}`);
+    expect(res.statusCode).toBe(404);
+  });
+
   test("200 — reprise après erreur : un admin resynchronise un hôtel publié dont l'Accommodation était restée en divergence", async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
-    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, publicationStatus: 'publie', active: true });
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, tenant: TENANT_ID, publicationStatus: 'publie', active: true });
     Accommodation.updateMany = jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
     const res = await request(app)
       .post(`/api/hotels/${HOTEL_ID}/resync`)
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
     expect(res.statusCode).toBe(200);
     expect(Accommodation.updateMany).toHaveBeenCalledWith(
-      { hotel: HOTEL_ID },
+      { hotel: HOTEL_ID, tenant: TENANT_ID },
       { $set: { active: true, publicationStatus: 'publie' } },
     );
     expect(res.body.data.modifiedCount).toBe(1);
@@ -483,12 +532,35 @@ describe('POST /api/hotels/:id/resync — réconciliation manuelle après incide
 
   test('500 — une resynchronisation qui échoue à son tour est rapportée explicitement (pas de faux succès)', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
-    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, publicationStatus: 'publie', active: true });
+    Hotel.findById = jest.fn().mockResolvedValue({ _id: HOTEL_ID, tenant: TENANT_ID, publicationStatus: 'publie', active: true });
     Accommodation.updateMany = jest.fn().mockRejectedValue(new Error('still down'));
     const res = await request(app)
       .post(`/api/hotels/${HOTEL_ID}/resync`)
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
     expect(res.statusCode).toBe(500);
+  });
+});
+
+describe('PA-04C — provenance Hotel → Accommodation', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test('la synchronisation ne modifie que les adaptateurs portant le tenant direct de Hotel', async () => {
+    Accommodation.countDocuments = jest.fn().mockResolvedValue(1);
+    Accommodation.updateMany = jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+    const result = await syncLinkedAccommodations(HOTEL_ID, { active: false, sourceTenant: TENANT_ID });
+    expect(result.ok).toBe(true);
+    expect(Accommodation.updateMany).toHaveBeenCalledWith(
+      { hotel: HOTEL_ID, tenant: TENANT_ID },
+      { $set: { active: false } },
+    );
+  });
+
+  test('un adaptateur de provenance divergente fait échouer la synchronisation sans être muté', async () => {
+    Accommodation.countDocuments = jest.fn().mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+    Accommodation.updateMany = jest.fn();
+    await expect(syncLinkedAccommodations(HOTEL_ID, { active: false, sourceTenant: TENANT_ID }))
+      .resolves.toMatchObject({ ok: false, error: 'HOTEL_ACCOMMODATION_TENANT_PROVENANCE_MISMATCH' });
+    expect(Accommodation.updateMany).not.toHaveBeenCalled();
   });
 });
 

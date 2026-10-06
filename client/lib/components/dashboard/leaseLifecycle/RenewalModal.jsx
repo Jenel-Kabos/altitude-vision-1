@@ -9,6 +9,8 @@ import React, { useState } from "react";
 import { toast } from "react-hot-toast";
 import { X } from "lucide-react";
 import { previewRenewal, renewLease } from "../../../services/rentalLeaseLifecycleService";
+import { useRentalOperationContext } from "../../../context/RentalOperationContext";
+import { callWithRentalContext } from "../../../services/rentalRequestContext";
 
 const FIELD_LABELS = {
   dateFinBail: "Date de fin de bail", montantLoyer: "Loyer", montantCaution: "Caution",
@@ -16,6 +18,7 @@ const FIELD_LABELS = {
 };
 
 const RenewalModal = ({ contrat, onClose, onDone }) => {
+  const rentalContext = useRentalOperationContext();
   const [form, setForm] = useState({ dateFinBail: "", montantLoyer: "", montantCaution: "", motif: "" });
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -31,7 +34,7 @@ const RenewalModal = ({ contrat, onClose, onDone }) => {
   const handlePreview = async () => {
     setLoading(true);
     try {
-      const result = await previewRenewal(contrat._id, buildPayload());
+      const result = await callWithRentalContext(previewRenewal, rentalContext, contrat._id, buildPayload());
       setPreview(result);
     } catch (err) {
       toast.error(err.response?.data?.message || "Impossible de prévisualiser ce renouvellement.");
@@ -43,7 +46,7 @@ const RenewalModal = ({ contrat, onClose, onDone }) => {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      const result = await renewLease(contrat._id, buildPayload());
+      const result = await callWithRentalContext(renewLease, rentalContext, contrat._id, buildPayload());
       toast.success(result.mode === "prolongation" ? "Bail prolongé." : "Nouveau bail créé pour ce renouvellement.");
       onDone?.(result);
     } catch (err) {

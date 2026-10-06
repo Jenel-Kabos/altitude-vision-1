@@ -10,6 +10,8 @@ import { toast } from "react-hot-toast";
 import { useAuth } from "../../../context/AuthContext";
 import { isStaffImmo } from "../../../utils/staffRoles";
 import { encaisserCaution, bloquerCaution, appliquerRetenueCaution, restituerCaution } from "../../../services/rentalLeaseLifecycleService";
+import { useRentalOperationContext } from "../../../context/RentalOperationContext";
+import { callWithRentalContext } from "../../../services/rentalRequestContext";
 
 const CAUTION_LABELS = {
   non_versee: "Non versée", versee: "Versée", bloquee: "Bloquée",
@@ -19,6 +21,7 @@ const CAUTION_LABELS = {
 const fmtFcfa = (n) => `${Number(n || 0).toLocaleString("fr-FR")} FCFA`;
 
 const CautionPanel = ({ contrat, onChanged }) => {
+  const rentalContext = useRentalOperationContext();
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [retenueForm, setRetenueForm] = useState(null); // { montant, motif }
@@ -62,10 +65,10 @@ const CautionPanel = ({ contrat, onChanged }) => {
 
       <div className="flex gap-2 flex-wrap">
         {caution.statut === "non_versee" && (
-          <button disabled={busy} onClick={() => run(() => encaisserCaution(contrat._id), "Caution encaissée.")} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-900 text-white disabled:opacity-50">Encaisser</button>
+          <button disabled={busy} onClick={() => run(() => callWithRentalContext(encaisserCaution, rentalContext, contrat._id, {}), "Caution encaissée.")} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-900 text-white disabled:opacity-50">Encaisser</button>
         )}
         {caution.statut === "versee" && (
-          <button disabled={busy} onClick={() => run(() => bloquerCaution(contrat._id), "Caution bloquée.")} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-900 text-white disabled:opacity-50">Bloquer</button>
+          <button disabled={busy} onClick={() => run(() => callWithRentalContext(bloquerCaution, rentalContext, contrat._id, {}), "Caution bloquée.")} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-900 text-white disabled:opacity-50">Bloquer</button>
         )}
         {caution.statut === "bloquee" && (
           <button disabled={busy} onClick={() => setRetenueForm({ montant: "", motif: "" })} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 disabled:opacity-50">Appliquer une retenue</button>
@@ -85,7 +88,7 @@ const CautionPanel = ({ contrat, onChanged }) => {
             <button
               disabled={busy || !retenueForm.montant}
               onClick={async () => {
-                const ok = await run(() => appliquerRetenueCaution(contrat._id, { montant: Number(retenueForm.montant), motif: retenueForm.motif }), "Retenue appliquée.");
+                const ok = await run(() => callWithRentalContext(appliquerRetenueCaution, rentalContext, contrat._id, { montant: Number(retenueForm.montant), motif: retenueForm.motif }), "Retenue appliquée.");
                 if (ok) setRetenueForm(null);
               }}
               className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-900 text-white disabled:opacity-50"
@@ -105,7 +108,7 @@ const CautionPanel = ({ contrat, onChanged }) => {
             <button
               disabled={busy}
               onClick={async () => {
-                const ok = await run(() => restituerCaution(contrat._id, { montant: Number(restitutionForm.montant) }), "Caution restituée.");
+                const ok = await run(() => callWithRentalContext(restituerCaution, rentalContext, contrat._id, { montant: Number(restitutionForm.montant) }), "Caution restituée.");
                 if (ok) setRestitutionForm(null);
               }}
               className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-900 text-white disabled:opacity-50"

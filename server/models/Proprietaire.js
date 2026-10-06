@@ -111,6 +111,15 @@ const proprietaireSchema = new mongoose.Schema({
   // technique minimal (inactif, sans mot de passe utilisable) est créé pour
   // satisfaire la relation obligatoire Property.owner → User.
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  // C2.10A — espace de gestion locative (PlatformTenant) qui a créé cette
+  // fiche. Posé UNIQUEMENT côté serveur à la création (jamais depuis le body,
+  // jamais modifiable ensuite). Seule provenance tant qu'aucun bail ne relie
+  // la fiche à un bien ; dès qu'un bail existe, Property.tenant de chaque bien
+  // lié doit coïncider (voir rentalScopeService). null = fiche historique.
+  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },
+  // C2.10B — provenance d'une fiche INDIVIDUAL avant son premier bail.
+  // Jamais inférée ni rétro-projetée sur les fiches legacy.
+  individualOwner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
 }, { timestamps: true });
 proprietaireSchema.set('toJSON', { transform: (_doc, ret) => {
   const available = Boolean(ret.pieceIdentiteAsset || ret.pieceIdentite); delete ret.pieceIdentite; delete ret.pieceIdentiteAsset;

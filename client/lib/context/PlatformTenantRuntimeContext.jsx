@@ -15,6 +15,7 @@ const DEFAULT_RUNTIME = {
   operator: null,
   platformViewEligible: false,
   isPlatformView: false,
+  scope: Object.freeze({ mode: 'unresolved', tenantId: null, key: 'unresolved' }),
   tenants: [],
   selectedTenantId: null,
   selectedTenant: null,
@@ -124,6 +125,14 @@ export function PlatformTenantRuntimeProvider({ children }) {
   // n'est JAMAIS en Vue plateforme (sélection de tenant requise).
   const platformViewEligible = state.operator?.status === 'active' && state.operator?.platformViewEligible === true;
   const isPlatformView = platformViewEligible && !state.selectedTenantId;
+  const scope = useMemo(() => {
+    if (state.selectedTenantId) {
+      const tenantId = String(state.selectedTenantId);
+      return Object.freeze({ mode: 'tenant', tenantId, key: `tenant:${tenantId}` });
+    }
+    if (isPlatformView) return Object.freeze({ mode: 'platform', tenantId: null, key: 'platform' });
+    return Object.freeze({ mode: 'unresolved', tenantId: null, key: 'unresolved' });
+  }, [state.selectedTenantId, isPlatformView]);
 
   const value = useMemo(() => ({
     tenantLoading: authLoading || state.loading,
@@ -132,6 +141,7 @@ export function PlatformTenantRuntimeProvider({ children }) {
     operator: state.operator,
     platformViewEligible,
     isPlatformView,
+    scope,
     tenants: state.tenants,
     selectedTenantId: state.selectedTenantId,
     selectedTenant,
@@ -140,7 +150,7 @@ export function PlatformTenantRuntimeProvider({ children }) {
     isTenantAdmin: tenantBusinessRole === 'Admin',
     selectTenant,
     can,
-  }), [authLoading, state, platformViewEligible, isPlatformView, selectedTenant, tenantMembership, tenantBusinessRole, selectTenant, can]);
+  }), [authLoading, state, platformViewEligible, isPlatformView, scope, selectedTenant, tenantMembership, tenantBusinessRole, selectTenant, can]);
 
   return <TenantRuntimeContext.Provider value={value}>{children}</TenantRuntimeContext.Provider>;
 }

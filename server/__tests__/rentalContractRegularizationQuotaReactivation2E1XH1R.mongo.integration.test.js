@@ -69,7 +69,8 @@ async function seedRevertCase({ tenant, owner, restoredActive, currentActive }) 
 async function revertCase(fx, actor) {
   return service.revert({
     contractId: fx.contract._id, reason: 'Réversion quota contrôlée', actor,
-    actorBusinessRole: 'Admin', tenantScopeUserIds: [fx.ownerId || actor._id],
+    // C2.10A — périmètre = tenant du bien régularisé (Property.tenant).
+    actorBusinessRole: 'Admin', tenantId: fx.property.tenant,
   });
 }
 

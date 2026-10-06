@@ -17,7 +17,7 @@ const {
   parseNonNegativeAmount, buildBasePropertyData, parseNumericField,
 } = require('../services/propertyPublicationInputService');
 const { destroyFromCloudinary } = require('../config/cloudinary');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-F, finding RA-11) — même correctif que
@@ -25,7 +25,9 @@ const { resolveTenantForUser } = require('../services/platformTenant/tenantConte
 async function assertStaffPropertyTenantAccess(req, property) {
   const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
   const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-  await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
+  // C2.10A — un staff ne modifie qu'un bien dont Property.tenant est EXACTEMENT
+  // son tenant ; un bien tenant:null (INDIVIDUAL) n'est modifiable que par son owner.
+  await assertRentalResourceInTenant({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
 }
 
 const fail = (res, statusCode, message, extra = {}) =>

@@ -6,20 +6,26 @@ const Contrat = require('../models/Contrat');
 const RentalManagement = require('../models/RentalManagement');
 const { contractAlertWindowDays } = require('./rentalFinancialAutomationService');
 
-async function getLeaseLifecycleDashboard() {
+// C2.10A — `propertyIds` = population canonique du tenant (Property.tenant = T,
+// voir rentalScopeService.tenantRentalPropertyIds). Le contrôleur HTTP la passe
+// TOUJOURS : sans elle le tableau de bord agrégeait les baux de toute la
+// plateforme. `null` (appel interne explicite) conserve la vue non bornée.
+async function getLeaseLifecycleDashboard({ propertyIds = null } = {}) {
+  const byBien = propertyIds ? { bien: { $in: propertyIds } } : {};
+  const byProperty = propertyIds ? { property: { $in: propertyIds } } : {};
   const windowDays = contractAlertWindowDays();
   const now = new Date();
   const soon = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000);
 
   const [echeances, preavisEnAttente, cautionsARestituer, dossiersBloques] = await Promise.all([
-    Contrat.find({ type: 'location', statut: 'actif', dateFinBail: { $gte: now, $lte: soon } })
+    Contrat.find({ type: 'location', statut: 'actif', dateFinBail: { $gte: now, $lte: soon }, ...byBien })
       .select('bien locataire dateFinBail montantLoyer cycleVie avenants')
       .populate('bien', 'title').populate('locataire', 'nom prenom').lean(),
-    RentalManagement.find({ occupancyStatus: 'sortie_programmee', noticeAcknowledgedAt: null })
+    RentalManagement.find({ occupancyStatus: 'sortie_programmee', noticeAcknowledgedAt: null, ...byProperty })
       .select('property noticeStartedAt plannedExitAt').populate('property', 'title').lean(),
-    Contrat.find({ type: 'location', 'caution.statut': { $in: ['versee', 'bloquee'] }, cycleVie: { $in: ['inspection_sortie', 'cloture_financiere'] } })
+    Contrat.find({ type: 'location', 'caution.statut': { $in: ['versee', 'bloquee'] }, cycleVie: { $in: ['inspection_sortie', 'cloture_financiere'] }, ...byBien })
       .select('bien locataire montantCaution caution cycleVie').populate('bien', 'title').populate('locataire', 'nom prenom').lean(),
-    Contrat.find({ type: 'location', $or: [{ 'etatsDesLieux.blockingReason': { $nin: [null, ''] } }] })
+    Contrat.find({ type: 'location', $or: [{ 'etatsDesLieux.blockingReason': { $nin: [null, ''] } }], ...byBien })
       .select('bien cycleVie etatsDesLieux').populate('bien', 'title').lean(),
   ]);
 

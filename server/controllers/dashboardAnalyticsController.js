@@ -15,16 +15,24 @@ const { ROLES_ALTIMMO, ROLES_GL } = require('../utils/roles');
 const { listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
 const { getImmobilierReportData } = require('../services/reporting/immobilierReportQueryService');
 const { getRentalReportData } = require('../services/reporting/rentalReportQueryService');
+const {
+  accommodationScopeFilter,
+  hotelScopeFilter,
+  assertAccommodationInAdministrationScope,
+} = require('../services/administrationScopeService');
 
 const dayBounds = () => { const start = new Date(); start.setHours(0, 0, 0, 0); const end = new Date(start); end.setDate(end.getDate() + 1); return { start, end }; };
 const periodStarts = () => { const { start: today, end: tomorrow } = dayBounds(); const month = new Date(today.getFullYear(), today.getMonth(), 1); const year = new Date(today.getFullYear(), 0, 1); return { today, tomorrow, month, year }; };
 
-async function accommodations(accommodationId = null, { tenantId = null } = {}) {
+async function accommodations(accommodationId = null, { tenantId = null, scopeFilter = null } = {}) {
   const { today, tomorrow, month, year } = periodStarts(); const week = new Date(today.getTime() + 7 * 86400000); const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const independent = { $or: [{ hotel: null }, { hotel: { $exists: false } }], ...(accommodationId ? { _id: accommodationId } : {}), ...(tenantId ? { tenant: tenantId } : {}) };
+  // PA-04C1 — `$match` d'agrégation ne caste pas : le tenant du filtre de
+  // portée (chaîne) doit être converti en ObjectId, sinon TENANT compte 0.
+  const scoped = scopeFilter?.tenant ? { ...scopeFilter, tenant: new mongoose.Types.ObjectId(String(scopeFilter.tenant)) } : scopeFilter;
+  const independent = { $or: [{ hotel: null }, { hotel: { $exists: false } }], ...(accommodationId ? { _id: accommodationId } : {}), ...(scoped || (tenantId ? { tenant: tenantId } : {})) };
   const publishedIds = await Accommodation.find({ ...independent, publicationStatus: 'publie' }).distinct('_id');
   const [rows, reservationRows, reservationNights, blockedNights, documents, allocations, refunds] = await Promise.all([
-    Accommodation.aggregate([{ $match: independent }, { $lookup: { from: 'properties', localField: 'property', foreignField: '_id', as: 'property' } }, { $unwind: '$property' }, { $group: { _id: null, total: { $sum: 1 }, published: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'publie'] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'brouillon'] }, 1, 0] } }, unavailable: { $sum: { $cond: [{ $ne: ['$property.availability', 'Disponible'] }, 1, 0] } }, maintenance: { $sum: { $cond: [{ $eq: ['$property.availability', 'En maintenance'] }, 1, 0] } } } }]),
+    Accommodation.aggregate([{ $match: independent }, { $lookup: { from: 'properties', localField: 'property', foreignField: '_id', as: 'property' } }, { $unwind: '$property' }, { $group: { _id: null, total: { $sum: 1 }, visibleTotal: { $sum: { $cond: [{ $and: [{ $eq: ['$publicationStatus', 'publie'] }, { $ne: ['$active', false] }, { $eq: ['$property.statusAdmin', 'Validée'] }] }, 1, 0] } }, published: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'publie'] }, 1, 0] } }, drafts: { $sum: { $cond: [{ $eq: ['$publicationStatus', 'brouillon'] }, 1, 0] } }, unavailable: { $sum: { $cond: [{ $ne: ['$property.availability', 'Disponible'] }, 1, 0] } }, maintenance: { $sum: { $cond: [{ $eq: ['$property.availability', 'En maintenance'] }, 1, 0] } } } }]),
     AccommodationReservation.aggregate([{ $match: { accommodation: { $in: publishedIds }, status: { $in: ['confirmed', 'checked_in', 'checked_out'] } } }, { $group: { _id: null,
       reservationsToday: { $sum: { $cond: [{ $and: [{ $lt: ['$checkInDate', tomorrow] }, { $gt: ['$checkOutDate', today] }] }, 1, 0] } },
       reservationsWeek: { $sum: { $cond: [{ $and: [{ $lt: ['$checkInDate', week] }, { $gt: ['$checkOutDate', today] }] }, 1, 0] } },
@@ -39,7 +47,7 @@ async function accommodations(accommodationId = null, { tenantId = null } = {}) 
     PaymentAllocation.aggregate([{ $match: { domain: 'real_estate', establishmentType: 'Accommodation', establishmentId: { $in: publishedIds }, status: 'active' } }, { $group: { _id: null, amountCollected: { $sum: '$amountMinor' } } }]),
     FinancialRefund.aggregate([{ $match: { domain: 'real_estate', establishmentType: 'Accommodation', establishmentId: { $in: publishedIds } } }, { $group: { _id: null, refundedAmount: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, '$amountMinor', 0] } }, pendingRefunds: { $sum: { $cond: [{ $in: ['$status', ['requested', 'approved', 'processing']] }, 1, 0] } }, failedRefunds: { $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] } } } }]),
   ]);
-  const base = rows[0] || { total: 0, published: 0, drafts: 0, unavailable: 0, maintenance: 0 }; const daysInMonth = Math.round((nextMonth - month) / 86400000);
+  const base = rows[0] || { total: 0, visibleTotal: 0, published: 0, drafts: 0, unavailable: 0, maintenance: 0 }; const daysInMonth = Math.round((nextMonth - month) / 86400000);
   const availableNights = Math.max(0, publishedIds.length * daysInMonth - blockedNights); const occupancyRate = availableNights ? Math.round((reservationNights / availableNights) * 10000) / 100 : 0;
   const reservationStats = reservationRows[0] || { reservationsToday: 0, reservationsWeek: 0, checkInsToday: 0, checkOutsToday: 0, bookedValueToday: 0, bookedValueMonth: 0, bookedValueYear: 0, reservedNights: 0 };
   delete reservationStats.amountCollected;
@@ -48,11 +56,13 @@ async function accommodations(accommodationId = null, { tenantId = null } = {}) 
     occupancyFormula: 'Nuits verrouillées par réservation sur le mois / (hébergements publiés × jours du mois − nuits bloquées manuellement) × 100.', revenueBasis: 'Valeur réservée et montant encaissé sont exposés séparément.' };
 }
 
-async function hotels(actor, requestedHotelId = null) {
+async function hotels(actor, requestedHotelId = null, { scopeFilter = null } = {}) {
   const { today, tomorrow } = periodStarts();
   const activeReservation = ['confirmed', 'checked_in', 'checked_out'];
   let scopedIds;
-  if (actor?.platformTenant?._id || actor?.platformTenant) {
+  if (scopeFilter) {
+    scopedIds = await Hotel.find(scopeFilter).distinct('_id');
+  } else if (actor?.platformTenant?._id || actor?.platformTenant) {
     scopedIds = await Hotel.find({ tenant: actor.platformTenant._id || actor.platformTenant }).distinct('_id');
   } else if (actor?.role !== 'Admin') {
     const scoped = await listAccessibleHotels(actor);
@@ -119,18 +129,30 @@ exports.getModuleAnalytics = async (req, res) => {
     const requestedHotelId = req.params.module === 'hotels' && mongoose.isValidObjectId(req.query?.hotelId) ? new mongoose.Types.ObjectId(req.query.hotelId) : null;
     const scopeUserIds = req.user?.platformTenant ? (req.tenantScopeUserIds || []) : null;
     let data;
-    if (req.params.module === 'hotels') data = await handlers.hotels(req.user, requestedHotelId);
+    const administrativeScope = ['hotels', 'accommodations'].includes(req.params.module)
+      && req.user.role !== 'Proprietaire'
+      ? req.adminScope
+      : null;
+    if (req.params.module === 'hotels') {
+      data = await handlers.hotels(req.user, requestedHotelId, {
+        scopeFilter: administrativeScope ? hotelScopeFilter(administrativeScope) : null,
+      });
+    }
     else if (req.params.module === 'accommodations') {
       if (req.user.role === 'Proprietaire' && !accommodationId) return res.status(422).json({ status: 'fail', message: 'Sélectionnez un hébergement.' });
       if (accommodationId) {
         const selected = await Accommodation.findById(accommodationId).populate('property', 'owner').lean();
         if (!selected) return res.status(404).json({ status: 'fail', message: 'Hébergement introuvable.' });
         const isOwner = String(selected.property?.owner) === String(req.user.id || req.user._id) || String(selected.createdBy) === String(req.user.id || req.user._id);
-        const actorTenantId = req.user.platformTenant?._id || req.user.platformTenant || null;
-        const sameTenant = !actorTenantId || !selected.tenant || String(selected.tenant) === String(actorTenantId);
-        if ((req.user.role === 'Proprietaire' && !isOwner) || (req.user.role !== 'Proprietaire' && !sameTenant)) return res.status(403).json({ status: 'fail', message: 'Hébergement inaccessible.' });
+        if (req.user.role === 'Proprietaire' && !isOwner) return res.status(403).json({ status: 'fail', message: 'Hébergement inaccessible.' });
+        if (req.user.role !== 'Proprietaire') {
+          try { assertAccommodationInAdministrationScope(administrativeScope, selected); }
+          catch { return res.status(403).json({ status: 'fail', message: 'Hébergement inaccessible.' }); }
+        }
       }
-      data = await handlers.accommodations(accommodationId, { tenantId: req.user.role === 'Proprietaire' ? null : (req.user.platformTenant?._id || req.user.platformTenant || null) });
+      data = await handlers.accommodations(accommodationId, {
+        scopeFilter: administrativeScope ? accommodationScopeFilter(administrativeScope) : null,
+      });
     }
     else {
       // TENANT-DATA-ISOLATION-SALES-RENTALS-1A — propager le tenantId

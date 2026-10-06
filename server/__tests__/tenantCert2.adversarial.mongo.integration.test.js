@@ -199,6 +199,7 @@ describe('TENANT-CERT-2 — PROPERTY (§5)', () => {
 });
 
 describe('TENANT-CERT-2 — GESTION LOCATIVE (§6)', () => {
+  // C2.10A — un dossier « de B » est attribué par Property.tenant = B.
   async function makeRental(owner, overrides = {}) {
     const property = await makeProperty(owner, overrides.propertyOverrides);
     return RentalManagement.create({ property: property._id, owner: owner._id, managementActivated: true, ...overrides });
@@ -206,29 +207,29 @@ describe('TENANT-CERT-2 — GESTION LOCATIVE (§6)', () => {
 
   test('contrôle positif : RentalManagement B accessible par Gestionnaire B', async () => {
     const { gestB, propOwnerB, tenantB } = await buildThreatModel();
-    const rentalB = await makeRental(propOwnerB);
+    const rentalB = await makeRental(propOwnerB, { propertyOverrides: { tenant: tenantB._id } });
     const res = await request(app).get(`/api/rental-management/${rentalB._id}`).set(tenantHeaders(gestB._id, tenantB._id));
     expect(res.status).toBe(200);
   });
 
   test('Gestionnaire A → GET RentalManagement B = refusé', async () => {
-    const { gestA, propOwnerB } = await buildThreatModel();
-    const rentalB = await makeRental(propOwnerB);
+    const { gestA, propOwnerB, tenantB } = await buildThreatModel();
+    const rentalB = await makeRental(propOwnerB, { propertyOverrides: { tenant: tenantB._id } });
     const res = await request(app).get(`/api/rental-management/${rentalB._id}`).set('Authorization', auth(gestA._id));
     expect([403, 404]).toContain(res.status);
   });
 
   test('Gestionnaire A → PATCH update RentalManagement B = refusé', async () => {
-    const { gestA, propOwnerB } = await buildThreatModel();
-    const rentalB = await makeRental(propOwnerB);
+    const { gestA, propOwnerB, tenantB } = await buildThreatModel();
+    const rentalB = await makeRental(propOwnerB, { propertyOverrides: { tenant: tenantB._id } });
     const res = await request(app).patch(`/api/rental-management/${rentalB._id}`).set('Authorization', auth(gestA._id)).send({ occupancyStatus: 'occupe' });
     expect([403, 404]).toContain(res.status);
     expect((await RentalManagement.findById(rentalB._id).lean()).occupancyStatus).not.toBe('occupe');
   });
 
   test('Gestionnaire A → POST deactivate RentalManagement B = refusé', async () => {
-    const { gestA, propOwnerB } = await buildThreatModel();
-    const rentalB = await makeRental(propOwnerB);
+    const { gestA, propOwnerB, tenantB } = await buildThreatModel();
+    const rentalB = await makeRental(propOwnerB, { propertyOverrides: { tenant: tenantB._id } });
     const res = await request(app).post(`/api/rental-management/${rentalB._id}/deactivate`).set('Authorization', auth(gestA._id)).send({});
     expect([403, 404]).toContain(res.status);
     expect((await RentalManagement.findById(rentalB._id).lean()).managementActivated).toBe(true);
@@ -244,24 +245,24 @@ describe('TENANT-CERT-2 — GESTION LOCATIVE (§6)', () => {
   });
 
   test('contrôle positif : Contrat B accessible par le staff B (STAFF_IMMO/Secretaire)', async () => {
-    const { gestB, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
+    const { gestB, propOwnerB, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
     const contratB = await Contrat.create({ type: 'location', bien: propertyB._id, statut: 'actif', dateEntree: '2027-01-01', dateFinBail: '2027-12-31', montantLoyer: 300000 });
     const res = await request(app).get(`/api/contrats/${contratB._id}`).set('Authorization', auth(gestB._id));
     expect(res.status).toBe(200);
   });
 
   test('Gestionnaire A → GET Contrat B = refusé', async () => {
-    const { gestA, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
+    const { gestA, propOwnerB, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
     const contratB = await Contrat.create({ type: 'location', bien: propertyB._id, statut: 'actif', dateEntree: '2027-01-01', dateFinBail: '2027-12-31', montantLoyer: 300000 });
     const res = await request(app).get(`/api/contrats/${contratB._id}`).set('Authorization', auth(gestA._id));
     expect([403, 404]).toContain(res.status);
   });
 
   test('Gestionnaire A → PUT Contrat B = refusé', async () => {
-    const { gestA, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
+    const { gestA, propOwnerB, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
     const contratB = await Contrat.create({ type: 'location', bien: propertyB._id, statut: 'actif', dateEntree: '2027-01-01', dateFinBail: '2027-12-31', montantLoyer: 300000 });
     const res = await request(app).put(`/api/contrats/${contratB._id}`).set('Authorization', auth(gestA._id)).send({ montantLoyer: 999999 });
     expect([403, 404]).toContain(res.status);
@@ -272,8 +273,8 @@ describe('TENANT-CERT-2 — GESTION LOCATIVE (§6)', () => {
   // GestionnaireImmobilier) — Admin B/A utilisés ici pour rester dans le
   // périmètre RBAC réel de ces routes.
   test('contrôle positif : Paiement B accessible par le staff B', async () => {
-    const { adminB, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
+    const { adminB, propOwnerB, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
     const contratB = await Contrat.create({ type: 'location', bien: propertyB._id, statut: 'actif', dateEntree: '2027-01-01', dateFinBail: '2027-12-31', montantLoyer: 300000 });
     const paiementB = await Paiement.create({ contrat: contratB._id, mois: 1, annee: 2027, montant: 300000, statut: 'payé', datePaiement: new Date('2027-01-05') });
     const res = await request(app).get(`/api/paiements/${paiementB._id}`).set('Authorization', auth(adminB._id));
@@ -281,8 +282,8 @@ describe('TENANT-CERT-2 — GESTION LOCATIVE (§6)', () => {
   });
 
   test('Admin A → GET Paiement B = refusé', async () => {
-    const { adminA, propOwnerB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
+    const { adminA, propOwnerB, tenantB } = await buildThreatModel();
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
     const contratB = await Contrat.create({ type: 'location', bien: propertyB._id, statut: 'actif', dateEntree: '2027-01-01', dateFinBail: '2027-12-31', montantLoyer: 300000 });
     const paiementB = await Paiement.create({ contrat: contratB._id, mois: 1, annee: 2027, montant: 300000, statut: 'payé', datePaiement: new Date('2027-01-05') });
     const res = await request(app).get(`/api/paiements/${paiementB._id}`).set('Authorization', auth(adminA._id));
@@ -366,7 +367,7 @@ describe('TENANT-CERT-2 — REPORTING / ERP (§15/§16/§29 tenant explicite hos
 describe('TENANT-CERT-2 — HÔTELLERIE (§8, contrôle de non-régression du correctif F2.6.2)', () => {
   test('contrôle positif : Admin B accède à Hotel B', async () => {
     const { adminB, propOwnerB, tenantB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
     const hotelB = await Hotel.create({ name: 'Hôtel B', manager: propOwnerB._id, createdBy: adminB._id, property: propertyB._id, tenant: tenantB._id });
     const res = await request(app).get(`/api/hotels/${hotelB._id}`).set('Authorization', auth(adminB._id));
     expect(res.status).toBe(200);
@@ -374,15 +375,22 @@ describe('TENANT-CERT-2 — HÔTELLERIE (§8, contrôle de non-régression du co
 
   test('Admin A → GET Hotel B = refusé (déjà corrigé par tenantResourceAttributionService, non-régression)', async () => {
     const { adminA, propOwnerB, tenantB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
     const hotelB = await Hotel.create({ name: 'Hôtel B cible', manager: propOwnerB._id, createdBy: propOwnerB._id, property: propertyB._id, tenant: tenantB._id });
     const res = await request(app).get(`/api/hotels/${hotelB._id}`).set('Authorization', auth(adminA._id));
-    expect(res.status).toBe(404);
+    // PLATFORM-ADMIN-04C1 — le refus cross-tenant passe désormais par le scope
+    // d'administration canonique (PA-04C, HOTEL_SCOPE_FORBIDDEN → 403). Le
+    // contrat canonique (INVARIANTS.md « Fail-closed on missing/null/cross-tenant »)
+    // est « 404 ou 403, jamais un accès permissif » : on vérifie le refus ET
+    // l'absence totale de données de l'hôtel B, comme le test PUT voisin.
+    expect([403, 404]).toContain(res.status);
+    expect(res.body.data).toBeUndefined();
+    expect(JSON.stringify(res.body)).not.toContain('Hôtel B cible');
   });
 
   test('Admin A → PUT admin Hotel B = refusé', async () => {
     const { adminA, propOwnerB, tenantB } = await buildThreatModel();
-    const propertyB = await makeProperty(propOwnerB);
+    const propertyB = await makeProperty(propOwnerB, { tenant: tenantB._id });
     const hotelB = await Hotel.create({ name: 'Hôtel B', manager: propOwnerB._id, createdBy: propOwnerB._id, property: propertyB._id, tenant: tenantB._id });
     const res = await request(app).put(`/api/hotels/admin/${hotelB._id}`).set('Authorization', auth(adminA._id)).send({ name: 'Hacked' });
     expect([403, 404]).toContain(res.status);

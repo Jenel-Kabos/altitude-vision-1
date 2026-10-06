@@ -6,9 +6,22 @@ const auth = require('../controllers/authController');
 const ctrl = require('../controllers/rentalMaintenanceController');
 const { requireTenantScope } = require('../middleware/tenantContext');
 const { requireCapabilityForStaff } = require('../middleware/capabilityMiddleware');
+const { selectIndividualRoute, requireIndividualRentalScope } = require('../middleware/rentalScopeAccess');
 
 const router = express.Router();
-router.use(auth.protect, requireTenantScope);
+router.use(auth.protect);
+
+const individual = [selectIndividualRoute, requireIndividualRentalScope];
+router.get('/', ...individual, ctrl.list);
+router.get('/:id/attachments/:attachmentIndex', ...individual, ctrl.downloadAttachment);
+router.post('/', ...individual, ctrl.create);
+router.patch('/:id/assign', ...individual, ctrl.assign);
+router.patch('/:id/schedule', ...individual, ctrl.schedule);
+router.patch('/:id/start', ...individual, ctrl.start);
+router.patch('/:id/resolve', ...individual, ctrl.resolve);
+router.patch('/:id/close', ...individual, ctrl.close);
+
+router.use(requireTenantScope);
 
 router.get('/', requireCapabilityForStaff('maintenance.read'), ctrl.list);
 router.get('/:id/attachments/:attachmentIndex', requireCapabilityForStaff('maintenance.read'), ctrl.downloadAttachment);

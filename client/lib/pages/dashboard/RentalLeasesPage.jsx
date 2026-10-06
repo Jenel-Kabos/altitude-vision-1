@@ -18,7 +18,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { FileSignature } from "lucide-react";
-import { getContrats } from "../../services/gestionLocativeService";
+import { createContrat, getContrats, getRentalContracts } from "../../services/gestionLocativeService";
+import { useRentalOperationContext } from "../../context/RentalOperationContext";
+import { callWithRentalContext, isIndividualRentalContext, rentalBasePath } from "../../services/rentalRequestContext";
 import {
   DashboardPage, DashboardPageHeader, DashboardToolbar, DashboardCard, DashboardState,
 } from "../../components/dashboard/DashboardUI";
@@ -42,15 +44,21 @@ const joursAvantEcheance = (dateFinBail) => {
 
 const RentalLeasesPage = () => {
   const { user } = useAuth();
+  const rentalContext = useRentalOperationContext();
   const [contrats, setContrats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statut, setStatut] = useState('actif');
   const [pilotage, setPilotage] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [leaseForm, setLeaseForm] = useState({ bien: '', locataire: '', dateEntree: '', dateFinBail: '', montantLoyer: '', montantCaution: '' });
 
   const load = async () => {
     setLoading(true);
     try {
-      const rows = await getContrats({ type: 'location', ...(statut ? { statut } : {}) });
+      const params = { ...(statut ? { statut } : {}) };
+      const rows = isIndividualRentalContext(rentalContext)
+        ? await callWithRentalContext(getRentalContracts, rentalContext, params)
+        : await getContrats({ type: 'location', ...params });
       setContrats(rows || []);
     } catch (err) {
       toast.error("Erreur lors du chargement des baux.");
@@ -60,6 +68,23 @@ const RentalLeasesPage = () => {
   };
 
   useEffect(() => { load(); }, [statut]);
+
+  const createLease = async (event) => {
+    event.preventDefault();
+    setCreating(true);
+    try {
+      await callWithRentalContext(createContrat, rentalContext, {
+        type: 'location',
+        ...leaseForm,
+        montantLoyer: Number(leaseForm.montantLoyer),
+        montantCaution: Number(leaseForm.montantCaution || 0),
+      });
+      toast.success('Bail créé.');
+      setLeaseForm({ bien: '', locataire: '', dateEntree: '', dateFinBail: '', montantLoyer: '', montantCaution: '' });
+      await load();
+    } catch (error) { toast.error(error.response?.data?.message || 'Impossible de créer le bail.'); }
+    finally { setCreating(false); }
+  };
 
   const echeanceProche = useMemo(
     () => contrats.filter((c) => { const j = joursAvantEcheance(c.dateFinBail); return j !== null && j <= 60 && j >= 0; }).length,
@@ -77,13 +102,28 @@ const RentalLeasesPage = () => {
         title="Baux"
         description="Cycle de vie des baux de location — création/édition sur l'onglet Contrats de la vue d'ensemble."
         actions={(
-          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+          <Link href={rentalBasePath(rentalContext)} className="text-sm text-blue-600 underline">
             Vue d'ensemble Gestion Locative
           </Link>
         )}
       />
 
-      {isStaffImmo(user) && <LeaseLifecycleDashboard />}
+      {(isStaffImmo(user) || isIndividualRentalContext(rentalContext)) && <LeaseLifecycleDashboard />}
+
+      {isIndividualRentalContext(rentalContext) && (
+        <DashboardCard className="mb-6">
+          <h2 className="mb-3 font-semibold">Créer un bail individuel</h2>
+          <form onSubmit={createLease} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <input aria-label="Identifiant du bien" required placeholder="Identifiant du bien" value={leaseForm.bien} onChange={(e) => setLeaseForm((f) => ({ ...f, bien: e.target.value }))} className="rounded-lg border px-3 py-2" />
+            <input aria-label="Identifiant du locataire" required placeholder="Identifiant du locataire" value={leaseForm.locataire} onChange={(e) => setLeaseForm((f) => ({ ...f, locataire: e.target.value }))} className="rounded-lg border px-3 py-2" />
+            <input aria-label="Date d’entrée" required type="date" value={leaseForm.dateEntree} onChange={(e) => setLeaseForm((f) => ({ ...f, dateEntree: e.target.value }))} className="rounded-lg border px-3 py-2" />
+            <input aria-label="Date de fin du bail" required type="date" value={leaseForm.dateFinBail} onChange={(e) => setLeaseForm((f) => ({ ...f, dateFinBail: e.target.value }))} className="rounded-lg border px-3 py-2" />
+            <input aria-label="Loyer mensuel" required min="0" type="number" placeholder="Loyer mensuel" value={leaseForm.montantLoyer} onChange={(e) => setLeaseForm((f) => ({ ...f, montantLoyer: e.target.value }))} className="rounded-lg border px-3 py-2" />
+            <input aria-label="Dépôt de garantie" min="0" type="number" placeholder="Dépôt de garantie" value={leaseForm.montantCaution} onChange={(e) => setLeaseForm((f) => ({ ...f, montantCaution: e.target.value }))} className="rounded-lg border px-3 py-2" />
+            <button disabled={creating} className="rounded-lg bg-emerald-700 px-4 py-2 font-medium text-white disabled:opacity-50">Créer le bail</button>
+          </form>
+        </DashboardCard>
+      )}
 
       {!loading && contrats.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
@@ -161,7 +201,12 @@ const RentalLeasesPage = () => {
                       <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUT_CLASSES[c.statut] || 'bg-gray-100 text-gray-700'}`}>{STATUT_LABELS[c.statut] || c.statut}</span>
                     </td>
                     <td className="py-2 pr-3">
-                      <Link href={`/dashboard/documents?pole=Altimmo&service=gestion_locative&contratId=${c._id}`} className="text-blue-600 underline text-xs">
+                      <Link
+                        href={isIndividualRentalContext(rentalContext)
+                          ? `${rentalBasePath(rentalContext)}/documents?contratId=${c._id}`
+                          : `/dashboard/documents?pole=Altimmo&service=gestion_locative&contratId=${c._id}`}
+                        className="text-blue-600 underline text-xs"
+                      >
                         {(c.documents || []).length} document(s)
                       </Link>
                     </td>

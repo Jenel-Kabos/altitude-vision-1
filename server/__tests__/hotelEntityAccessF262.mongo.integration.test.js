@@ -15,7 +15,8 @@ const admin = { role: 'Admin', _id: id() };
 let tenantFixture;
 async function ensureTenant() {
   if (!tenantFixture) {
-    tenantFixture = await createTenantFixture({ label: 'Hotel entity', bootstrap: admin });
+    await User.create({ _id: admin._id, name: 'Entity Admin', email: `entity-admin-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin' });
+    tenantFixture = await createTenantFixture({ label: 'Hotel entity', bootstrap: admin, withAdminMembership: true });
     Object.assign(admin, tenantActor(admin, tenantFixture.tenant));
   }
   return tenantFixture;

@@ -120,7 +120,8 @@ Détail des types de données collectées / partagées : voir
     non-dernier admin autorisé, invalidation JWT).
 - **HUMAN_REVIEW_REQUIRED** : NO pour le mécanisme technique. YES pour :
   - décision métier RGPD sur les durées de conservation légales
-    (facturation, litiges) en RDC → à documenter dans la politique de
+    (facturation, litiges) en République du Congo / Congo-Brazzaville →
+    `HUMAN_LEGAL_REVIEW_REQUIRED` avant publication d'une durée chiffrée ;
     confidentialité et éventuellement une purge programmée ;
   - communication avec les autres participants d'une conversation dont
     l'auteur a été anonymisé (aucune notification automatique
@@ -186,11 +187,11 @@ Détail des types de données collectées / partagées : voir
 | # | Décision | Priorité | Bloque soumission Play |
 |---|---|---|---|
 | 1 | ~~Suppression de compte self-service~~ ✅ CODE_CLOSED — endpoint + UI + tests livrés | — | Non |
-| 2 | Rotation Google Maps API key (Google Cloud Console) + rebuild AAB — voir `google-maps-key-rotation.md` | P0 sécurité | Recommandé fortement |
+| 2 | Rotation Google Maps configurée (`HUMAN_CONFIRMED`) ; rebuild AAB et validation Maps signée restent requis avant suppression de l'ancienne clé | P0 sécurité | **OUI** |
 | 3 | Confirmer prestataire de paiement effectif et adapter Data Safety | P1 | Recommandé |
 | 4 | ~~RECORD_AUDIO / SYSTEM_ALERT_WINDOW~~ ✅ CODE_CLOSED — bloquées via `android.blockedPermissions` dans `app.config.js`. FOREGROUND_SERVICE_MEDIA_PLAYBACK reste (héritée d'`expo-audio`) | P1 | Non bloquant |
-| 5 | Politique de confidentialité web/mobile — ajouter Sentry, Expo Push, Cloudinary, Google Maps, Google Sign-In + procédure de suppression | P1 | Recommandé (Play compare Data Safety ↔ politique) |
+| 5 | Politiques web/mobile et procédure publique alignées ; durées chiffrées soumises à `HUMAN_LEGAL_REVIEW_REQUIRED` | P1 | Revue juridique |
 | 6 | Fournir un compte de test Google Review (Client + Proprietaire) | P0 | **OUI** pour review |
 | 7 | Répondre au questionnaire IARC (content rating) | P0 | **OUI** |
 | 8 | Décider tranche d'âge cible (18+ vs 13+) et ajouter age gate si nécessaire | P0 | **OUI** |
-| 9 | Décision RGPD/RDC : durées de conservation légales (facturation, litiges) — à documenter dans la politique | P1 | Recommandé |
+| 9 | Revue juridique humaine (République du Congo / Congo-Brazzaville) : durées de conservation applicables à la facturation et aux litiges — à documenter dans la politique | P1 | Recommandé |

@@ -29,6 +29,7 @@
 //                                 TENANT_SCOPE_HOTFIX3_ROUTE_MATRIX.md.
 const { resolveEffectiveTenantContext, resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
 const { PLATFORM_WIDE_CONTEXT_SOURCE, PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE } = require('../constants/platformOperatorConstants');
+const { deriveAdministrationScope } = require('../services/administrationScopeService');
 
 // PLATFORM-ADMIN-04A — prédicat CANONIQUE du scope plateforme global. Fondé
 // exclusivement sur la source de contexte résolue (`platform_operator_unscoped`,
@@ -69,12 +70,14 @@ const attachTenantContext = async (req, res, next) => {
       && req.tenantContextSource.startsWith('platform_operator');
     req.platformOperator = req.isPlatformOperatorContext ? context?.operator || null : null;
     req.platformOperatorCapabilities = req.platformOperator?.capabilities || [];
+    req.adminScope = deriveAdministrationScope(req);
   } catch {
     req.platformTenant = null;
     req.tenantContextSource = null;
     req.isPlatformOperatorContext = false;
     req.platformOperator = null;
     req.platformOperatorCapabilities = [];
+    req.adminScope = deriveAdministrationScope(req);
   }
   next();
 };
@@ -95,7 +98,9 @@ async function resolveAndAttachTenantScope(req, { allowAnyStatus = false } = {})
 
   const isPlatformOperator = typeof req.tenantContextSource === 'string' && req.tenantContextSource.startsWith('platform_operator');
   req.isPlatformOperatorContext = isPlatformOperator;
+  req.platformOperator = isPlatformOperator ? (context?.operator || null) : null;
   req.platformOperatorCapabilities = isPlatformOperator ? (context.operator?.capabilities || []) : [];
+  req.adminScope = deriveAdministrationScope(req);
 
   if (!req.platformTenant) {
     return { resolved: false, isPlatformOperator, available, explicitTenantId, context };
@@ -222,7 +227,9 @@ const attachTenantScopeIfResolvable = async (req, res, next) => {
     await resolveAndAttachTenantScope(req);
   } catch {
     req.platformTenant = null;
+    req.tenantContextSource = null;
     req.tenantScopeUserIds = null;
+    req.adminScope = deriveAdministrationScope(req);
   }
   return next();
 };

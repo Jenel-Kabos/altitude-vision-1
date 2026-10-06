@@ -13,7 +13,9 @@ const {
     guardUserViabilityMutation,
     assertNoPlatformOperatorForHardDelete,
     transitionOperatorForUserLifecycle,
+    assertOperatorAccountGovernance,
 } = require('../services/platformOperator/platformOperatorService');
+const { isPlatformGovernanceScope } = require('../middleware/platformAuthority'); // PLATFORM-ADMIN-04C2 (D14)
 const { expandScopeWithUnaffiliatedUsersIfSoleTenant } = require('../services/unaffiliatedUserScopeService');
 const { getEffectiveCapabilities } = require('../utils/iamArchitecture'); // RBAC-3 — refresh identité /me
 const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
@@ -339,7 +341,12 @@ exports.suspendUser = async (req, res, next) => {
                 message: 'Vous ne pouvez pas suspendre votre propre compte depuis l’administration globale.',
             });
         }
-        await guardUserViabilityMutation({ userId: req.params.id, operation: async (session) => {
+        // PLATFORM-ADMIN-04C2 (C2.0b, F8/D14) — suspendre le compte d'un
+        // PlatformOperator actif est une mutation d'autorité PLATFORM : jamais
+        // via une sélection de tenant ni sans platform.operators.manage.
+        const platformScope = await isPlatformGovernanceScope(req);
+        const actorId = req.user?._id || req.user?.id;
+        await guardUserViabilityMutation({ userId: req.params.id, actor: req.user, req, authorize: (session) => assertOperatorAccountGovernance({ targetUserId: req.params.id, actorId, platformScope, session }), operation: async (session) => {
             const query = User.findById(req.params.id);
             if (session) query.session(session);
             const user = await query;

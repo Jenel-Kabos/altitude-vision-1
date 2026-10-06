@@ -7,25 +7,33 @@ const onboarding = require('./rentalAssetOnboardingService');
 const { ensureRentalManagementActive, syncLeaseOccupation } = require('./rentalManagementLeaseSyncService');
 const { withActivationQuotaGuard } = require('./rentalManagementQuotaService');
 const { logAction, buildAuteur } = require('./actionLogService');
+const { RENTAL_SCOPE, resolveRentalResourceScope } = require('./platformTenant/rentalScopeService');
 
 class RegularizationError extends Error {
   constructor(message, statusCode = 409, code = 'REGULARIZATION_ERROR') { super(message); this.statusCode = statusCode; this.code = code; }
 }
 
-// PLATFORM-ADMIN-CERT-1 (V3) \u2014 un contrat dont `proprietaire.user` est
-// r\u00e9solvable appartient au tenant de ce user ; ce centre ne doit jamais
-// exposer ou laisser agir un acteur d'un AUTRE tenant sur un tel dossier.
-// Un contrat sans `proprietaire.user` li\u00e9 reste authentiquement non
-// attribuable (aucun tenant \u00e0 faire respecter) \u2014 c'est le cas d'usage m\u00eame
-// de ce centre, rest\u00e9 ouvert \u00e0 tout staff autoris\u00e9, comme avant ce correctif.
-function isContractInScope(contract, tenantScopeUserIds) {
-  const ownerUserId = contract.proprietaire?.user;
-  if (!ownerUserId) return true;
-  return (tenantScopeUserIds || []).some((id) => String(id) === String(ownerUserId));
+// C2.10A — un dossier n'appartient au tenant T que par provenance canonique :
+//   bail déjà lié à un bien → Property.tenant = T (rentalScopeService) ;
+//   bail historique sans bien → fiche Proprietaire de provenance T.
+// Plus aucune inférence via Proprietaire.user → OrgMembership, plus aucun
+// fail-open « fiche sans compte = visible de tous les tenants ».
+async function contractRentalTenantId(contract) {
+  if (contract.bien) {
+    const scope = await resolveRentalResourceScope({ resourceType: 'Contrat', resource: contract });
+    return scope.scope === RENTAL_SCOPE.ORGANIZATION ? scope.tenantId : null;
+  }
+  const provenance = contract.proprietaire?.tenant;
+  return provenance ? String(provenance._id || provenance) : null;
 }
 
-function assertContractInScope(contract, tenantScopeUserIds) {
-  if (!isContractInScope(contract, tenantScopeUserIds)) {
+async function isContractInScope(contract, tenantId) {
+  if (!tenantId) return false;
+  return (await contractRentalTenantId(contract)) === String(tenantId);
+}
+
+async function assertContractInScope(contract, tenantId) {
+  if (!await isContractInScope(contract, tenantId)) {
     throw new RegularizationError('Ce contrat n\u2019est plus r\u00e9gularisable.', 409, 'CASE_NOT_PENDING');
   }
 }
@@ -57,7 +65,7 @@ function scoreProperty(contract, property, ownerUserId) {
   return { score, reasons };
 }
 
-async function getCases({ tenantScopeUserIds = [] } = {}) {
+async function getCases({ tenantId = null } = {}) {
   const decisions = await Reconciliation.find({}).lean();
   const contracts = await Contrat.find({
     type: 'location',
@@ -67,10 +75,13 @@ async function getCases({ tenantScopeUserIds = [] } = {}) {
     ],
   })
     .populate('locataire', 'nom prenom email telephone')
-    .populate('proprietaire', 'nom prenom email telephone ville user biensPropres')
+    .populate('proprietaire', 'nom prenom email telephone ville user biensPropres tenant')
     .sort({ createdAt: 1 }).lean();
-  const scopedContracts = contracts.filter((contract) => isContractInScope(contract, tenantScopeUserIds));
-  const properties = await Property.find({ status: 'location' }).select('title type price address owner availability assetCycle internalManagedOnly').lean();
+  const inScope = await Promise.all(contracts.map((contract) => isContractInScope(contract, tenantId)));
+  const scopedContracts = contracts.filter((_contract, index) => inScope[index]);
+  // C2.10A — suggestions de rattachement : uniquement les biens du tenant
+  // (Property.tenant = T), comme `assertProperty` ; jamais tout le référentiel.
+  const properties = !tenantId ? [] : await Property.find({ status: 'location', tenant: tenantId }).select('title type price address owner availability assetCycle internalManagedOnly').lean();
   const decisionByContract = new Map(decisions.map((decision) => [String(decision.contract), decision]));
   return scopedContracts.map((contract) => {
     const scored = properties.map((property) => ({ ...property, ...scoreProperty(contract, property, contract.proprietaire?.user) }))
@@ -86,18 +97,20 @@ async function getCases({ tenantScopeUserIds = [] } = {}) {
   });
 }
 
-async function loadOpenCase(contractId, tenantScopeUserIds = []) {
+async function loadOpenCase(contractId, tenantId = null) {
   if (!mongoose.isValidObjectId(contractId)) throw new RegularizationError('Contrat invalide.', 400, 'INVALID_CONTRACT');
   const contract = await Contrat.findOne({ _id: contractId, type: 'location', statut: { $in: ['actif', 'en_attente'] }, bien: null }).populate('proprietaire');
   if (!contract) throw new RegularizationError('Ce contrat n’est plus régularisable.', 409, 'CASE_NOT_PENDING');
-  assertContractInScope(contract, tenantScopeUserIds);
+  await assertContractInScope(contract, tenantId);
   const existing = await Reconciliation.findOne({ contract: contract._id });
   if (existing && existing.status !== 'pending' && existing.status !== 'reverted') throw new RegularizationError('Une décision active existe déjà.', 409, 'DECISION_ALREADY_EXISTS');
   return { contract, record: existing || new Reconciliation({ contract: contract._id }) };
 }
 
-async function assertProperty(contract, propertyId) {
+async function assertProperty(contract, propertyId, tenantId) {
   const property = await Property.findById(propertyId);
+  // C2.10A — le bien cible doit appartenir au tenant du dossier (Property.tenant).
+  if (property && (!property.tenant || String(property.tenant) !== String(tenantId))) throw new RegularizationError('Property locatif introuvable.', 404, 'PROPERTY_NOT_FOUND');
   if (!property || property.status !== 'location') throw new RegularizationError('Property locatif introuvable.', 404, 'PROPERTY_NOT_FOUND');
   if (['Vendu', 'Retiré'].includes(property.availability) || ['vendu', 'archive'].includes(property.assetCycle)) throw new RegularizationError('Ce bien est clôturé ou indisponible.', 409, 'PROPERTY_BLOCKED');
   if (!contract.proprietaire?.user || String(property.owner) !== String(contract.proprietaire.user)) throw new RegularizationError('Le propriétaire du Property ne correspond pas à la fiche du contrat.', 409, 'OWNER_MISMATCH');
@@ -128,10 +141,10 @@ async function finish({ contract, record, decision, property, rental, actor, rea
 // replaces every legacy read of `actor.role` inside this service. Passing
 // `null` from a non-tenant caller is refused (the sub-action gates fail
 // closed). No fallback to `User.role`.
-async function decide({ contractId, action, data, actor, actorBusinessRole = null, tenantScopeUserIds = [] }) {
+async function decide({ contractId, action, data, actor, actorBusinessRole = null, tenantId = null }) {
   const reason = String(data.reason || '').trim();
   if (reason.length < 5) throw new RegularizationError('Un motif explicite est obligatoire.', 422, 'REASON_REQUIRED');
-  const { contract, record } = await loadOpenCase(contractId, tenantScopeUserIds);
+  const { contract, record } = await loadOpenCase(contractId, tenantId);
 
   if (action === 'flag_anomaly') return finish({ contract, record, decision: action, actor, reason, before: snapshot(contract), createdProperty: false });
   if (action === 'close_historical') {
@@ -143,7 +156,7 @@ async function decide({ contractId, action, data, actor, actorBusinessRole = nul
 
   let property; let rental; let createdProperty = false;
   if (action === 'link_existing') {
-    property = await assertProperty(contract, data.propertyId);
+    property = await assertProperty(contract, data.propertyId, tenantId);
     rental = await RentalManagement.findOne({ property: property._id });
     const before = snapshot(contract, property, rental);
     rental = await ensureRentalManagementActive({ property, actor: actor._id || actor.id, monthlyRent: contract.montantLoyer });
@@ -156,7 +169,9 @@ async function decide({ contractId, action, data, actor, actorBusinessRole = nul
     if (!contract.proprietaire?.user) throw new RegularizationError('La fiche Propriétaire doit être liée à un compte avant de créer le Property.', 422, 'OWNER_USER_REQUIRED');
     const created = await onboarding.reconstructHistoricalManagedProperty({
       data: { ...data.property, owner: contract.proprietaire.user, monthlyRent: data.property?.monthlyRent || contract.montantLoyer },
-      actor,
+      // C2.10A — le bien reconstruit naît dans le tenant du dossier (contexte
+      // explicite attendu par resolvePropertyCreationTenant), jamais tenant:null.
+      actor: { ...(actor.toObject ? actor.toObject() : actor), platformTenant: tenantId },
       contractId: contract._id,
       reason,
     });
@@ -202,7 +217,7 @@ async function restoreRentalSnapshot(rentalSnapshot) {
   });
 }
 
-async function revert({ contractId, reason, actor, actorBusinessRole = null, tenantScopeUserIds = [] }) {
+async function revert({ contractId, reason, actor, actorBusinessRole = null, tenantId = null }) {
   if (actorBusinessRole !== 'Admin') throw new RegularizationError('Réversion réservée à l’Administrateur.', 403, 'ADMIN_REQUIRED');
   if (String(reason || '').trim().length < 5) throw new RegularizationError('Un motif de réversion est obligatoire.', 422, 'REASON_REQUIRED');
   const record = await Reconciliation.findOne({ contract: contractId });
@@ -211,7 +226,7 @@ async function revert({ contractId, reason, actor, actorBusinessRole = null, ten
   const contract = await Contrat.findById(contractId).populate('proprietaire');
   if (!contract) throw new RegularizationError('Contrat introuvable.', 404, 'CONTRACT_NOT_FOUND');
   // PLATFORM-ADMIN-CERT-1 (V3) — même garde qu'à la décision initiale.
-  assertContractInScope(contract, tenantScopeUserIds);
+  await assertContractInScope(contract, tenantId);
   if (record.property && contract.bien && String(contract.bien) !== String(record.property)) throw new RegularizationError('Le contrat a divergé depuis la décision.', 409, 'STATE_DIVERGED');
   const beforeRevert = snapshot(contract);
   const original = event.before?.contract || {};

@@ -13,6 +13,8 @@ jest.mock('../services/rentalTenantNotificationService', () => ({ notifyContract
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const { attachLeaseToTenant } = require('./helpers/rentalScopeFixture');
+const { addTenantMember } = require('./helpers/tenantAwareFixture');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const User = require('../models/User');
 const Contrat = require('../models/Contrat');
@@ -47,8 +49,10 @@ async function fixtureEcheance(overrides = {}) {
   const admin = await makeUser({ role: 'Admin' });
   const gestionnaire = await makeUser({ role: 'GestionnaireImmobilier' });
   const contrat = await Contrat.create({ type: 'location', statut: 'actif', adresseBien: 'Test GL-DEBT-1', montantLoyer: 150000 });
+  // C2.10A — bail rattaché à un bien du tenant du staff (Property.tenant).
+  const scope = await attachLeaseToTenant({ contrat, staff: [{ user: admin }, { user: gestionnaire, businessRole: 'GestionnaireImmobilier' }] });
   const paiement = await Paiement.create({ contrat: contrat._id, mois: 6, annee: 2027, montant: 150000, montantTotal: 150000, statut: 'impayé', ...overrides });
-  return { admin, gestionnaire, contrat, paiement, adminToken: signToken(admin._id), gestionnaireToken: signToken(gestionnaire._id) };
+  return { admin, gestionnaire, contrat, paiement, scope, adminToken: signToken(admin._id), gestionnaireToken: signToken(gestionnaire._id) };
 }
 
 test('plusieurs encaissements successifs sur la même échéance créent un reçu chacun', async () => {
@@ -123,8 +127,10 @@ test('un motif d’annulation est obligatoire', async () => {
 });
 
 test('IDOR/permissions : Secretaire (ROLES_PAIEMENTS mais pas CANCEL_ROLES) ne peut pas annuler', async () => {
-  const { paiement, adminToken } = await fixtureEcheance();
+  const { paiement, adminToken, scope } = await fixtureEcheance();
   const secretaire = await makeUser({ role: 'Secretaire' });
+  // C2.10A — membre du même tenant : c'est bien le contrôle de RÔLE qui est exercé.
+  await addTenantMember({ tenant: scope.tenant, user: secretaire, bootstrap: scope.bootstrap, businessRole: 'Secretaire' });
   const record = await request(app).post(`/api/paiements/${paiement._id}/marquer-paye`).set('Authorization', `Bearer ${adminToken}`)
     .send({ montantRecu: 150000, datePaiement: '2027-06-10', modePaiement: 'espèces' });
   const res = await request(app).post(`/api/paiements/${paiement._id}/receipts/${record.body.data.receipt._id}/cancel`).set('Authorization', `Bearer ${signToken(secretaire._id)}`)

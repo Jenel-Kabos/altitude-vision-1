@@ -193,4 +193,21 @@ describe('Global Users registry', () => {
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: /confirmer la suspension/i })).toBeInTheDocument();
   });
+  test('C2.9 — le tableau n’affiche que les organisations actives et le rôle plateforme', async () => {
+    listGlobalUsers.mockResolvedValue(registry({
+      items: [{
+        _id: 'u-former', name: 'Ancien Membre', email: 'former@example.test', role: 'Proprietaire', status: 'Actif', isActive: true,
+        tenantCount: 0, platformOperator: null,
+        memberships: [{ _id: 'm-r', businessRole: 'Admin', status: 'revoked', tenant: { _id: 't-r', name: 'Tenant Révoqué' }, organization: { name: 'Tenant Révoqué' } }],
+      }],
+      total: 1, stats: { total: 1, active: 1, suspended: 0, withoutOrganization: 1 },
+    }));
+    render(<UsersPanel />);
+    const row = (await screen.findByText('Ancien Membre')).closest('tr');
+    expect(within(row).getByText('Aucune organisation')).toBeInTheDocument();
+    expect(within(row).queryByText('Tenant Révoqué')).not.toBeInTheDocument();
+    expect(within(row).queryByText('Admin')).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Compte \/ statut plateforme/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Organisation(s)' })).toBeInTheDocument();
+  });
 });

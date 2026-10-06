@@ -139,22 +139,23 @@ const sections = [
           </div>
           <div className="flex items-center justify-between">
             <span className="font-medium text-gray-900">Transactions</span>
-            <span className="text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">5 ans (légal)</span>
+            <span className="text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Selon les obligations applicables</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="font-medium text-gray-900">Notifications lues</span>
-            <span className="text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">90 jours</span>
+            <span className="text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Selon la nécessité du service</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="font-medium text-gray-900">Logs de connexion</span>
-            <span className="text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">12 mois</span>
+            <span className="text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Selon les besoins de sécurité</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="font-medium text-gray-900">Cookies analytiques</span>
-            <span className="text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">24 mois</span>
+            <span className="text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Selon le consentement et la configuration</span>
           </div>
         </div>
-        <p>Après suppression de votre compte, vos données sont anonymisées ou effacées dans un délai de 30 jours, sauf obligation légale de conservation.</p>
+        <p>Après suppression de votre compte, les données du profil sont anonymisées ou effacées. Certaines données métier restent conservées lorsque cela est nécessaire à l'intégrité des transactions ou aux obligations applicables.</p>
+        <p className="font-medium">Revue juridique humaine requise pour confirmer et publier toute durée chiffrée de conservation.</p>
       </div>
     ),
   },
@@ -478,7 +479,7 @@ const sections = [
             <span>+242 06 800 21 51</span>
           </div>
         </div>
-        <p className="text-sm">Nous répondons à toute demande dans un délai maximum de 30 jours.</p>
+        <p className="text-sm">Chaque demande est traitée après vérification d'identité. Revue juridique humaine requise avant de publier un délai de réponse chiffré.</p>
       </div>
     ),
   },
@@ -585,7 +586,10 @@ const PolitiqueConfidentialite = () => (
         </h3>
         <p className="text-gray-600 mb-4">
           Notre équipe répond à toutes vos questions relatives à la protection de vos données personnelles
-          dans un délai de 30 jours.
+          après vérification d'identité.
+        </p>
+        <p className="text-sm text-gray-600 mb-4">
+          Revue juridique humaine requise avant de publier un délai de réponse chiffré.
         </p>
         <a
           href="mailto:support@altitudevision.agency"

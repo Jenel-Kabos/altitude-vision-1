@@ -127,7 +127,7 @@ describe('Accommodation', () => {
   beforeAll(async () => {
     const property = await makeProperty(adminB);
     accommodationB = await Accommodation.create({
-      property: property._id, createdBy: adminB._id, accommodationType: 'appartement_meuble',
+      property: property._id, tenant: tenantB._id, createdBy: adminB._id, accommodationType: 'appartement_meuble',
       capacity: { maxAdults: 2, maxChildren: 0 }, publicationStatus: 'brouillon',
     });
   });
@@ -143,10 +143,15 @@ describe('Accommodation', () => {
   });
 });
 
+// ARCH-AUTH-03 Pattern 1 (Option 3) — CRM : PATH B = PlatformOperator actif +
+// platform.crm.read (lecture) / platform.crm.manage (mutations, dont
+// /consolidations) + tenant explicitement sélectionné, sans OrgMembership.
+// Toujours borné au tenant sélectionné (voir P-CRM-01..15b).
 describe('CRM — dont fusion cross-tenant', () => {
   let customerB1;
   let customerB2;
   let customerA1;
+  let operatorCrmReadOnly;
 
   beforeAll(async () => {
     const mk = (tenant, name) => CrmCustomer.create({
@@ -155,11 +160,30 @@ describe('CRM — dont fusion cross-tenant', () => {
     customerB1 = await mk(tenantB, 'CustomerB1');
     customerB2 = await mk(tenantB, 'CustomerB2');
     customerA1 = await mk(tenantA, 'CustomerA1');
+    operatorCrmReadOnly = await User.create({
+      name: 'Operator CRM read', email: `operator-crm-read-${Date.now()}@example.test`,
+      password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
+    });
+    await grantOperator({ userId: operatorCrmReadOnly._id, actor: grantingAdmin, reason: 'Test CRM read-only', capabilities: ['platform.crm.read'] });
   });
 
-  test('2B.2-D : PlatformOperator sans membership ne liste pas les customers de B', async () => {
+  test('PATH B : PlatformOperator platform.crm.read, sans membership, Tenant B sélectionné → customers de B uniquement', async () => {
     const res = await request(app).get('/api/crm/customers').set(bearer(operatorUser, tenantB));
+    expect(res.status).toBe(200);
+    const customers = res.body.data?.customers;
+    expect(Array.isArray(customers)).toBe(true);
+    const ids = customers.map((c) => String(c._id));
+    expect(ids).toEqual(expect.arrayContaining([String(customerB1._id), String(customerB2._id)]));
+    expect(ids).not.toContain(String(customerA1._id));
+    for (const c of customers) expect(String(c.tenant)).toBe(String(tenantB._id));
+  });
+
+  test('PATH B : platform.crm.read seul ne permet pas la fusion (read ≠ manage) → 403, aucune mutation', async () => {
+    const res = await request(app).post('/api/crm/consolidations').set(bearer(operatorCrmReadOnly, tenantB))
+      .send({ customerA: String(customerB1._id), customerB: String(customerB2._id), decision: 'keep_a', justification: 'Test PLATFORM-ADMIN-CERT-1 read-only' });
     expect(res.status).toBe(403);
+    const b2 = await CrmCustomer.findById(customerB2._id).select('mergedInto');
+    expect(b2.mergedInto).toBeFalsy();
   });
 
   test('TESTÉ DIRECTEMENT : fusion CRM cross-tenant refusée même pour un opérateur scopé à B (customerA1 hors scope)', async () => {
@@ -170,10 +194,21 @@ describe('CRM — dont fusion cross-tenant', () => {
     expect(check.mergedInto).toBeFalsy();
   });
 
-  test('2B.2-D : fusion CRM reste refusée à l\'opérateur sans membership', async () => {
+  test('PATH B : PlatformOperator platform.crm.manage, sans membership, fusionne deux customers de B → 201, borné à B', async () => {
     const res = await request(app).post('/api/crm/consolidations').set(bearer(operatorUser, tenantB))
       .send({ customerA: String(customerB1._id), customerB: String(customerB2._id), decision: 'keep_a', justification: 'Test PLATFORM-ADMIN-CERT-1 fusion' });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
+    expect(String(res.body.data.consolidation.tenant)).toBe(String(tenantB._id));
+    const [b1, b2, a1] = await Promise.all([
+      CrmCustomer.findById(customerB1._id).select('tenant mergedInto').lean(),
+      CrmCustomer.findById(customerB2._id).select('tenant mergedInto').lean(),
+      CrmCustomer.findById(customerA1._id).select('tenant mergedInto').lean(),
+    ]);
+    expect(String(b2.mergedInto)).toBe(String(customerB1._id));
+    expect(b1.mergedInto).toBeFalsy();
+    expect(String(b1.tenant)).toBe(String(tenantB._id));
+    expect(String(b2.tenant)).toBe(String(tenantB._id));
+    expect(a1.mergedInto).toBeFalsy();
   });
 });
 
@@ -279,18 +314,66 @@ describe('Finance — hotel financial dashboard', () => {
   });
 });
 
+// ARCH-AUTH-03 Pattern 1 (Option 3) — RentalManagement R1 (lecture) : PATH B =
+// PlatformOperator actif + platform.rentals.read + tenant sélectionné, sans
+// OrgMembership (voir P-RENTAL-01..19). Une membership d'un AUTRE tenant
+// n'autorise jamais le tenant cible ; seule la capability plateforme + le
+// tenant sélectionné le peut, et toujours bornée à ce tenant.
 describe('GL — RentalManagement', () => {
+  let rentalA;
   let rentalB;
+  let rentalNull;
+  let memberBNotOperator;
+  let operatorNoRentals;
+  const rentalIds = (res) => {
+    const rentals = res.body.data?.rentals;
+    expect(Array.isArray(rentals)).toBe(true);
+    return rentals.map((r) => String(r._id));
+  };
+
   beforeAll(async () => {
-    const property = await makeProperty(adminB);
-    property.tenant = tenantB._id;
-    await property.save();
-    rentalB = await RentalManagement.create({ property: property._id, owner: adminB._id, tenant: tenantB._id, managementActivated: true, active: true });
+    const propertyB = await makeProperty(adminB);
+    propertyB.tenant = tenantB._id;
+    await propertyB.save();
+    rentalB = await RentalManagement.create({ property: propertyB._id, owner: adminB._id, tenant: tenantB._id, managementActivated: true, active: true });
+    const propertyA = await makeProperty(adminA);
+    propertyA.tenant = tenantA._id;
+    await propertyA.save();
+    rentalA = await RentalManagement.create({ property: propertyA._id, owner: adminA._id, tenant: tenantA._id, managementActivated: true, active: true });
+    // Legacy tenant:null, possédé par un membre de A : ne doit jamais être
+    // exposé à un contexte opérateur (INVARIANTS §12 anti-pattern tenant:null).
+    const propertyNull = await makeProperty(adminA);
+    rentalNull = await RentalManagement.create({ property: propertyNull._id, owner: adminA._id, tenant: null, managementActivated: true, active: true });
+
+    memberBNotOperator = await User.create({
+      name: 'Member B not operator', email: `member-b-${Date.now()}@example.test`,
+      password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
+    });
+    await addTenantMember({ tenant: tenantB, user: memberBNotOperator, bootstrap: adminB, businessRole: 'Admin' });
+    operatorNoRentals = await User.create({
+      name: 'Operator no rentals', email: `operator-no-rentals-${Date.now()}@example.test`,
+      password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
+    });
+    await grantOperator({ userId: operatorNoRentals._id, actor: grantingAdmin, reason: 'Test sans rentals', capabilities: ['platform.crm.read'] });
   });
 
-  test('PlatformOperator sans membership reste refusé sur RentalManagement tenant', async () => {
+  test('PATH B : PlatformOperator platform.rentals.read, sans membership, Tenant B sélectionné → rentals de B uniquement', async () => {
     const res = await request(app).get('/api/rental-management').set(bearer(operatorUser, tenantB));
+    expect(res.status).toBe(200);
+    const ids = rentalIds(res);
+    expect(ids).toContain(String(rentalB._id));
+    expect(ids).not.toContain(String(rentalA._id));
+    expect(ids).not.toContain(String(rentalNull._id));
+  });
+
+  test('PlatformOperator SANS platform.rentals.* (mauvaise capability), Tenant B sélectionné → 403', async () => {
+    const res = await request(app).get('/api/rental-management').set(bearer(operatorNoRentals, tenantB));
     expect(res.status).toBe(403);
+  });
+
+  test('PlatformOperator avec tenant cible inexistant → refusé', async () => {
+    const res = await request(app).get('/api/rental-management').set(bearer(operatorUser, { _id: '64b000000000000000000000' }));
+    expect([403, 404]).toContain(res.status);
   });
 
   test('le même acteur avec membership Admin est évalué par son businessRole tenant', async () => {
@@ -300,8 +383,18 @@ describe('GL — RentalManagement', () => {
     expect(res.body.data.rentals.map((r) => String(r._id))).toContain(String(rentalB._id));
   });
 
-  test('la membership Tenant B ne donne aucun accès au Tenant A', async () => {
-    const res = await request(app).get('/api/rental-management').set(bearer(operatorUser, tenantA));
+  test('membership Admin Tenant B SANS PlatformOperator → aucun accès au Tenant A (403)', async () => {
+    const res = await request(app).get('/api/rental-management').set(bearer(memberBNotOperator, tenantA));
     expect(res.status).toBe(403);
+    expect(JSON.stringify(res.body)).not.toContain(String(rentalA._id));
+  });
+
+  test('membership Tenant B + PlatformOperator platform.rentals.read, Tenant A sélectionné → accès via PATH B, borné à A', async () => {
+    const res = await request(app).get('/api/rental-management').set(bearer(operatorUser, tenantA));
+    expect(res.status).toBe(200);
+    const ids = rentalIds(res);
+    expect(ids).toContain(String(rentalA._id));
+    expect(ids).not.toContain(String(rentalB._id));
+    expect(ids).not.toContain(String(rentalNull._id));
   });
 });

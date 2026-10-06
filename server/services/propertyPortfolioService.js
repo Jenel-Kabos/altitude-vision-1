@@ -80,7 +80,10 @@ async function getPropertyPortfolio({ scopeUserIds, tenantId } = {}) {
       publicationStatus: 'publie', active: { $ne: false },
       $or: [{ hotel: null }, { hotel: { $exists: false } }],
     }).populate({ path: 'property', match: { ...ownerScope, ...tenantScope } }).lean(),
-    listEligibleHotels({ propertyOwnerIds: Array.isArray(scopeUserIds) ? scopeUserIds : undefined }),
+    listEligibleHotels({
+      propertyOwnerIds: Array.isArray(scopeUserIds) ? scopeUserIds : undefined,
+      tenantId,
+    }),
   ]);
 
   const projected = [

@@ -20,6 +20,7 @@ const FinancialDocument = require('../models/FinancialDocument');
 const dashboardAnalyticsRoutes = require('../routes/dashboardAnalyticsRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
+const { listAccommodationsForAdmin } = require('../services/accommodationService');
 
 jest.setTimeout(180000);
 
@@ -127,6 +128,29 @@ describe('reproduction cross-tenant — Admin A ne reçoit jamais la sentinelle 
     expect(res.status).toBe(200);
     expect(res.body.data.kpis.grossAmountCollected).toBe(sentinels.A);
     expect(res.body.data.kpis.total).toBe(1);
+  });
+
+  test('C2.8 — le KPI visibleTotal correspond à la liste publiée/active/validée sans supprimer le total workflow', async () => {
+    const draftProperty = await Property.collection.insertOne({
+      _id: oid(), tenant: tenantA._id, owner: adminA._id, title: 'C28 brouillon',
+      status: 'hebergement', pole: 'Altimmo', statusAdmin: 'Validée',
+      isPublished: false, availability: 'Disponible',
+    });
+    await Accommodation.collection.insertOne({
+      _id: oid(), tenant: tenantA._id, property: draftProperty.insertedId,
+      accommodationType: 'villa_meublee', publicationStatus: 'brouillon',
+      active: true, createdBy: adminA._id,
+    });
+    const list = await listAccommodationsForAdmin({
+      status: 'publie', independentOnly: true, validatedOnly: true, activeOnly: true,
+      scopeFilter: { tenant: tenantA._id },
+    });
+    const res = await request(app).get('/api/dashboard-analytics/accommodations').set(bearer(adminA));
+
+    expect(list.total).toBe(1);
+    expect(res.status).toBe(200);
+    expect(res.body.data.kpis.total).toBe(2);
+    expect(res.body.data.kpis.visibleTotal).toBe(list.total);
   });
 
   test('hotels — agrégat financier inclus', async () => {

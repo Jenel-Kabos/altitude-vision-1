@@ -3,6 +3,14 @@
 // /api/maintenance, hôtelier — Sprint E) + actions préavis sur
 // /api/rental-management (acknowledge-notice/cancel-notice).
 
+// C2.10A — primitive canonique du scope locatif (Property.tenant), mockée
+// comme l'attribution ci-dessus ; la frontière réelle est certifiée par
+// __tests__/rentalScopeC210A.mongo.integration.test.js.
+jest.mock('../services/platformTenant/rentalScopeService', () => ({
+  ...jest.requireActual('../services/platformTenant/rentalScopeService'),
+  assertRentalResourceInTenant: jest.fn().mockResolvedValue({ status: 'resolved', scope: 'ORGANIZATION' }),
+}));
+
 jest.mock('../models/Property');
 jest.mock('../models/RentalMaintenanceTicket');
 jest.mock('../models/RentalManagement');

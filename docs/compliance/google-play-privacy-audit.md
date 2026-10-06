@@ -1,7 +1,7 @@
 # Google Play — Privacy & Data Safety audit (Altimmo)
 
 Sprint : préparation soumission Google Play.
-Date : 2026-09-28 (mise à jour post-remédiation P0). Commit HEAD : `1f5c74f`.
+Date : 2026-09-29 (gate de clôture P0). Commit HEAD audité : `46644bee0cc238e82efdedabd29bec79512c7541`.
 Branch : `main`.
 
 **Statut** : après le sprint de remédiation, P0-1 (account deletion) est
@@ -40,7 +40,7 @@ Aucun fichier de politique publique créé — les pages existent déjà :
 | Crash reporting mobile | Sentry (`altimmo-mobile` / org `altitudevision`) | `App.js` `Sentry.init`, plugin dans `app.config.js:113` |
 | Auth Google | `@react-native-google-signin/google-signin` mobile ; `passport-google-oauth20`/similaire côté server | `googleSignIn.js` |
 | Analytics web | Google Analytics (GA4) | `client/lib/components/GoogleAnalytics.jsx` |
-| Cartographie | Google Maps Android + `react-native-maps` | `app.config.js:70-72` + clé dans manifest |
+| Cartographie | Google Maps Android + `react-native-maps` | `app.config.js:70-72`, injection par variable d'environnement uniquement |
 | Email transactionnel | Zoho SMTP + OAuth (org Altitude Vision) | `server/config/email.js` |
 
 ---
@@ -88,19 +88,19 @@ Manifeste fusionné réel : `altimmo-app/android/app/src/main/AndroidManifest.xm
 | `READ_EXTERNAL_STORAGE` | `app.config.js` (avec `maxSdkVersion=32` dans manifeste) | Sélection fichier < Android 13 | **Nécessaire (legacy)** |
 | `WRITE_EXTERNAL_STORAGE` | Manifest merger (`maxSdkVersion=32`) | Cache Expo/Cloudinary sur legacy Android | **Recommandation : à confirmer, hérité** |
 | `INTERNET` | Merger (RN core) | Requêtes API | **Nécessaire** |
-| `FOREGROUND_SERVICE` | Merger (`expo-audio`) | Service `AudioControlsService` déclaré | **À justifier** — usage audio en foreground non évident dans le code applicatif |
-| `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Merger (`expo-audio`) | Service audio | **À justifier** — voir ci-dessus |
+| `FOREGROUND_SERVICE` | Merger (`expo-audio`) | Service `AudioControlsService` déclaré | **Justifié** par la lecture des pièces jointes audio dans `ChatScreen.jsx` |
+| `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Merger (`expo-audio`) | Service audio | **Justifié** par la lecture audio et les contrôles média |
 | `MODIFY_AUDIO_SETTINGS` | Merger (`expo-audio` / `expo-video`) | Lecture vidéo/audio | **À justifier** |
-| `RECORD_AUDIO` | Merger (`expo-audio`/`expo-camera` selon config) | Aucun flow d'enregistrement audio dans `src/` | **Recommandation : supprimer** ou justifier |
-| `SYSTEM_ALERT_WINDOW` | Merger (module tiers, probable `react-native-modal` / `react-native-webview`) | Aucun usage overlay explicite | **Recommandation : supprimer** ou justifier (probablement inutile) |
+| `RECORD_AUDIO` | Bloquée dans `app.config.js` | Aucun flow d'enregistrement audio dans `src/` | **Retrait configuré** |
+| `SYSTEM_ALERT_WINDOW` | Bloquée dans `app.config.js` | Aucun usage overlay explicite | **Retrait configuré** |
 | `VIBRATE` | Merger (`expo-haptics` / `expo-notifications`) | Feedback haptique / notifications | **Nécessaire** |
 
-**Verdict permissions** : cœur des permissions justifié. **Trois
-permissions à revalider avant soumission** : `RECORD_AUDIO`,
-`SYSTEM_ALERT_WINDOW`, et le duo `FOREGROUND_SERVICE_MEDIA_PLAYBACK` +
-service `AudioControlsService`. Play Console peut demander une
-justification écrite pour chacune. Aucune modification effectuée dans
-ce sprint.
+**Verdict permissions** : le prebuild temporaire contient les directives
+`tools:node="remove"` pour `RECORD_AUDIO` et `SYSTEM_ALERT_WINDOW`. Le manifest
+debug fusionné confirme `RECORD_AUDIO` absent ; `SYSTEM_ALERT_WINDOW` y est
+réintroduite uniquement par le manifest debug d'Expo Dev Client. La preuve
+fusionnée **release** reste à obtenir sur le prochain build signé. La permission
+de service média reste justifiée par `expo-audio` et `ChatScreen.jsx`.
 
 ---
 
@@ -184,7 +184,7 @@ bouger — CLAUDE.md invariants).
 - **VERDICT** : ✅ **CODE_CLOSED**.
 
 **Décisions humaines restantes (non bloquantes pour Play)** :
-1. Durées de conservation légales (facturation / litiges) en RDC — à
+1. Durées de conservation applicables (facturation / litiges) en République du Congo / Congo-Brazzaville — revue juridique humaine requise et à
    documenter dans la politique de confidentialité et éventuellement
    à automatiser via une purge programmée.
 2. Faut-il notifier les autres participants d'une conversation lorsqu'un
@@ -200,7 +200,7 @@ bouger — CLAUDE.md invariants).
 - Écran mobile : `PolitiqueConfidentialiteScreen.jsx` accessible depuis
   Profil.
 - Contact : `support@altitudevision.agency`, `+242 06 800 21 51`,
-  Brazzaville RDC (`PolitiqueConfidentialite.jsx:31-45`).
+  Brazzaville, République du Congo (`PolitiqueConfidentialite.jsx:31-45`).
 
 **Points à mettre à jour dans la politique existante** (non fait dans
 ce sprint car dirty worktree préservé et politique déjà présente) :
@@ -233,7 +233,7 @@ généré par `expo prebuild` est exclu.
 
 - **CLÉ_GOOGLE_MAPS_DANS_GIT** : ❌ non — jamais tracké. Aucun secret à
   extirper de l'historique.
-- **CLÉ_SUR_FILESYSTEM_LOCAL** : YES — le manifest local et l'APK
+- **CLÉ_SUR_FILESYSTEM_LOCAL** : non vérifié pendant ce gate ; aucune valeur secrète n'a été lue. Un manifest temporaire a été généré avec une valeur factice
   `build-1787511872437.apk` (149 Mo, non tracké) contiennent la clé.
 - **EXPOSITION EXTERNE** : dépend d'où cet APK a été distribué. Si
   jamais partagé (EAS internal distribution, test interne, upload Play
@@ -270,18 +270,12 @@ config :
 ]
 ```
 
-**État actuel du manifest natif** : le fichier
-`altimmo-app/android/app/src/main/AndroidManifest.xml` local contient
-encore RECORD_AUDIO et SYSTEM_ALERT_WINDOW car il date d'un prebuild
-antérieur à l'ajout de `blockedPermissions`. Il sera régénéré au
-prochain build EAS (ou `expo prebuild --clean`) qui appliquera
-`tools:node="remove"` sur ces permissions.
-
-**Choix intentionnel** : `expo prebuild --clean` n'a **pas** été
-exécuté dans ce sprint pour préserver le dossier `android/` local (qui
-n'est pas suivi par Git mais peut contenir des ajustements natifs
-locaux non documentés). La preuve définitive interviendra au prochain
-build officiel. Documenté comme `ANDROID_MANIFEST_REBUILD_PENDING`.
+**Vérification non destructive** : un prebuild a été exécuté dans une copie
+contrôlée sous `/private/tmp`, avec une valeur Maps factice. Le projet et son
+dossier `android/` local n'ont pas été modifiés. Le manifest principal généré
+porte les deux directives de retrait. La fusion debug réussit ; la fusion
+release a été arrêtée par l'upload Sentry faute de token et n'a pas été
+contournée. `ANDROID_RELEASE_MANIFEST_REBUILD_PENDING`.
 
 `FOREGROUND_SERVICE_MEDIA_PLAYBACK` et le service `AudioControlsService`
 restent (auto-ajoutés par `expo-audio` pour la lecture des annonces
@@ -295,12 +289,13 @@ Résultats réels des suites lancées :
 
 | Suite | Résultat | Détail |
 |---|---|---|
-| Backend integration ciblé (`accountSelfDeletion.mongo.integration.test.js`) | **8/8 PASS** | 22s, MongoMemoryReplSet réel |
-| Backend unit (`npm run test:unit`) | 1700 PASS / 3 pré-existants sur `propertyRoutes.test.js` (timeout, non lié) | 155 suites |
-| Frontend targeted (`SupprimerMonCompte.test.jsx`, `PolitiqueConfidentialite.privacy.test.jsx`) | **10/10 PASS** | Vitest |
-| Frontend complet (`npx vitest run`) | **1189/1189 PASS**, 157 suites | 75s |
-| Mobile targeted (`ProfilScreenAccountDeletion.test.jsx`) | **7/7 PASS** | Jest expo |
-| Mobile complet (`npm test`) | **604/604 PASS**, 68 suites | 62s |
+| Backend ciblé suppression/auth/membership/last-admin | **97/97 PASS**, 7 suites | Jest + MongoMemoryReplSet |
+| Backend unit (`npm run test:unit`) | 1700 PASS / 3 échecs (timeout `propertyRoutes`, 2 attentes `rentalDossiersRoutes`) | 157 suites |
+| Backend Mongo complet (`npm run test:mongo`) | **BLOCKED** | interrompu après 4 h 34 ; timeout 180 s observé dans `postContractContratTenantAuthority2E2XIII.mongo.integration.test.js` ; aucun total final fiable |
+| Frontend targeted (`SupprimerMonCompte.test.jsx`, `PolitiqueConfidentialite.privacy.test.jsx`) | **12/12 PASS**, 2 suites | Vitest |
+| Frontend complet (`npm test`) | **1191/1191 PASS**, 157 suites | Vitest |
+| Mobile targeted (suppression + politique) | **8/8 PASS**, 2 suites | Jest Expo |
+| Mobile complet (`npm test`) | **605/605 PASS**, 69 suites | Jest Expo |
 | Client lint | 0 erreurs (280 warnings pré-existants) | ESLint |
 | Mobile lint | 0 erreurs (129 warnings pré-existants) | ESLint |
 | Mobile typecheck | OK | tsc --noEmit |
@@ -317,14 +312,18 @@ navigateur/émulateur interactif dans cette session).
 
 | Contrôle | Statut | Commentaire |
 |---|---|---|
-| `PRIVACY_VS_CODE_CONSISTENCY` | **PARTIAL** | Politique existante mentionne Google Analytics correctement mais omet Sentry, Expo Push, Cloudinary. |
+| `PRIVACY_VS_CODE_CONSISTENCY` | **PASS** | Politiques web/mobile alignées sur Sentry, Expo, Cloudinary, Google Maps, Google Sign-In et suppression. |
 | `DATA_SAFETY_VS_CODE_CONSISTENCY` | **PASS** | Cette matrice a été construite depuis le code. |
-| `ANDROID_PERMISSIONS_CONSISTENCY` | **PARTIAL** | 3 permissions injectées par les modules natifs à justifier ou nettoyer. |
-| `ACCOUNT_DELETION_CONSISTENCY` | **FAIL** | Politique ne peut pas promettre une suppression que le code n'expose pas. Bloquant Play. |
+| `ANDROID_PERMISSIONS_CONSISTENCY` | **PARTIAL** | Retraits configurés et prebuild prouvé ; manifest release fusionné attendu au prochain build signé. |
+| `ACCOUNT_DELETION_CONSISTENCY` | **PASS** | Endpoint, service, UI et tests ciblés confirmés. |
 
 ---
 
-## 11. Rapport final
+## 11. Rapport initial historique — OBSOLÈTE
+
+> Ce bloc est conservé comme trace de l'audit initial. Il est explicitement
+> remplacé par le `GOOGLE_PLAY_P0_CLOSURE_REPORT` du 2026-09-29 et ne doit pas
+> être utilisé pour une décision de release.
 
 ```
 GOOGLE_PLAY_PRIVACY_DATA_SAFETY_REPORT
@@ -345,7 +344,7 @@ ARCHITECTURE_AUDIT
 DATA_INVENTORY
 - personal_info: nom, prénom, email (req), téléphone, photo, rôle
 - location: approx (recentrage carte) + précise (GPS d'un bien publié)
-- photos_videos: photos (biens/avatar/messages/documents) via Cloudinary; upload vidéo non confirmé
+- photos_videos: photos et vidéos de biens via Cloudinary ; upload vidéo confirmé dans `PublierBienScreen`
 - files_documents: dossiers locataires, litiges, contrats, factures — Cloudinary
 - messages: in-app (Socket.IO + MongoDB)
 - financial: purchase history métier (transactions, réservations, loyers); aucune donnée bancaire dans le code
@@ -355,9 +354,9 @@ DATA_INVENTORY
 - other: contenu utilisateur (annonces, avis, offres)
 
 ANDROID_PERMISSIONS
-- permissions: ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION, CAMERA, READ_MEDIA_IMAGES, READ_EXTERNAL_STORAGE (déclarées), + INTERNET, VIBRATE, MODIFY_AUDIO_SETTINGS, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK, RECORD_AUDIO, SYSTEM_ALERT_WINDOW, WRITE_EXTERNAL_STORAGE<=32 (injectées par modules)
-- unnecessary_permissions: RECORD_AUDIO, SYSTEM_ALERT_WINDOW — non trouvées à l'usage. FOREGROUND_SERVICE_MEDIA_PLAYBACK à justifier
-- verdict: PARTIAL
+- permissions: ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION, CAMERA, READ_MEDIA_IMAGES, READ_EXTERNAL_STORAGE, INTERNET, VIBRATE, MODIFY_AUDIO_SETTINGS, FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK, WRITE_EXTERNAL_STORAGE<=32
+- blocked_permissions: RECORD_AUDIO, SYSTEM_ALERT_WINDOW ; preuve release finale différée au prochain build signé
+- verdict: PARTIAL — manifest release fusionné encore requis
 
 THIRD_PARTY_SERVICES
 - services: Cloudinary, Expo Push, Expo Updates, Sentry, Google Sign-In, Google Maps SDK, Zoho Mail, MongoDB, Facebook Graph (pull vitrine)
@@ -373,15 +372,15 @@ LOCAL_STORAGE
 
 ACCOUNT_DELETION
 - account_creation: YES (email + Google Sign-In)
-- in_app_deletion: MISSING
-- web_deletion: MISSING
-- backend_support: PARTIAL (admin-only)
-- verdict: MISSING — bloquant Play Store
+- in_app_deletion: YES
+- web_deletion: YES (processus public informatif et espace authentifié)
+- backend_support: YES (`DELETE /api/users/me`, identité issue de `req.user`)
+- verdict: CODE_CLOSED ; 97/97 tests ciblés PASS
 
 PRIVACY_POLICY
 - existing_page: YES (web + mobile)
 - route: /politique-confidentialite
-- created_or_updated: NEITHER (préservation du worktree, page déjà présente et complète à 80%)
+- created_or_updated: UPDATED — suppression des durées juridiques non confirmées et alignement web/mobile
 - public_auth_requirement: NONE (route publique)
 - support_contact: support@altitudevision.agency
 - local_status: EXISTS (429 lignes web, 417 mobile)
@@ -390,7 +389,7 @@ PRIVACY_POLICY
 DATA_SAFETY
 - matrix_created: YES
 - path: docs/compliance/google-play-data-safety.md
-- unresolved_items: 5 (Sentry.setUser, upload vidéo, paiement effectif, permissions héritées, classification precise location)
+- unresolved_items: 3 (prestataire de paiement effectif, manifest release signé, classification Play de la position précise du bien)
 
 PLAY_CONSOLE_ANSWERS
 - document_created: YES

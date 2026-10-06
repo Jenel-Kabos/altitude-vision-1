@@ -62,9 +62,12 @@ async function createPropertyFor(owner, overrides = {}) {
 beforeAll(async () => { await startFinancialMongo(); });
 afterAll(async () => stopFinancialMongo());
 
+// PLATFORM-ADMIN-04C1 — les administrateurs tenant portent une adhésion
+// canonique `businessRole: 'Admin'` (contrat PA-01, 145a6e9) ; un
+// `User.role === 'Admin'` sans adhésion n'est plus une autorité tenant.
 describe('TENANT-SCOPE-AUDIT-2A — userController.downloadContractDocument : correction confirmée', () => {
   test('Admin (tenant unique) reçoit désormais autre chose qu’un échec masqué pour un Proprietaire non affilié — la vérification tenant ne bloque plus', async () => {
-    const fixture = await createTenantFixture({ label: 'ScopeAudit2aUser Solo' });
+    const fixture = await createTenantFixture({ label: 'ScopeAudit2aUser Solo', withAdminMembership: true });
     const owner = await createUnaffiliatedOwner();
     const res = await request(app).get(`/api/users/${owner._id}/contract-document`).set(bearer(fixture.bootstrap));
     // Avant correctif : 502 générique (l'erreur 404 de assertResourceTenant
@@ -76,7 +79,7 @@ describe('TENANT-SCOPE-AUDIT-2A — userController.downloadContractDocument : co
   });
 
   test('cross-tenant reste refusé : Admin A ne peut pas télécharger le contrat d’un compte affilié au Tenant B', async () => {
-    const fixtureA = await createTenantFixture({ label: 'ScopeAudit2aUser CrossA' });
+    const fixtureA = await createTenantFixture({ label: 'ScopeAudit2aUser CrossA', withAdminMembership: true });
     const fixtureB = await createTenantFixture({ label: 'ScopeAudit2aUser CrossB' });
     const ownerB = (await createTenantUser({ tenant: fixtureB.tenant, bootstrap: fixtureB.bootstrap, overrides: { role: 'Proprietaire' } })).user;
     const res = await request(app).get(`/api/users/${ownerB._id}/contract-document`).set(bearer(fixtureA.bootstrap));
@@ -143,7 +146,9 @@ describe('TENANT-SCOPE-AUDIT-2A — propertyController moderation (TENANT-strict
 });
 
 describe('TENANT-SCOPE-AUDIT-2A — rentalMaintenanceController (assertPropertyAccess) : correction confirmée', () => {
-  test('staff GL (tenant unique) peut désormais créer un ticket de maintenance pour un bien d’un Proprietaire non affilié', async () => {
+  // C2.10A (D3/D4, §9) — un bien tenant:null est INDIVIDUAL : aucun staff
+  // d'organisation ne peut y créer de ticket, même sur tenant unique.
+  test('C2.10A — staff GL ne peut pas créer de ticket sur le bien tenant:null d’un Proprietaire non affilié (même tenant unique)', async () => {
     const fixture = await createTenantFixture({ label: 'ScopeAudit2aMaint Solo' });
     const owner = await createUnaffiliatedOwner();
     const property = await createPropertyFor(owner);
@@ -153,8 +158,7 @@ describe('TENANT-SCOPE-AUDIT-2A — rentalMaintenanceController (assertPropertyA
       .set(bearer(fixture.bootstrap))
       .send({ propertyId: String(property._id), category: 'plomberie', description: 'Fuite sous évier cuisine' });
 
-    expect(res.status).toBe(201);
-    expect(res.body.data.ticket.category).toBe('plomberie');
+    expect(res.status).toBe(403);
   });
 
   test('cross-tenant reste refusé : staff GL du Tenant A ne peut pas créer de ticket sur un bien du Tenant B', async () => {
@@ -171,10 +175,18 @@ describe('TENANT-SCOPE-AUDIT-2A — rentalMaintenanceController (assertPropertyA
     expect(res.status).toBe(403);
   });
 
-  test('non-régression : un bien d’un Proprietaire affilié (OrgMembership réel) continue de fonctionner', async () => {
+  // C2.10A — la membership de l'owner n'attribue plus son bien personnel : seul
+  // Property.tenant = T ouvre la maintenance au staff de T.
+  test('C2.10A — bien Property.tenant = T : ticket créé ; bien personnel tenant:null du même owner membre : refusé', async () => {
     const fixture = await createTenantFixture({ label: 'ScopeAudit2aMaint IAM' });
     const owner = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Proprietaire' } })).user;
-    const property = await createPropertyFor(owner);
+    const property = await createPropertyFor(owner, { tenant: fixture.tenant._id });
+    const personal = await createPropertyFor(owner);
+    const refused = await request(app)
+      .post('/api/rental-maintenance')
+      .set(bearer(fixture.bootstrap))
+      .send({ propertyId: String(personal._id), category: 'electricite', description: 'Panne sur bien personnel' });
+    expect(refused.status).toBe(403);
 
     const res = await request(app)
       .post('/api/rental-maintenance')

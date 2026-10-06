@@ -8,11 +8,12 @@ import api from '../services/api';
 vi.mock('../services/api', () => ({ default: { get: vi.fn() } }));
 
 describe('dashboardService — getDashboardStats', () => {
+  const tenantScope = { mode: 'tenant', tenantId: 'tenant-a', key: 'tenant:tenant-a' };
   test('contratsActifs lit le KPI réel fourni par le backend (data.stats.RentalActiveContracts)', async () => {
     api.get.mockResolvedValue({ data: { data: { stats: { Altimmo: 2, RentalActiveContracts: 3 } } } });
     const { getDashboardStats } = await import('../services/dashboardService');
 
-    const result = await getDashboardStats();
+    const result = await getDashboardStats(tenantScope);
 
     expect(result.contratsActifs).toBe(3);
   });
@@ -21,7 +22,7 @@ describe('dashboardService — getDashboardStats', () => {
     api.get.mockResolvedValue({ data: { data: { stats: { Altimmo: 0, RentalActiveContracts: 0 } } } });
     const { getDashboardStats } = await import('../services/dashboardService');
 
-    const result = await getDashboardStats();
+    const result = await getDashboardStats(tenantScope);
 
     expect(result.contratsActifs).toBe(0);
     expect(Number.isNaN(result.contratsActifs)).toBe(false);
@@ -31,7 +32,7 @@ describe('dashboardService — getDashboardStats', () => {
     api.get.mockResolvedValue({ data: { data: { stats: { Altimmo: 0 } } } });
     const { getDashboardStats } = await import('../services/dashboardService');
 
-    const result = await getDashboardStats();
+    const result = await getDashboardStats(tenantScope);
 
     expect(result.contratsActifs).toBe(0);
   });

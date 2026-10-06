@@ -31,12 +31,14 @@ describe('runtime tenant plateforme', () => {
     const config = await api.interceptors.request.handlers[0].fulfilled({ headers: {} });
     expect(config.headers['X-Platform-Tenant-Id']).toBeUndefined();
     expect(result.current.tenantRequired).toBe(true);
+    expect(result.current.scope).toEqual({ mode: 'unresolved', tenantId: null, key: 'unresolved' });
   });
 
   test('une sélection validée est injectée et un changement remplace le header', async () => {
     const { result } = renderHook(() => usePlatformTenantRuntime(), { wrapper });
     await waitFor(() => expect(result.current.tenantReady).toBe(true));
     act(() => result.current.selectTenant('tenant-a'));
+    expect(result.current.scope).toEqual({ mode: 'tenant', tenantId: 'tenant-a', key: 'tenant:tenant-a' });
     expect(result.current.tenantBusinessRole).toBe('Admin');
     expect(authUser.role).toBe('Admin');
     let config = await api.interceptors.request.handlers[0].fulfilled({ headers: {} });
@@ -45,6 +47,32 @@ describe('runtime tenant plateforme', () => {
     expect(result.current.tenantBusinessRole).toBe('Collaborateur');
     config = await api.interceptors.request.handlers[0].fulfilled({ headers: {} });
     expect(config.headers['X-Platform-Tenant-Id']).toBe('tenant-b');
+  });
+
+  test('un opérateur pleinement éligible sans sélection obtient le scope PLATFORM explicite', async () => {
+    listAccessibleTenants.mockResolvedValue([]);
+    getMyOperatorStatus.mockResolvedValue({
+      status: 'active',
+      platformViewEligible: true,
+      capabilities: ['platform.properties.read'],
+    });
+    const { result } = renderHook(() => usePlatformTenantRuntime(), { wrapper });
+    await waitFor(() => expect(result.current.tenantReady).toBe(true));
+    expect(result.current.scope).toEqual({ mode: 'platform', tenantId: null, key: 'platform' });
+    expect(result.current.isPlatformView).toBe(true);
+  });
+
+  test('un opérateur partiel sans sélection reste UNRESOLVED et conserve sa capability spécialisée', async () => {
+    listAccessibleTenants.mockResolvedValue([]);
+    getMyOperatorStatus.mockResolvedValue({
+      status: 'active',
+      platformViewEligible: false,
+      capabilities: ['platform.support.read'],
+    });
+    const { result } = renderHook(() => usePlatformTenantRuntime(), { wrapper });
+    await waitFor(() => expect(result.current.tenantReady).toBe(true));
+    expect(result.current.scope).toEqual({ mode: 'unresolved', tenantId: null, key: 'unresolved' });
+    expect(result.current.can('platform.support.read')).toBe(true);
   });
 
   test('SWITCH-01..04 / UIROLE-01 : un Proprietaire découvre et sélectionne ses rôles tenant sans mutation globale', async () => {

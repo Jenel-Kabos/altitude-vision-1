@@ -9,7 +9,14 @@ vi.mock('next/image', () => ({ default: ({ fill: _fill, ...props }) => <img {...
 vi.mock('../services/hotelService', () => ({ getHotelPortfolio: vi.fn(), deactivateHotel: vi.fn() }));
 vi.mock('../components/dashboard/HotelPropertyForm', () => ({ default: ({ onSuccess }) => <button onClick={() => onSuccess({ hotel: { publicationStatus: 'soumis' } })}>Soumettre le formulaire test</button> }));
 vi.mock('../services/dashboardAnalyticsService', () => ({ getDashboardAnalytics: vi.fn().mockResolvedValue({ kpis: {} }) }));
-vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { role: 'Admin' } }) }));
+const runtimeState = {
+  scope: { mode: 'tenant', tenantId: 'TENANT-A', key: 'tenant:TENANT-A' },
+  tenantBusinessRole: 'Admin',
+  can: () => false,
+};
+vi.mock('../context/PlatformTenantRuntimeContext', () => ({
+  usePlatformTenantRuntime: () => runtimeState,
+}));
 
 const publishedHotel = {
   _id: 'HOTEL-1', name: 'Altitude Hôtel', publicationStatus: 'publie', status: 'actif', active: true,
@@ -21,6 +28,11 @@ const publishedHotel = {
 describe('ManageHotelsPage — portefeuille hôtelier validé', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(runtimeState, {
+      scope: { mode: 'tenant', tenantId: 'TENANT-A', key: 'tenant:TENANT-A' },
+      tenantBusinessRole: 'Admin',
+      can: () => false,
+    });
     getHotelPortfolio.mockResolvedValue({ hotels: [publishedHotel], total: 1, page: 1, limit: 12 });
     window.confirm = vi.fn(() => true);
   });
@@ -41,7 +53,7 @@ describe('ManageHotelsPage — portefeuille hôtelier validé', () => {
   test('recherche via le seul endpoint portefeuille sans statut de modération', async () => {
     render(<ManageHotelsPage />);
     fireEvent.change(await screen.findByLabelText('Rechercher un établissement'), { target: { value: 'Altitude' } });
-    await waitFor(() => expect(getHotelPortfolio).toHaveBeenCalledWith(expect.objectContaining({ search: 'Altitude' })));
+    await waitFor(() => expect(getHotelPortfolio).toHaveBeenCalledWith(expect.objectContaining({ search: 'Altitude' }), { platformScoped: false }));
     expect(getHotelPortfolio.mock.calls.flatMap(([params]) => Object.keys(params))).not.toContain('status');
   });
 
@@ -61,6 +73,33 @@ describe('ManageHotelsPage — portefeuille hôtelier validé', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Actions pour Altitude Hôtel' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Archiver' }));
     fireEvent.click(screen.getByRole('button', { name: 'Archiver' }));
-    await waitFor(() => expect(deactivateHotel).toHaveBeenCalledWith('HOTEL-1'));
+    await waitFor(() => expect(deactivateHotel).toHaveBeenCalledWith('HOTEL-1', { platformScoped: false }));
+  });
+
+  test('refuse les actions hôtel au CommunityManager du tenant', async () => {
+    runtimeState.tenantBusinessRole = 'CommunityManager';
+    render(<ManageHotelsPage />);
+    await screen.findByText('Altitude Hôtel');
+    expect(screen.queryByRole('button', { name: 'Ajouter un établissement' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions pour Altitude Hôtel' }));
+    expect(screen.queryByRole('menuitem', { name: 'Modifier' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Archiver' })).not.toBeInTheDocument();
+  });
+
+  test('accorde les actions hôtel depuis le businessRole tenant, sans dépendre du User.role global', async () => {
+    runtimeState.tenantBusinessRole = 'GestionnaireImmobilier';
+    render(<ManageHotelsPage />);
+    expect(await screen.findByRole('button', { name: 'Ajouter un établissement' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actions pour Altitude Hôtel' })).toBeInTheDocument();
+  });
+
+  test('ne transforme pas un ancien Admin global sans membership en autorité tenant', async () => {
+    runtimeState.tenantBusinessRole = null;
+    render(<ManageHotelsPage />);
+    await screen.findByText('Altitude Hôtel');
+    expect(screen.queryByRole('button', { name: 'Ajouter un établissement' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions pour Altitude Hôtel' }));
+    expect(screen.queryByRole('menuitem', { name: 'Modifier' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Archiver' })).not.toBeInTheDocument();
   });
 });

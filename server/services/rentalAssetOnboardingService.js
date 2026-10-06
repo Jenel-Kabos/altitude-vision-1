@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const { resolvePropertyCreationTenant } = require('./platformTenant/organizationAssetInvariantService');
 const Property = require('../models/Property');
 const RentalManagement = require('../models/RentalManagement');
 const User = require('../models/User');
 const Proprietaire = require('../models/Proprietaire');
 const Contrat = require('../models/Contrat');
-const PlatformTenantSubscription = require('../models/PlatformTenantSubscription');
 const sync = require('./rentalListingSyncService');
 const { logAction, buildAuteur } = require('./actionLogService');
 
@@ -33,14 +33,22 @@ const optionBase = ({ id, sourceType, proprietaire, ownerUserId, title, address,
   proprietaireName: `${proprietaire.prenom} ${proprietaire.nom}`.trim(),
 });
 
-async function getOptions() {
+// `propertyFilter` (optionnel) — BACKEND-TENANT-ISOLATION-CLOSURE-01 : en
+// contexte PlatformOperator, le contrôleur passe `{ tenant: tenantSélectionné }`
+// ; seuls les Property de ce tenant et les Proprietaire qui en possèdent
+// sont alors exposés. Sans filtre, comportement historique inchangé.
+async function getOptions({ propertyFilter } = {}) {
   // La fiche métier Proprietaire est le point de départ. Un User portant
   // simplement le rôle Proprietaire n'accorde aucune éligibilité.
-  const proprietaires = await Proprietaire.find({}).select('nom prenom email telephone ville user biensPropres').sort({ nom: 1, prenom: 1 }).lean();
-  const linkedUserIds = proprietaires.map(p => p.user).filter(Boolean);
+  const allProprietaires = await Proprietaire.find({}).select('nom prenom email telephone ville user biensPropres').sort({ nom: 1, prenom: 1 }).lean();
+  const linkedUserIds = allProprietaires.map(p => p.user).filter(Boolean);
   const properties = linkedUserIds.length
-    ? await Property.find({ owner: { $in: linkedUserIds } }).sort({ createdAt: -1 }).lean()
+    ? await Property.find({ owner: { $in: linkedUserIds }, ...(propertyFilter || {}) }).sort({ createdAt: -1 }).lean()
     : [];
+  const scopedOwnerIds = new Set(properties.map(p => String(p.owner)));
+  const proprietaires = propertyFilter
+    ? allProprietaires.filter(p => p.user && scopedOwnerIds.has(String(p.user)))
+    : allProprietaires;
   const propertyIds = properties.map(p => p._id);
   const [rentals, contracts, imported] = await Promise.all([
     RentalManagement.find({ property: { $in: propertyIds }, managementActivated: true }).select('property').lean(),
@@ -218,6 +226,10 @@ async function reconstructHistoricalManagedProperty({ data, actor, contractId, r
     owner._id, data.title, data.city, data.street,
   ].map(value => String(value).trim().toLocaleLowerCase('fr')).join('|')).digest('hex');
 
+  const propertyTenant = await resolvePropertyCreationTenant({
+    ownerId: owner._id,
+    contextualTenantId: actor?.platformTenant?._id || actor?.platformTenant || null,
+  });
   let property;
   try {
     property = await Property.create({
@@ -232,7 +244,7 @@ async function reconstructHistoricalManagedProperty({ data, actor, contractId, r
       // Historical reconstruction inherits attribution from the caller's
       // resolved tenant when available (Lot G contract). Falls back to the
       // owner's canonical tenant if the caller is unattributed.
-      tenant: actor?.platformTenant?._id || null,
+      tenant: propertyTenant,
     });
     // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-H.1 — historical reconstruction
     // must participate in the canonical quota invariant. Admin/GestionnaireImmobilier

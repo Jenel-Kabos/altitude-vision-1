@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import DashboardLayout from '../../app/dashboard/layout';
 import { useAuth } from '../context/AuthContext';
-import { DASHBOARD_SCOPE, dashboardScopeForRoute } from '../navigation/dashboardRouteScope';
+import { DASHBOARD_SCOPE, dashboardScopeForRoute, dashboardRequirementForRoute } from '../navigation/dashboardRouteScope';
 
 let pathname = '/dashboard/activations-professionnelles';
 let authUser = { _id: 'operator-1', role: 'Admin' };
@@ -10,6 +10,7 @@ let runtime = {
   tenantLoading: false,
   tenantRequired: true,
   selectedTenantId: null,
+  scope: { mode: 'platform', tenantId: null, key: 'platform' },
 };
 const replace = vi.fn();
 
@@ -46,7 +47,7 @@ describe('DashboardLayout — portée plateforme des activations professionnelle
     pathname = '/dashboard/activations-professionnelles';
     authUser = { _id: 'operator-1', role: 'Admin' };
     capabilities = ['platform.tenant_applications.read'];
-    runtime = { tenantLoading: false, tenantRequired: true, selectedTenantId: null };
+    runtime = { tenantLoading: false, tenantRequired: true, selectedTenantId: null, scope: { mode: 'platform', tenantId: null, key: 'platform' } };
     replace.mockClear();
   });
 
@@ -70,6 +71,7 @@ describe('DashboardLayout — portée plateforme des activations professionnelle
   });
 
   test.each([
+    '/dashboard',
     '/dashboard/properties',
     '/dashboard/sales',
     '/dashboard/rentals',
@@ -79,6 +81,25 @@ describe('DashboardLayout — portée plateforme des activations professionnelle
     render(<DashboardLayout><p>Registre global Altimmo</p></DashboardLayout>);
     expect(screen.getByText('Registre global Altimmo')).toBeInTheDocument();
     expect(screen.queryByText('Sélectionnez un tenant à administrer')).not.toBeInTheDocument();
+  });
+
+  test.each(['/dashboard', '/dashboard/properties', '/dashboard/sales', '/dashboard/rentals'])(
+    'le domaine Core %s refuse un runtime UNRESOLVED',
+    (route) => {
+      pathname = route;
+      runtime = { ...runtime, scope: { mode: 'unresolved', tenantId: null, key: 'unresolved' } };
+      render(<DashboardLayout><p>Données administratives</p></DashboardLayout>);
+      expect(screen.getByText('Sélectionnez un tenant à administrer')).toBeInTheDocument();
+      expect(screen.queryByText('Données administratives')).not.toBeInTheDocument();
+    },
+  );
+
+  test('la définition Core exprime les branches plateforme et tenant avec la capability exacte', () => {
+    expect(dashboardRequirementForRoute('/dashboard/properties')).toEqual({
+      kind: 'administration',
+      platform: { capability: 'platform.properties.read' },
+      tenant: { allowed: true },
+    });
   });
 
   test('un opérateur sans capacité reste bloqué', () => {

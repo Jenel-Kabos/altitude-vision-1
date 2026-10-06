@@ -42,7 +42,8 @@ async function buildTenantWithTicket(label) {
     title: `Bien maintenance ${label}`, description: 'Description suffisamment longue pour le test de maintenance locative.',
     pole: 'Altimmo', type: 'Maison', status: 'location', price: 200000,
     address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.24,
-    images: ['https://placehold.co/1200x800/png?text=Test'], surface: 80, owner: owner._id,
+    images: ['https://placehold.co/1200x800/png?text=Test'], surface: 80, owner: owner._id, tenant: tenant._id, // C2.10A — provenance canonique Property.tenant
+
   });
   const ticket = await RentalMaintenanceTicket.create({ property: property._id, owner: owner._id, category: 'plomberie', description: `Maintenance ${label}` });
   return { admin, tenant, property, ticket };

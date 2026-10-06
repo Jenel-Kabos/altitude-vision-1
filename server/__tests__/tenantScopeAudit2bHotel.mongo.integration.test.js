@@ -84,9 +84,13 @@ describe('TENANT-SCOPE-HOTFIX-3 — Phase A (Hotel) — correction confirmée', 
   });
 
   test('staff (tenant unique) continue de fonctionner sans changement : Admin consulte son hôtel via GET /:id', async () => {
-    const fixture = await createTenantFixture({ label: 'Hotfix3Hotel Staff' });
+    // PLATFORM-ADMIN-04C1 — l'Admin est un administrateur tenant canonique
+    // (adhésion Admin) et l'hôtel porte son attribution DIRECTE `tenant` : le
+    // repli propriétaire a été supprimé par PA-04C (un hôtel tenant:null est
+    // une ressource plateforme, jamais administrable en TENANT).
+    const fixture = await createTenantFixture({ label: 'Hotfix3Hotel Staff', withAdminMembership: true });
     const manager = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Proprietaire' } })).user;
-    const hotel = await Hotel.create({ name: 'Hotel Staff GetOne', manager: manager._id, createdBy: manager._id, publicationStatus: 'publie' });
+    const hotel = await Hotel.create({ name: 'Hotel Staff GetOne', tenant: fixture.tenant._id, manager: manager._id, createdBy: manager._id, publicationStatus: 'publie' });
 
     const res = await request(app).get(`/api/hotels/${hotel._id}`).set(bearer(fixture.bootstrap));
     expect(res.status).toBe(200);
@@ -95,15 +99,28 @@ describe('TENANT-SCOPE-HOTFIX-3 — Phase A (Hotel) — correction confirmée', 
 
   test('cross-tenant reste refusé : staff non-Admin (Tenant A) ne peut pas accéder à un hôtel du Tenant B via /admin/list (scope déjà appliqué pour les rôles non-Admin)', async () => {
     const fixtureA = await createTenantFixture({ label: 'Hotfix3Hotel CrossA' });
-    const staffA = (await createTenantUser({ tenant: fixtureA.tenant, bootstrap: fixtureA.bootstrap, overrides: { role: 'GestionnaireImmobilier' } })).user;
+    // PA-04C2 (C2.2) — autorité tenant Hotel = OrgMembership active + businessRole
+    // (HOTEL_TENANT_ROLES), jamais User.role seul : le staff A est un
+    // GestionnaireImmobilier canonique. L'intention (B jamais visible) est inchangée.
+    const staffA = (await createTenantUser({ tenant: fixtureA.tenant, bootstrap: fixtureA.bootstrap, overrides: { role: 'GestionnaireImmobilier' }, businessRole: 'GestionnaireImmobilier' })).user;
     const fixtureB = await createTenantFixture({ label: 'Hotfix3Hotel CrossB' });
     const managerB = (await createTenantUser({ tenant: fixtureB.tenant, bootstrap: fixtureB.bootstrap, overrides: { role: 'Proprietaire' } })).user;
-    const hotelB = await Hotel.create({ name: 'Hotel Tenant B', manager: managerB._id, createdBy: managerB._id, publicationStatus: 'publie' });
+    // PA-04C1 — hôtel réellement attribué au Tenant B (sinon le refus serait trivial).
+    const hotelB = await Hotel.create({ name: 'Hotel Tenant B', tenant: fixtureB.tenant._id, manager: managerB._id, createdBy: managerB._id, publicationStatus: 'publie' });
 
     const res = await request(app).get(`/api/hotels/admin/list`).set(bearer(staffA));
     expect(res.status).toBe(200);
     const ids = (res.body.data?.hotels || []).map((h) => String(h._id));
     expect(ids).not.toContain(String(hotelB._id));
+  });
+
+  test('PA-04C2 (C2.2) — User.role GestionnaireImmobilier seul (membership sans businessRole) → /admin/list refusé', async () => {
+    const fixture = await createTenantFixture({ label: 'Hotfix3Hotel LegacyRoleOnly' });
+    const legacyStaff = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'GestionnaireImmobilier' } })).user;
+    await Hotel.create({ name: 'Hotel Legacy Role Only', tenant: fixture.tenant._id, manager: fixture.bootstrap._id, createdBy: fixture.bootstrap._id, publicationStatus: 'publie' });
+    const res = await request(app).get('/api/hotels/admin/list').set(bearer(legacyStaff));
+    expect(res.status).toBe(403);
+    expect(res.body.data).toBeUndefined();
   });
 
   test('staff-only reste refusé pour un Proprietaire : /admin (création staff) toujours 403', async () => {

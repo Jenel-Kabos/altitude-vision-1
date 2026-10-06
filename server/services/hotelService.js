@@ -17,6 +17,7 @@ const { createFullAccommodation } = require('./accommodationService');
 const { ensureHotelManagerAssignment } = require('./hotel/hotelStaffAssignmentService');
 const { escapeRegex } = require('../utils/regexEscape');
 const logger = require('../utils/logger');
+const { resolvePropertyCreationTenant } = require('./platformTenant/organizationAssetInvariantService');
 const {
   assertHotelNameAvailable, translateHotelNameDuplicate,
 } = require('./hotel/hotelNameUniquenessService');
@@ -106,14 +107,23 @@ function computeHotelCompletionScore(hotel, property, categories = [], categoryR
  * propagation vers l'Accommodation adaptateur — récupérable à tout moment
  * via `resyncLinkedAccommodations` (reconciliation manuelle).
  */
-async function syncLinkedAccommodations(hotelId, { publicationStatus, active } = {}) {
+async function syncLinkedAccommodations(hotelId, { publicationStatus, active, sourceTenant } = {}) {
   const update = {};
   if (publicationStatus !== undefined) update.publicationStatus = publicationStatus;
   if (active !== undefined) update.active = active;
   if (Object.keys(update).length === 0) return { ok: true, matchedCount: 0, modifiedCount: 0 };
   try {
-    const result = await Accommodation.updateMany({ hotel: hotelId }, { $set: update });
-    return { ok: true, matchedCount: result.matchedCount ?? result.n ?? 0, modifiedCount: result.modifiedCount ?? result.nModified ?? 0 };
+    const provenance = sourceTenant == null ? null : sourceTenant._id || sourceTenant;
+    const [allLinked, sameTenantLinked] = await Promise.all([
+      Accommodation.countDocuments({ hotel: hotelId }),
+      Accommodation.countDocuments({ hotel: hotelId, tenant: provenance }),
+    ]);
+    if (Number.isFinite(allLinked) && Number.isFinite(sameTenantLinked) && sameTenantLinked !== allLinked) {
+      return { ok: false, error: 'HOTEL_ACCOMMODATION_TENANT_PROVENANCE_MISMATCH', matchedCount: sameTenantLinked, expectedCount: allLinked };
+    }
+    const result = await Accommodation.updateMany({ hotel: hotelId, tenant: provenance }, { $set: update });
+    const matchedCount = result.matchedCount ?? result.n ?? 0;
+    return { ok: true, matchedCount, modifiedCount: result.modifiedCount ?? result.nModified ?? 0 };
   } catch (err) {
     logger.error(`Synchronisation Accommodation← Hotel(${hotelId}) échouée`, err);
     return { ok: false, error: err.message };
@@ -131,7 +141,7 @@ async function syncLinkedAccommodations(hotelId, { publicationStatus, active } =
  * `active` est réappliquée dans ces cas).
  */
 async function resyncLinkedAccommodations(hotelId, hotel) {
-  const update = { active: hotel.active !== false };
+  const update = { active: hotel.active !== false, sourceTenant: hotel.tenant ?? null };
   if (['publie', 'rejete'].includes(hotel.publicationStatus)) {
     update.publicationStatus = hotel.publicationStatus;
   }
@@ -225,6 +235,10 @@ async function updateFullHotel({ property, hotel, propertyUpdates, hotelUpdates,
 
 /** Duplique un hôtel (Property + Hotel + RoomCategory actives, jamais les tarifs — l'admin les redéfinit). */
 async function duplicateHotel({ hotel, property, actingUser }) {
+  const propertyTenant = await resolvePropertyCreationTenant({
+    ownerId: property.owner,
+    contextualTenantId: property.tenant || hotel.tenant || null,
+  });
   const clonedName = `${hotel.name} (copie)`;
   await assertHotelNameAvailable({
     name: clonedName,
@@ -233,6 +247,8 @@ async function duplicateHotel({ hotel, property, actingUser }) {
   });
   const clonedProperty = await Property.create({
     owner: property.owner,
+    tenant: propertyTenant,
+    pole: property.pole,
     title: `${property.title} (copie)`,
     description: property.description,
     price: property.price,
@@ -275,7 +291,7 @@ async function duplicateHotel({ hotel, property, actingUser }) {
       manager: hotel.manager,
       property: clonedProperty._id,
       createdBy: actingUser.id,
-      tenant: actingUser.platformTenant?._id || actingUser.platformTenant || hotel.tenant || null,
+      tenant: propertyTenant,
     });
   } catch (error) {
     await Property.findByIdAndDelete(clonedProperty._id).catch(() => {});
@@ -289,7 +305,7 @@ async function duplicateHotel({ hotel, property, actingUser }) {
     checkInTime: '14:00',
     checkOutTime: '11:00',
     createdBy: actingUser.id,
-    tenant: actingUser.platformTenant?._id || actingUser.platformTenant || clonedHotel.tenant || null,
+    tenant: propertyTenant,
   });
 
   const categories = await RoomCategory.find({ hotel: hotel._id, status: 'actif' });
@@ -323,8 +339,8 @@ async function deleteHotel({ hotel, property }) {
 }
 
 /** Liste paginée pour le dashboard admin ("Établissements"). */
-async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20, hotelIds, tenantId }) {
-  const query = tenantId ? { tenant: tenantId } : {};
+async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20, hotelIds, tenantId, scopeFilter = null }) {
+  const query = scopeFilter || (tenantId ? { tenant: tenantId } : {});
   if (status && status !== 'tous') query.publicationStatus = status;
   // F2.6.2 : scope optionnel (non-Admin) — même filtre pour la liste et le total.
   if (hotelIds) query._id = { $in: hotelIds };
@@ -355,12 +371,12 @@ async function listHotelsForAdmin({ status, search, sort, page = 1, limit = 20, 
  * filtre n'accepte aucun statut venant du client : la publication validée et
  * l'activation opérationnelle sont des invariants serveur.
  */
-async function listEligibleHotels({ search, city, district, starRating, sort, hotelIds, propertyOwnerIds, tenantId } = {}) {
+async function listEligibleHotels({ search, city, district, starRating, sort, hotelIds, propertyOwnerIds, tenantId, scopeFilter = null } = {}) {
   const query = {
     publicationStatus: 'publie',
     status: 'actif',
     active: { $ne: false },
-    ...(tenantId ? { tenant: tenantId } : {}),
+    ...(scopeFilter || (tenantId ? { tenant: tenantId } : {})),
   };
   if (hotelIds) query._id = { $in: hotelIds };
   if (starRating !== undefined && starRating !== '') query.starRating = Number(starRating);
@@ -376,13 +392,13 @@ async function listEligibleHotels({ search, city, district, starRating, sort, ho
 
   const sortMap = { recent: { updatedAt: -1 }, ancien: { updatedAt: 1 }, nom: { name: 1 } };
   const hotels = await Hotel.find(query)
-    .populate({ path: 'property', select: 'title images address owner price statusAdmin availability updatedAt', match: propertyMatch })
+    .populate({ path: 'property', select: 'title images address owner tenant price statusAdmin availability updatedAt', match: propertyMatch })
     .sort(sortMap[sort] || sortMap.recent);
   return hotels.filter((hotel) => hotel.property);
 }
 
-async function listValidatedHotelPortfolio({ search, city, district, starRating, sort, page = 1, limit = 20, hotelIds, tenantId }) {
-  const eligible = await listEligibleHotels({ search, city, district, starRating, sort, hotelIds, tenantId });
+async function listValidatedHotelPortfolio({ search, city, district, starRating, sort, page = 1, limit = 20, hotelIds, tenantId, scopeFilter = null }) {
+  const eligible = await listEligibleHotels({ search, city, district, starRating, sort, hotelIds, tenantId, scopeFilter });
   const safePage = Math.max(1, Number(page) || 1);
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
   const start = (safePage - 1) * safeLimit;

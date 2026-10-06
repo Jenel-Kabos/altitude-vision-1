@@ -9,25 +9,32 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { Users } from "lucide-react";
-import { getLocataireDossiers } from "../../services/gestionLocativeService";
+import { createLocataire, getLocataireDossiers, updateLocataire } from "../../services/gestionLocativeService";
 import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
 import TenantLinkManagement from "../../components/dashboard/TenantLinkManagement";
 import { DashboardPage, DashboardPageHeader, DashboardState } from "../../components/dashboard/DashboardUI";
+import { useRentalOperationContext } from "../../context/RentalOperationContext";
+import { callWithRentalContext, isIndividualRentalContext, rentalBasePath } from "../../services/rentalRequestContext";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('fr-FR') : '—');
 
 const RentalTenantsPage = () => {
+  const rentalContext = useRentalOperationContext();
   const [data, setData] = useState({ locataires: [], total: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = { nom: '', prenom: '', telephone: '', email: '' };
+  const [form, setForm] = useState(emptyForm);
   const limit = 20;
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await getLocataireDossiers({ search: search || undefined, page, limit });
+      const res = await callWithRentalContext(getLocataireDossiers, rentalContext, { search: search || undefined, page, limit });
       setData(res);
     } catch (err) {
       toast.error("Erreur lors du chargement des locataires.");
@@ -45,6 +52,22 @@ const RentalTenantsPage = () => {
 
   const totalPages = Math.max(1, Math.ceil((data.total || 0) / limit));
 
+  const openCreate = () => { setEditing('new'); setForm(emptyForm); };
+  const openEdit = (tenant) => {
+    setSelected(null); setEditing(tenant._id);
+    setForm({ nom: tenant.nom || '', prenom: tenant.prenom || '', telephone: tenant.telephone || '', email: tenant.email || '' });
+  };
+  const saveTenant = async (event) => {
+    event.preventDefault(); setSaving(true);
+    try {
+      if (editing === 'new') await callWithRentalContext(createLocataire, rentalContext, form);
+      else await callWithRentalContext(updateLocataire, rentalContext, editing, form);
+      toast.success(editing === 'new' ? 'Locataire créé.' : 'Locataire mis à jour.');
+      setEditing(null); setForm(emptyForm); await load();
+    } catch (error) { toast.error(error.response?.data?.message || 'Impossible d’enregistrer le locataire.'); }
+    finally { setSaving(false); }
+  };
+
   return (
     <DashboardPage>
       <DashboardPageHeader
@@ -52,11 +75,23 @@ const RentalTenantsPage = () => {
         title="Locataires"
         description="Locataires enregistrés, bail et situation de paiement."
         actions={(
-          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+          <Link href={rentalBasePath(rentalContext)} className="text-sm text-blue-600 underline">
             Vue d'ensemble Gestion Locative
           </Link>
         )}
       />
+
+      <button onClick={openCreate} className="mb-4 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white">+ Nouveau locataire</button>
+
+      {editing && (
+        <form onSubmit={saveTenant} className="mb-4 grid gap-2 rounded-xl border bg-white p-4 sm:grid-cols-2">
+          <input required aria-label="Nom du locataire" placeholder="Nom" value={form.nom} onChange={(e) => setForm((f) => ({ ...f, nom: e.target.value }))} className="rounded-lg border px-3 py-2" />
+          <input required aria-label="Prénom du locataire" placeholder="Prénom" value={form.prenom} onChange={(e) => setForm((f) => ({ ...f, prenom: e.target.value }))} className="rounded-lg border px-3 py-2" />
+          <input required aria-label="Téléphone du locataire" placeholder="Téléphone" value={form.telephone} onChange={(e) => setForm((f) => ({ ...f, telephone: e.target.value }))} className="rounded-lg border px-3 py-2" />
+          <input type="email" aria-label="Email du locataire" placeholder="Email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className="rounded-lg border px-3 py-2" />
+          <div className="flex gap-2"><button disabled={saving} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm text-white disabled:opacity-50">Enregistrer</button><button type="button" onClick={() => setEditing(null)} className="text-sm text-gray-600">Annuler</button></div>
+        </form>
+      )}
 
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un nom, email, téléphone..."
         aria-label="Rechercher" className="w-full mb-4 px-3 py-2 border rounded text-sm" />
@@ -151,12 +186,13 @@ const RentalTenantsPage = () => {
               )}
             </div>
             <div className="flex gap-2 mt-4">
-              <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">Voir dans la Gestion Locative →</Link>
+              <Link href={rentalBasePath(rentalContext)} className="text-sm text-blue-600 underline">Voir dans la Gestion Locative →</Link>
+              <button onClick={() => openEdit(selected)} className="text-sm text-emerald-700 underline">Modifier</button>
             </div>
           </div>
         </div>
       )}
-      <TenantLinkManagement />
+      {!isIndividualRentalContext(rentalContext) && <TenantLinkManagement />}
     </DashboardPage>
   );
 };

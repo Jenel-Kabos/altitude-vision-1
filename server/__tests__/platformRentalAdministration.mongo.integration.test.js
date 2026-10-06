@@ -89,8 +89,8 @@ const enableTenantLocationModule = async (tenant) => {
 
 let tenantA; let tenantB; let bootstrapA; let bootstrapB;
 let ownerA; let ownerB;
-let propertyA; let propertyB; let propertyLegacyNull;
-let rentalA; let rentalB; let rentalLegacyNull;
+let propertyA; let propertyB; let propertyLegacyNull; let propertyLegacyNullB;
+let rentalA; let rentalB; let rentalLegacyNull; let rentalLegacyNullB;
 let tenantAdminA; let gestionA;
 let operatorRead; let operatorManage; let operatorNoRentals; let operatorSuspended;
 let operatorTenantsManageOnly; let operatorPropertiesManageOnly; let bareGlobalAdmin;
@@ -111,16 +111,25 @@ beforeEach(async () => {
   await enableTenantLocationModule(tenantA);
   await enableTenantLocationModule(tenantB);
 
+  // BACKEND-TENANT-ISOLATION-CLOSURE-01 — les propriétaires sont membres de
+  // leur tenant : sans cela, le scope owner du listing excluait TOUT (y
+  // compris rentalA) et P-RENTAL-01/04/19 passaient sur un tableau vide.
   ownerA = await makeUser({ role: 'Proprietaire' });
   ownerB = await makeUser({ role: 'Proprietaire' });
+  await OrgMembership.create({ user: ownerA._id, orgUnit: tenantA.rootOrgUnit, status: 'active', roleInUnit: 'member', grantedBy: bootstrapA._id });
+  await OrgMembership.create({ user: ownerB._id, orgUnit: tenantB.rootOrgUnit, status: 'active', roleInUnit: 'member', grantedBy: bootstrapB._id });
 
   propertyA = await insertProperty(ownerA._id, tenantA._id);
   propertyB = await insertProperty(ownerB._id, tenantB._id);
   propertyLegacyNull = await insertProperty(ownerA._id, null, { price: 650000 });
+  propertyLegacyNullB = await insertProperty(ownerB._id, null, { price: 660000 });
 
   rentalA = await insertRental(propertyA, tenantA._id);
   rentalB = await insertRental(propertyB, tenantB._id);
+  // Legacy tenant:null, MÊME owner que rentalA, activé et actif : seule la
+  // valeur `tenant:null` le distingue de rentalA.
   rentalLegacyNull = await insertRental(propertyLegacyNull, null);
+  rentalLegacyNullB = await insertRental(propertyLegacyNullB, null);
 
   // Tenant A canonical staff (PATH A).
   tenantAdminA = await makeUser({ role: 'Admin' });
@@ -162,40 +171,77 @@ beforeEach(async () => {
 
 // ─── P-RENTAL-01/02/03/04 — cross-tenant listing + isolation ──────────────
 
-test('P-RENTAL-01: operator + rentals.read lists Tenant A rentals', async () => {
-  const res = await request(app).get('/api/rental-management').set(bearer(operatorRead, tenantA._id));
+// Contrat réel de GET /api/rental-management : `data: { rentals, total, ... }`.
+// Exige un tableau et renvoie les ids — la présence de la ressource du
+// tenant cible est toujours assertée : un tableau vide échoue.
+const listRentalIds = async (user, tenantId) => {
+  const res = await request(app).get('/api/rental-management').set(bearer(user, tenantId));
   expect(res.status).toBe(200);
-  const list = res.body.data?.rentals || res.body.data || [];
-  const arr = Array.isArray(list) ? list : (list.rentals || []);
-  for (const r of arr) {
-    expect(String(r.tenant)).toBe(String(tenantA._id));
-  }
+  expect(Array.isArray(res.body.data?.rentals)).toBe(true);
+  return { res, ids: res.body.data.rentals.map((r) => String(r._id)) };
+};
+
+test('P-RENTAL-01: operator + rentals.read lists Tenant A rentals', async () => {
+  const { res, ids } = await listRentalIds(operatorRead, tenantA._id);
+  expect(ids).toContain(String(rentalA._id));
+  for (const r of res.body.data.rentals) expect(String(r.tenant)).toBe(String(tenantA._id));
 });
 
 test('P-RENTAL-02: switch to Tenant B returns Tenant B rentals', async () => {
-  const res = await request(app).get('/api/rental-management').set(bearer(operatorRead, tenantB._id));
-  expect(res.status).toBe(200);
-  const list = res.body.data?.rentals || res.body.data || [];
-  const arr = Array.isArray(list) ? list : (list.rentals || []);
-  for (const r of arr) {
-    expect(String(r.tenant)).toBe(String(tenantB._id));
-  }
+  const { res, ids } = await listRentalIds(operatorRead, tenantB._id);
+  expect(ids).toContain(String(rentalB._id));
+  expect(ids).not.toContain(String(rentalA._id));
+  for (const r of res.body.data.rentals) expect(String(r.tenant)).toBe(String(tenantB._id));
 });
 
 test('P-RENTAL-03: Tenant A response contains no Tenant B rental', async () => {
-  const res = await request(app).get('/api/rental-management').set(bearer(operatorRead, tenantA._id));
-  expect(res.status).toBe(200);
-  const list = res.body.data?.rentals || res.body.data || [];
-  const arr = Array.isArray(list) ? list : (list.rentals || []);
-  expect(arr.some((r) => String(r._id) === String(rentalB._id))).toBe(false);
+  const { ids } = await listRentalIds(operatorRead, tenantA._id);
+  expect(ids).toContain(String(rentalA._id));
+  expect(ids).not.toContain(String(rentalB._id));
 });
 
 test('P-RENTAL-04: Tenant A response contains no tenant:null legacy rental (650k Bureau invariant)', async () => {
-  const res = await request(app).get('/api/rental-management').set(bearer(operatorRead, tenantA._id));
+  const { ids } = await listRentalIds(operatorRead, tenantA._id);
+  expect(ids).toContain(String(rentalA._id));
+  expect(ids).not.toContain(String(rentalLegacyNull._id));
+  expect(ids).not.toContain(String(rentalLegacyNullB._id));
+});
+
+test('PLATFORM_OPERATOR_CANNOT_ACCESS_TENANT_NULL_RENTAL_MANAGEMENT', async () => {
+  // C2.10A (D4/D6) — le dossier legacy tenant:null (owner membre de A) est un
+  // bien INDIVIDUAL : il n'est plus visible du staff de A (PATH A) non plus.
+  // Staff et opérateur partagent la même population Property.tenant = A.
+  const pathA = await listRentalIds(tenantAdminA, tenantA._id);
+  expect(pathA.ids).toContain(String(rentalA._id));
+  expect(pathA.ids).not.toContain(String(rentalLegacyNull._id));
+
+  const { ids } = await listRentalIds(operatorRead, tenantA._id);
+  expect(ids).toContain(String(rentalA._id));
+  expect(ids).not.toContain(String(rentalLegacyNull._id));
+
+  const byId = await request(app).get(`/api/rental-management/${rentalLegacyNull._id}`).set(bearer(operatorRead, tenantA._id));
+  expect(byId.status).toBe(404);
+  expect(JSON.stringify(byId.body)).not.toContain(String(rentalLegacyNull._id));
+
+  const history = await request(app).get(`/api/rental-management/${rentalLegacyNull._id}/history`).set(bearer(operatorRead, tenantA._id));
+  expect(history.status).toBe(404);
+});
+
+test('P-RENTAL-STATS: operator /stats Tenant A counts only Tenant A (no tenant:null, no Tenant B)', async () => {
+  // C2.10A (D4/D6) — PATH A compte désormais la même population canonique
+  // (Property.tenant = A) : le dossier legacy tenant:null n'est plus compté.
+  const pathA = await request(app).get('/api/rental-management/stats').set(bearer(tenantAdminA, tenantA._id));
+  expect(pathA.status).toBe(200);
+  expect(pathA.body.data.stats.total).toBe(1);
+
+  const res = await request(app).get('/api/rental-management/stats').set(bearer(operatorRead, tenantA._id));
   expect(res.status).toBe(200);
-  const list = res.body.data?.rentals || res.body.data || [];
-  const arr = Array.isArray(list) ? list : (list.rentals || []);
-  expect(arr.some((r) => String(r._id) === String(rentalLegacyNull._id))).toBe(false);
+  expect(res.body.data.stats.total).toBe(1);
+  expect(res.body.data.stats.vacant).toBe(1);
+
+  const resB = await request(app).get('/api/rental-management/stats').set(bearer(operatorRead, tenantB._id));
+  expect(resB.status).toBe(200);
+  expect(resB.body.data.stats.total).toBe(1);
 });
 
 // ─── P-RENTAL-05/06 — read cannot write ─────────────────────────────────
@@ -299,13 +345,62 @@ test('P-RENTAL-18: platform.properties.manage/read alone grants no rental author
 test('P-RENTAL-19: RentalManagement listing remains tenant-isolated for operator (never leaks tenant:null 650k)', async () => {
   // Additional safeguard: request Tenant A rentals and prove the legacy null
   // 650k rental is never reachable via list/stats through platform authority.
-  const list = await request(app).get('/api/rental-management').set(bearer(operatorManage, tenantA._id));
-  expect(list.status).toBe(200);
-  const arr = list.body.data?.rentals || list.body.data || [];
-  const items = Array.isArray(arr) ? arr : (arr.rentals || []);
-  for (const r of items) {
-    expect(String(r._id)).not.toBe(String(rentalLegacyNull._id));
-  }
+  const { ids } = await listRentalIds(operatorManage, tenantA._id);
+  expect(ids).toContain(String(rentalA._id));
+  expect(ids).not.toContain(String(rentalLegacyNull._id));
+  const stats = await request(app).get('/api/rental-management/stats').set(bearer(operatorManage, tenantA._id));
+  expect(stats.status).toBe(200);
+  expect(stats.body.data.stats.total).toBe(1);
+});
+
+// ─── BACKEND-TENANT-ISOLATION-CLOSURE-01 — adversarial PATH B ───────────
+
+test('P-RENTAL-21: invalid (nonexistent) tenant target → refused', async () => {
+  const res = await request(app).get('/api/rental-management').set(bearer(operatorRead, new mongoose.Types.ObjectId()));
+  expect([403, 404]).toContain(res.status);
+});
+
+test('P-RENTAL-22: Tenant B membership only (no PlatformOperator) → no access to Tenant A', async () => {
+  const memberB = await makeUser({ role: 'Admin' });
+  await OrgMembership.create({ user: memberB._id, orgUnit: tenantB.rootOrgUnit, businessRole: 'Admin', status: 'active', roleInUnit: 'member', grantedBy: bootstrapB._id });
+  const res = await request(app).get('/api/rental-management').set(bearer(memberB, tenantA._id));
+  expect(res.status).toBe(403);
+  expect(JSON.stringify(res.body)).not.toContain(String(rentalA._id));
+});
+
+test('P-RENTAL-23: rentals.manage operator cannot activate a Tenant B or tenant:null property from Tenant A context', async () => {
+  const before = await RentalManagement.countDocuments({});
+  const crossTenant = await request(app).post('/api/rental-management/').set(bearer(operatorManage, tenantA._id)).send({ property: String(propertyB._id) });
+  expect(crossTenant.status).toBe(404);
+  const legacy = await request(app).post('/api/rental-management/').set(bearer(operatorManage, tenantA._id)).send({ property: String(propertyLegacyNull._id) });
+  expect(legacy.status).toBe(404);
+  expect(await RentalManagement.countDocuments({})).toBe(before);
+});
+
+test('P-RENTAL-24: rentals.manage operator still activates a Tenant A property (Option 3 preserved)', async () => {
+  const freshA = await insertProperty(ownerA._id, tenantA._id);
+  const res = await request(app).post('/api/rental-management/').set(bearer(operatorManage, tenantA._id)).send({ property: String(freshA._id) });
+  expect(res.status).toBe(201);
+  const created = await RentalManagement.findOne({ property: freshA._id }).lean();
+  expect(String(created.tenant)).toBe(String(tenantA._id));
+});
+
+test('P-RENTAL-25: /onboarding/options for operator exposes only Tenant A properties and owners', async () => {
+  const Proprietaire = require('../models/Proprietaire');
+  await Proprietaire.create([
+    { nom: 'OwnerA', prenom: 'P', email: `pa-${Date.now()}@example.test`, telephone: '+242060000011', user: ownerA._id },
+    { nom: 'OwnerB', prenom: 'P', email: `pb-${Date.now()}@example.test`, telephone: '+242060000012', user: ownerB._id },
+  ]);
+  const res = await request(app).get('/api/rental-management/onboarding/options').set(bearer(operatorRead, tenantA._id));
+  expect(res.status).toBe(200);
+  const rows = [...res.body.data.existingEligibleProperties, ...res.body.data.ineligibleProperties];
+  const propertyIds = rows.filter((r) => r.propertyId).map((r) => r.propertyId);
+  expect(propertyIds).toContain(String(propertyA._id));
+  expect(propertyIds).not.toContain(String(propertyB._id));
+  expect(propertyIds).not.toContain(String(propertyLegacyNull._id));
+  expect(propertyIds).not.toContain(String(propertyLegacyNullB._id));
+  expect(res.body.data.owners.map((o) => o._id)).toEqual([String(ownerA._id)]);
+  expect(JSON.stringify(res.body)).not.toContain('OwnerB');
 });
 
 // ─── P-RENTAL-20 — R4 out-of-scope invariant ────────────────────────────

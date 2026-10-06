@@ -3,6 +3,8 @@ import { toast } from 'react-hot-toast';
 import RentalDocumentsPage from '../pages/dashboard/RentalDocumentsPage';
 import { getContrats, previewRentalDocument, previewSecureDocumentEndpoint } from '../services/gestionLocativeService';
 import { getAllDocuments } from '../services/documentService';
+import { RentalOperationProvider } from '../context/RentalOperationContext';
+import { INDIVIDUAL_RENTAL_CONTEXT } from '../services/rentalRequestContext';
 
 vi.mock('react-hot-toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../services/gestionLocativeService', () => ({ getContrats: vi.fn(), previewRentalDocument: vi.fn(), previewSecureDocumentEndpoint: vi.fn() }));
@@ -121,5 +123,14 @@ describe('RentalDocumentsPage — Sprint GL-UX1 — TEST DATA', () => {
     render(<RentalDocumentsPage />);
     await screen.findByText('Bail signé');
     expect(screen.queryByText("Pièce d'identité — Paul Moke")).not.toBeInTheDocument();
+  });
+
+  test('le dossier individuel s’ouvre sans appeler le panneau tenant-scoped', async () => {
+    getContrats.mockResolvedValue([contratAvecDocuments({ statut: 'actif', cycleVie: 'actif', montantLoyer: 200000 })]);
+    render(<RentalOperationProvider value={INDIVIDUAL_RENTAL_CONTEXT}><RentalDocumentsPage /></RentalOperationProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: /Villa Doc Test/ }));
+    expect(screen.getByRole('dialog', { name: 'Dossier locatif individuel' })).toBeInTheDocument();
+    expect(screen.getByText('200 000 FCFA')).toBeInTheDocument();
+    expect(getAllDocuments).not.toHaveBeenCalled();
   });
 });

@@ -17,9 +17,12 @@ const PlatformTenantSubscription = require('../models/PlatformTenantSubscription
 const OrgUnit = require('../models/OrgUnit');
 const OrgMembership = require('../models/OrgMembership');
 const ActionLog = require('../models/ActionLog');
+const Property = require('../models/Property');
+const Transaction = require('../models/Transaction');
 const service = require('../services/platformTenant/tenantApplicationService');
 const { resolveEffectiveTenantContext } = require('../services/platformTenant/tenantContextService');
 const organizationService = require('../services/organizationService');
+const platformTenantService = require('../services/platformTenant/platformTenantService');
 const crypto = require('crypto');
 const routes = require('../routes/platformTenantRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -32,6 +35,12 @@ const makeUser = (role = 'Proprietaire') => User.create({ name: `Phase3 ${++sequ
 const submitted = async (owner) => TenantApplication.create({ applicant: owner._id, organizationName: 'Organisation à instruire', status: 'SUBMITTED', activeApplicantKey: String(owner._id), history: [{ from: null, to: 'DRAFT', actor: owner._id }, { from: 'DRAFT', to: 'SUBMITTED', actor: owner._id }] });
 const underReview = async (owner, reviewer) => { const item = await submitted(owner); return service.startReview({ applicationId: item._id, actor: reviewer }); };
 const operator = async (capabilities) => { const user = await makeUser('Admin'); await PlatformOperator.create({ user: user._id, status: 'active', capabilities, grantedBy: user._id, grantReason: 'Phase 3 test' }); return user; };
+const property = (owner, suffix, overrides = {}) => Property.create({
+  title: `Actif professionnel ${suffix}`, pole: 'Altimmo', description: `Description professionnelle ${suffix}`,
+  type: 'Villa', status: 'location', price: 100000, address: { arrondissement: 'Centre' },
+  latitude: -4.26, longitude: 15.24, surface: 100, images: [], internalManagedOnly: true,
+  owner: owner._id, tenant: null, ...overrides,
+});
 
 beforeAll(async () => { await startFinancialMongo(); await TenantApplication.syncIndexes(); });
 afterEach(clearFinancialMongo);
@@ -137,6 +146,8 @@ describe('TenantApplication Phase 3 — preuve RED review API', () => {
   test('APP-01..16 / FOUNDER-01..06/09/10/12 — approbation atomique crée un founder owner/Admin sans autorité globale', async () => {
     const owner = await makeUser(); const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']);
     const item = await underReview(owner, review); const plainAdmin = await makeUser('Admin');
+    const activeAssets = await Promise.all([property(owner, 'P1'), property(owner, 'P2'), property(owner, 'P3')]);
+    const historical = await property(owner, 'HIST', { availability: 'Vendu', assetCycle: 'vendu' });
     const beforeOwner = await User.findById(owner._id).select('role isActive status historiqueRoles').lean();
     const beforeGlobalAdminCount = await User.countDocuments({ role: 'Admin' });
     expect(beforeOwner.role).toBe('Proprietaire'); // FOUNDER-01
@@ -162,6 +173,8 @@ describe('TenantApplication Phase 3 — preuve RED review API', () => {
     expect(globalEscalation.status).toBe(403);
     expect(await PlatformTenant.countDocuments()).toBe(1); expect(await OrgUnit.countDocuments({ type: 'organization' })).toBe(1);
     expect(await OrgMembership.countDocuments({ user: owner._id, status: 'active' })).toBe(1);
+    expect(await Property.countDocuments({ _id: { $in: activeAssets.map((asset) => asset._id) }, tenant: tenant._id })).toBe(3);
+    expect((await Property.findById(historical._id)).tenant).toBeNull();
     expect(await PlatformTenantSettings.countDocuments()).toBe(1); expect(await PlatformTenantTheme.countDocuments()).toBe(1); expect(await PlatformTenantSubscription.countDocuments({ status: 'trialing' })).toBe(1);
     expect(String((await resolveEffectiveTenantContext(owner._id)).tenant._id)).toBe(String(stored.provisionedTenant));
     expect((await request(app).get('/api/platform-tenants/applications/me/status').set(bearer(owner))).body.data.state).toBe('ALREADY_ONBOARDED');
@@ -188,9 +201,60 @@ describe('TenantApplication Phase 3 — preuve RED review API', () => {
     expect(await PlatformTenant.countDocuments()).toBe(1); expect(await OrgUnit.countDocuments({ type: 'organization' })).toBe(1); expect(await OrgMembership.countDocuments()).toBe(1); expect(await PlatformTenantSubscription.countDocuments()).toBe(1);
   });
   test.each(['after_tenant', 'after_membership', 'before_commit'])('FOUNDER-11 / ROLL — %s annule tout le graphe', async (failurePoint) => {
-    const owner = await makeUser(); const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']); const item = await underReview(owner, review);
+    const owner = await makeUser(); const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']); const item = await underReview(owner, review); const asset = await property(owner, failurePoint);
     await expect(service.approveApplication({ applicationId: item._id, actor: approver, failurePoint })).rejects.toThrow();
     expect((await TenantApplication.findById(item._id)).status).toBe('UNDER_REVIEW'); expect(await PlatformTenant.countDocuments()).toBe(0); expect(await OrgUnit.countDocuments()).toBe(0); expect(await OrgMembership.countDocuments()).toBe(0); expect(await PlatformTenantSubscription.countDocuments()).toBe(0);
+    expect((await Property.findById(asset._id)).tenant).toBeNull();
+  });
+
+  test('un simple membre conserve son bien personnel tenant:null pendant son provisioning owner', async () => {
+    const owner = await makeUser(); const tenantBootstrap = await makeUser();
+    const root = await organizationService.createOrgUnit({ name: 'Tenant membre', type: 'organization', actor: tenantBootstrap });
+    await OrgMembership.create({ user: owner._id, orgUnit: root._id, roleInUnit: 'member', businessRole: 'Collaborateur', status: 'active', grantedBy: tenantBootstrap._id });
+    const personal = await property(owner, 'PERSONAL', { pole: 'Altcom' });
+    const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']);
+    const item = await underReview(owner, review);
+    const result = await service.approveApplication({ applicationId: item._id, actor: approver });
+    expect(result.application.status).toBe('APPROVED');
+    expect((await Property.findById(personal._id)).tenant).toBeNull();
+    expect(await OrgMembership.countDocuments({ user: owner._id, status: 'active' })).toBe(2);
+  });
+
+  test('un détenteur existant réutilise son organisation et ne crée aucun second tenant', async () => {
+    const owner = await makeUser();
+    const tenant = await platformTenantService.createTenant({ name: 'Organisation existante', actor: owner });
+    const membership = await organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, roleInUnit: 'owner', businessRole: 'Admin', actor: owner });
+    const asset = await property(owner, 'EXISTING');
+    const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']);
+    const result = await service.approveApplication({ applicationId: (await underReview(owner, review))._id, actor: approver });
+    expect(String(result.tenant._id)).toBe(String(tenant._id));
+    expect(String(result.membership._id)).toBe(String(membership._id));
+    expect(await PlatformTenant.countDocuments()).toBe(1);
+    expect(String((await Property.findById(asset._id)).tenant)).toBe(String(tenant._id));
+  });
+
+  test('deux organisations détenues bloquent sans sélection arbitraire', async () => {
+    const owner = await makeUser();
+    for (const name of ['Organisation A', 'Organisation B']) {
+      const tenant = await platformTenantService.createTenant({ name, actor: owner });
+      await organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, roleInUnit: 'owner', businessRole: 'Admin', actor: owner });
+    }
+    const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']);
+    await expect(service.approveApplication({ applicationId: (await underReview(owner, review))._id, actor: approver }))
+      .rejects.toMatchObject({ code: 'ORGANIZATION_SELECTION_REQUIRED', statusCode: 409 });
+    expect(await PlatformTenant.countDocuments()).toBe(2);
+  });
+
+  test('un workflow transactionnel actif bloque et rollback le provisioning', async () => {
+    const owner = await makeUser(); const asset = await property(owner, 'BLOCKED');
+    await Transaction.collection.insertOne({ property: asset._id, status: 'En cours', createdAt: new Date(), updatedAt: new Date() });
+    const review = await operator(['platform.tenant_applications.review']); const approver = await operator(['platform.tenant_applications.approve']);
+    const item = await underReview(owner, review);
+    await expect(service.approveApplication({ applicationId: item._id, actor: approver }))
+      .rejects.toMatchObject({ code: 'ACTIVE_ASSET_WORKFLOW_BLOCKER', statusCode: 409 });
+    expect(await PlatformTenant.countDocuments()).toBe(0);
+    expect((await Property.findById(asset._id)).tenant).toBeNull();
+    expect((await TenantApplication.findById(item._id)).status).toBe('UNDER_REVIEW');
   });
   test('DOC-R-01..04 — reviewer read accède par application, les autres sont bloqués', async () => {
     const owner = await makeUser(); const reviewer = await operator(['platform.tenant_applications.read']); const admin = await makeUser('Admin');

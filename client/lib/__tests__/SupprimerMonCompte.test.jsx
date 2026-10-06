@@ -46,4 +46,9 @@ describe('SupprimerMonCompte (page publique)', () => {
     expect(screen.getByText(/messages échangés/i)).toBeInTheDocument();
     expect(screen.getByText(/transactions, contrats/i)).toBeInTheDocument();
   });
+
+  test('ne promet aucun délai de traitement non confirmé', () => {
+    expect(document.body.textContent).not.toMatch(/quelques jours ouvrés|30 jours|90 jours/i);
+    expect(document.body.textContent).toMatch(/revue juridique humaine requise/i);
+  });
 });

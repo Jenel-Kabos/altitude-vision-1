@@ -54,6 +54,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const connectDB = require('../config/db');
 const { resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
+const { resolveAvailableTenantsForUser } = require('../services/platformTenant/tenantContextService');
 const PlatformTenant = require('../models/PlatformTenant');
 const User = require('../models/User');
 
@@ -137,6 +138,31 @@ async function verifyNoTenantEntitiesExist(proofs) {
   const existing = await User.find({ _id: { $in: ids } }).select('_id').lean();
   const existingIds = new Set(existing.map((u) => String(u._id)));
   return ids.some((id) => existingIds.has(id));
+}
+
+// PLATFORM-ADMIN-04C2 — SIGNAL D'AUDIT, jamais une autorité. L'attribution
+// canonique d'un Hotel est `Hotel.tenant` seul (resolveResourceTenant, inchangé).
+// L'audit compare néanmoins ce tenant explicite aux relations organisationnelles
+// CANONIQUES liées — membership du manager et `tenant` explicite du Property
+// d'ancrage — pour SIGNALER une contradiction de données (classification C,
+// revue humaine). Lecture seule : aucune réattribution, aucune écriture.
+// `createdBy` est exclu : provenance technique, jamais une relation métier.
+async function detectHotelRelationContradictions(hotel) {
+  if (!hotel?.tenant) return [];
+  const tenantId = String(hotel.tenant);
+  const signals = [];
+  if (hotel.manager) {
+    const tenants = await resolveAvailableTenantsForUser(hotel.manager).catch(() => []);
+    (tenants || []).filter((tenant) => String(tenant._id) !== tenantId)
+      .forEach((tenant) => signals.push(`hotel:${hotel._id}.manager:${hotel.manager}→membership→${tenant._id}≠hotel.tenant:${tenantId}`));
+  }
+  if (hotel.property) {
+    const property = await require('../models/Property').findById(hotel.property).select('tenant').lean();
+    if (property?.tenant && String(property.tenant) !== tenantId) {
+      signals.push(`hotel:${hotel._id}.property:${hotel.property}.tenant:${property.tenant}≠hotel.tenant:${tenantId}`);
+    }
+  }
+  return signals;
 }
 
 function classify(attribution) {
@@ -228,6 +254,13 @@ async function main() {
       } else {
         attribution = await resolveResourceTenant({ resourceType, resource: doc });
         classification = classify(attribution);
+        if (resourceType === 'Hotel' && classification === 'A') {
+          const auditSignals = await detectHotelRelationContradictions(doc);
+          if (auditSignals.length) {
+            classification = 'C';
+            attribution = { ...attribution, auditSignals };
+          }
+        }
         if (classification === 'B') {
           const anyReferencedUserExists = await verifyNoTenantEntitiesExist(attribution.proof || []);
           if (anyReferencedUserExists === false) classification = 'D';
@@ -261,6 +294,7 @@ async function main() {
         targetTenant: classification === 'A' ? attribution.tenantId : null,
         matchesRequestedTenant: targetTenant && classification === 'A' ? String(attribution.tenantId) === String(targetTenant) : null,
         proofs: attribution.proof || [],
+        auditSignals: attribution.auditSignals || [],
         confidence: attribution.confidence ?? null,
         recommendedAction: classification === 'A' ? 'READY_FOR_FUTURE_CONTROLLED_ATTRIBUTION'
           : classification === 'B' ? 'HUMAN_REVIEW_REQUIRED_ENTITY_WITHOUT_TENANT'

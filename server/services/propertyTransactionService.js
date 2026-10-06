@@ -17,6 +17,7 @@
 const Property = require('../models/Property');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const logger = require('../utils/logger');
+const { resolvePropertyCreationTenant } = require('./platformTenant/organizationAssetInvariantService');
 
 const cleanupImages = (images = []) => Promise.all(images.map((url) => destroyFromCloudinary(url)));
 
@@ -42,7 +43,11 @@ const compensateDelete = (label, promise) => promise.catch((err) => {
  * @returns {Promise<{property, satellite}>}
  */
 async function createFullPropertyTransaction({ propertyData, satelliteData, SatelliteModel, satelliteLabel }) {
-  const property = await Property.create(propertyData);
+  const tenant = await resolvePropertyCreationTenant({
+    ownerId: propertyData.owner,
+    contextualTenantId: propertyData.tenant || null,
+  });
+  const property = await Property.create({ ...propertyData, tenant });
 
   let satellite;
   try {

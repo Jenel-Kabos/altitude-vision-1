@@ -32,6 +32,7 @@ const NAV_LINKS = [
   { to: '/mes-biens',                 end: true, Icon: Building, label: 'Vue du patrimoine', accent: BLUE, section: 'Mon patrimoine', profile: 'proprietaire_immobilier' },
   { to: '/mes-biens?status=vente',    end: false, Icon: Landmark, label: 'Biens en vente', accent: BLUE, section: 'Mon patrimoine', profile: 'proprietaire_immobilier' },
   { to: '/mes-biens?status=location', end: false, Icon: KeyRound, label: 'Biens en location', accent: BLUE, section: 'Mon patrimoine', profile: 'proprietaire_immobilier' },
+  { to: '/mes-biens/gestion-locative', end: false, Icon: KeyRound, label: 'Gestion locative individuelle', accent: GREEN, section: 'Activité', profile: 'proprietaire_immobilier' },
   { to: '/mes-biens/visites',         end: false, Icon: Calendar, label: 'Mes rendez-vous', accent: GOLD, section: 'Activité', profile: 'proprietaire_immobilier' },
   { to: '/mes-biens/paiements',       end: false, Icon: CreditCard, label: 'Mes paiements', accent: GOLD, section: 'Activité', profile: 'proprietaire_immobilier' },
   { to: '/mes-hotels',                end: true, Icon: Building2, label: 'Mes établissements', accent: GOLD, section: 'Exploitation', profile: 'exploitant_etablissement' },
@@ -111,6 +112,7 @@ const OwnerDashboard = ({ children }) => {
 
   useEffect(() => {
     if (!sidebarOpen) return undefined;
+    const menuButton = menuButtonRef.current;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     closeButtonRef.current?.focus();
@@ -129,7 +131,7 @@ const OwnerDashboard = ({ children }) => {
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', onKeyDown);
-      menuButtonRef.current?.focus();
+      menuButton?.focus();
     };
   }, [sidebarOpen]);
 

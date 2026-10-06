@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
+import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
 import { getDashboardStats } from "../../services/dashboardService";
 import { getAllQuotes } from "../../services/quoteService";
 import { getAllEvents } from "../../services/eventService";
@@ -52,7 +53,7 @@ const statusColor = (s) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-const GlobalDashboardHome = () => {
+const GlobalDashboardHome = ({ scope }) => {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -74,23 +75,27 @@ const GlobalDashboardHome = () => {
 
   useEffect(() => {
     if (authLoading) return;
+    if (!scope || scope.mode === 'unresolved') return;
+    let active = true;
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
         const isAdmin = user?.role === 'Admin';
+        const platformMode = scope.mode === 'platform';
         const STAFF_DOC_ROLES = ['Admin', 'Secretaire', 'Collaborateur'];
         const canReadUsers   = isAdmin;
         const canReadAlertes = STAFF_DOC_ROLES.includes(user?.role);
 
         const [dashboardData, quotesData, eventsData, alertesData, usersData, logsData] = await Promise.all([
-          getDashboardStats(),
-          getAllQuotes().catch(() => []),
-          getAllEvents(),
-          canReadAlertes ? getAlertesPaiements().catch(() => null) : Promise.resolve(null),
-          canReadUsers   ? getAllUsers().catch(() => [])            : Promise.resolve([]),
-          isAdmin        ? getRecentActionLogs(8).catch(() => [])  : Promise.resolve([]),
+          getDashboardStats(scope),
+          platformMode ? Promise.resolve([]) : getAllQuotes().catch(() => []),
+          platformMode ? Promise.resolve([]) : getAllEvents(),
+          !platformMode && canReadAlertes ? getAlertesPaiements().catch(() => null) : Promise.resolve(null),
+          !platformMode && canReadUsers   ? getAllUsers().catch(() => [])            : Promise.resolve([]),
+          !platformMode && isAdmin        ? getRecentActionLogs(8).catch(() => [])  : Promise.resolve([]),
         ]);
+        if (!active) return;
         const dsStats = dashboardData.stats || { Altimmo: 0, MilaEvents: 0, Altcom: 0 };
         const events  = Array.isArray(eventsData) ? eventsData : [];
         setStats(dsStats);
@@ -117,14 +122,16 @@ const GlobalDashboardHome = () => {
           converti: quotes.filter(q => q.status === 'Converti').length,
         });
       } catch (err) {
+        if (!active) return;
         if (err.response?.status === 401) router.push("/login");
         else setError("Impossible de charger les données du dashboard.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     load();
-  }, [authLoading, user, router]);
+    return () => { active = false; };
+  }, [authLoading, user, router, scope]);
 
   const menuItems = [
     { id:'overview', label:"Vue d'ensemble",    Icon:LayoutDashboard, count:stats.Altimmo+milaCount+stats.Altcom+quotesStats.total, color: BLUE  },
@@ -778,10 +785,11 @@ const ErrorScreen = ({ error }) => (
 
 const DashboardHome = () => {
   const { user } = useAuth();
-  if (['Secretaire', 'GestionnaireImmobilier', 'CommunityManager'].includes(user?.role)) {
+  const { scope } = usePlatformTenantRuntime();
+  if (scope?.mode === 'tenant' && ['Secretaire', 'GestionnaireImmobilier', 'CommunityManager'].includes(user?.role)) {
     return <RoleDashboardOverview />;
   }
-  return <GlobalDashboardHome />;
+  return <GlobalDashboardHome scope={scope} />;
 };
 
 export default DashboardHome;

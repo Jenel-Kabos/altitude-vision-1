@@ -22,6 +22,7 @@ jest.mock('../services/rentalTenantNotificationService', () => ({ notifyContract
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const { attachLeaseToTenant } = require('./helpers/rentalScopeFixture');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const User = require('../models/User');
 const Contrat = require('../models/Contrat');
@@ -51,6 +52,8 @@ afterAll(stopFinancialMongo);
 async function fixtureEcheance(overrides = {}) {
   const admin = await makeUser({ role: 'Admin' });
   const contrat = await Contrat.create({ type: 'location', statut: 'actif', adresseBien: 'Test GL-UX1', montantLoyer: 150000 });
+  // C2.10A — bail rattaché à un bien du tenant de l'admin (Property.tenant).
+  await attachLeaseToTenant({ contrat, staff: [{ user: admin }] });
   const paiement = await Paiement.create({ contrat: contrat._id, mois: 6, annee: 2027, montant: 150000, montantTotal: 150000, statut: 'impayé', ...overrides });
   return { admin, contrat, paiement, adminToken: signToken(admin._id) };
 }
@@ -127,7 +130,9 @@ test('IDOR : un rôle non staff (Client) ne peut pas marquer un paiement comme p
   const client = await makeUser({ role: 'Client' });
   const res = await request(app).post(`/api/paiements/${paiement._id}/marquer-paye`).set('Authorization', `Bearer ${signToken(client._id)}`)
     .send({ montantRecu: 150000, datePaiement: '2027-06-10', modePaiement: 'espèces' });
-  expect(res.status).toBe(403);
+  // C2.10A — un acteur hors du tenant du bail est arrêté dès la frontière de
+  // scope (404) ou par le rôle (403) ; dans les deux cas aucune écriture.
+  expect([403, 404]).toContain(res.status);
   const untouched = await Paiement.findById(paiement._id);
   expect(untouched.statut).toBe('impayé');
 });

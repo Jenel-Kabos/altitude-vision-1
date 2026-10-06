@@ -7,17 +7,20 @@ const Proprietaire = require('../models/Proprietaire');
 const RentalManagement = require('../models/RentalManagement');
 const ActionLog = require('../models/ActionLog');
 const service = require('../services/rentalContractRegularizationService');
+const { createTenantFixture } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(120000);
 let counter = 0;
 const user = (role) => User.create({ name: role, email: `reconux${counter += 1}${Date.now()}@test.dev`, password: 'Password123!', passwordConfirm: 'Password123!', role });
 const fixture = async () => {
   const admin = await user('Admin'); const owner = await user('Proprietaire');
-  const proprietaire = await Proprietaire.create({ nom: 'Owner', prenom: 'One', telephone: '06000000', user: owner._id });
+  // C2.10A — provenance canonique : fiche Proprietaire et bien du tenant T.
+  const { tenant } = await createTenantFixture({ label: 'Regularisation T' });
+  const proprietaire = await Proprietaire.create({ nom: 'Owner', prenom: 'One', telephone: '06000000', user: owner._id, tenant: tenant._id });
   const locataire = await Locataire.create({ nom: 'Tenant', prenom: 'One', telephone: '07000000' });
-  const property = await Property.create({ title: 'Villa Centre', description: 'Description suffisamment longue pour les tests.', pole: 'Altimmo', type: 'Villa', status: 'location', price: 250000, address: { street: 'Rue Test', city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2, images: ['https://test.dev/a.jpg'], surface: 80, availability: 'Disponible', owner: owner._id });
+  const property = await Property.create({ title: 'Villa Centre', description: 'Description suffisamment longue pour les tests.', pole: 'Altimmo', type: 'Villa', status: 'location', price: 250000, address: { street: 'Rue Test', city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2, images: ['https://test.dev/a.jpg'], surface: 80, availability: 'Disponible', owner: owner._id, tenant: tenant._id });
   const contract = await Contrat.create({ type: 'location', statut: 'actif', proprietaire: proprietaire._id, locataire: locataire._id, adresseBien: 'Rue Test', villeBien: 'Brazzaville', montantLoyer: 250000 });
-  return { admin, owner, proprietaire, locataire, property, contract };
+  return { admin, owner, proprietaire, locataire, property, contract, tenant };
 };
 const reconstructionData = {
   reason: 'Reconstruction après contrôle humain des pièces historiques',
@@ -30,6 +33,9 @@ const reconstructionData = {
 
 beforeAll(startFinancialMongo); afterEach(clearFinancialMongo); afterAll(stopFinancialMongo);
 
+// C2.10A — la frontière est désormais le tenant sélectionné (`tenantId`),
+// résolu par provenance canonique (Property.tenant / Proprietaire.tenant) ;
+// l'ancien scope `owner ∈ membres` (`tenantScopeUserIds`) est retiré.
 // PLATFORM-ADMIN-CERT-1 (V3) — ce service impose désormais une frontière
 // tenant (voir server/docs/PLATFORM_ADMIN_CERT_1_AUDIT.md). Ces tests,
 // antérieurs à cette exigence, appelaient le service directement sans le
@@ -38,8 +44,8 @@ beforeAll(startFinancialMongo); afterEach(clearFinancialMongo); afterAll(stopFin
 // `Proprietaire.user` de la fixture) dans le scope — sinon le service
 // traiterait à raison ces dossiers comme hors périmètre de l'acteur.
 test('liste le dossier et explique les Property compatibles sans mutation', async () => {
-  const { contract, property, owner } = await fixture();
-  const rows = await service.getCases({ tenantScopeUserIds: [owner._id] });
+  const { contract, property, tenant } = await fixture();
+  const rows = await service.getCases({ tenantId: tenant._id });
   expect(rows).toHaveLength(1);
   expect(String(rows[0].contract._id)).toBe(String(contract._id));
   expect(String(rows[0].compatibleProperties[0]._id)).toBe(String(property._id));
@@ -48,8 +54,8 @@ test('liste le dossier et explique les Property compatibles sans mutation', asyn
 });
 
 test('rattache, synchronise, journalise puis permet une réversion Admin contrôlée', async () => {
-  const { admin, property, contract, owner } = await fixture();
-  const scope = { tenantScopeUserIds: [owner._id] };
+  const { admin, property, contract, tenant } = await fixture();
+  const scope = { tenantId: tenant._id };
   const record = await service.decide({ contractId: contract._id, action: 'link_existing', data: { propertyId: property._id, reason: 'Vérification humaine des pièces du dossier' }, actor: admin, actorBusinessRole: 'Admin', ...scope });
   expect(record.status).toBe('resolved');
   expect(String((await Contrat.findById(contract._id)).bien)).toBe(String(property._id));
@@ -63,8 +69,8 @@ test('rattache, synchronise, journalise puis permet une réversion Admin contrô
 });
 
 test('classe une anomalie sans modifier le contrat et réserve la réversion à Admin', async () => {
-  const { contract, admin, owner } = await fixture();
-  const scope = { tenantScopeUserIds: [owner._id] };
+  const { contract, admin, tenant } = await fixture();
+  const scope = { tenantId: tenant._id };
   const manager = await user('GestionnaireImmobilier');
   await service.decide({ contractId: contract._id, action: 'flag_anomaly', data: { reason: 'Adresse insuffisante à confirmer manuellement' }, actor: manager, actorBusinessRole: 'GestionnaireImmobilier', ...scope });
   expect((await Contrat.findById(contract._id)).statut).toBe('actif');
@@ -73,8 +79,8 @@ test('classe une anomalie sans modifier le contrat et réserve la réversion à 
 });
 
 test('reconstruit exactement un Property non publié et un RentalManagement pour un contrat legacy', async () => {
-  const { admin, contract, owner } = await fixture();
-  const scope = { tenantScopeUserIds: [owner._id] };
+  const { admin, contract, tenant } = await fixture();
+  const scope = { tenantId: tenant._id };
   const before = await Property.countDocuments();
   const record = await service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin, actorBusinessRole: 'Admin', ...scope });
   const updated = await Contrat.findById(contract._id);
@@ -90,8 +96,8 @@ test('reconstruit exactement un Property non publié et un RentalManagement pour
 });
 
 test('refuse la reconstruction sans motif, pour Collaborateur et pour un contrat moderne déjà rattaché', async () => {
-  const { admin, property, contract, owner } = await fixture();
-  const scope = { tenantScopeUserIds: [owner._id] };
+  const { admin, property, contract, tenant } = await fixture();
+  const scope = { tenantId: tenant._id };
   const collaborator = await user('Collaborateur');
   await expect(service.decide({
     contractId: contract._id,
@@ -110,8 +116,8 @@ test('refuse la reconstruction sans motif, pour Collaborateur et pour un contrat
 });
 
 test('la réversion d’une reconstruction conserve le Property et le rend interne non publié', async () => {
-  const { admin, contract, owner } = await fixture();
-  const scope = { tenantScopeUserIds: [owner._id] };
+  const { admin, contract, tenant } = await fixture();
+  const scope = { tenantId: tenant._id };
   await service.decide({ contractId: contract._id, action: 'create_internal', data: reconstructionData, actor: admin, actorBusinessRole: 'Admin', ...scope });
   const propertyId = (await Contrat.findById(contract._id)).bien;
   await service.revert({ contractId: contract._id, reason: 'Réversion contrôlée sans suppression patrimoniale', actor: admin, actorBusinessRole: 'Admin', ...scope });

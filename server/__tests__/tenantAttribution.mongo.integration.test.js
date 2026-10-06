@@ -28,22 +28,24 @@ test('résout une attribution explicite avec une preuve déterministe', async ()
   await expect(resolveResourceTenant({ resourceType: 'Document', resource: document })).resolves.toMatchObject({ status: 'resolved', tenantId: String(tenant._id), confidence: 1 });
 });
 
-test('résout une attribution legacy dérivée des relations réelles', async () => {
+test('Hotel tenant:null reste sans attribution organisationnelle malgré le manager/createdBy membre', async () => {
   const bootstrap = await makeUser('bootstrap-derived');
   const { tenant, user } = await tenantWithMember('derived', bootstrap);
   const hotel = await Hotel.create({ name: 'Legacy derived', manager: user._id, createdBy: user._id });
   const result = await resolveResourceTenant({ resourceType: 'Hotel', resource: hotel });
-  expect(result).toMatchObject({ status: 'resolved', tenantId: String(tenant._id) });
-  expect(result.proof.join(' ')).toContain('membership');
+  expect(result).toMatchObject({ status: 'unresolved', tenantId: null });
+  await expect(assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: tenant._id }))
+    .rejects.toMatchObject({ statusCode: 404, code: 'TENANT_RESOURCE_NOT_FOUND' });
 });
 
-test('classe ambiguë une ressource dont les preuves pointent vers deux tenants', async () => {
+test('Hotel.tenant direct reste l’unique attribution malgré manager/createdBy incohérents', async () => {
   const bootstrap = await makeUser('bootstrap-ambiguous');
   const a = await tenantWithMember('ambiguous-a', bootstrap);
   const b = await tenantWithMember('ambiguous-b', bootstrap);
-  const hotel = await Hotel.create({ name: 'Ambiguous', manager: a.user._id, createdBy: b.user._id });
-  await expect(resolveResourceTenant({ resourceType: 'Hotel', resource: hotel })).resolves.toMatchObject({ status: 'ambiguous', tenantId: null, confidence: 0 });
-  await expect(assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: a.tenant._id })).rejects.toMatchObject({ statusCode: 404, code: 'TENANT_ATTRIBUTION_AMBIGUOUS' });
+  const hotel = await Hotel.create({ name: 'Direct wins', tenant: a.tenant._id, manager: a.user._id, createdBy: b.user._id });
+  await expect(resolveResourceTenant({ resourceType: 'Hotel', resource: hotel })).resolves.toMatchObject({ status: 'resolved', tenantId: String(a.tenant._id), confidence: 1 });
+  await expect(assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: a.tenant._id })).resolves.toMatchObject({ status: 'resolved' });
+  await expect(assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: b.tenant._id })).rejects.toMatchObject({ statusCode: 404, code: 'TENANT_RESOURCE_NOT_FOUND' });
 });
 
 test('classe non résolue une ressource orpheline et échoue fermé', async () => {

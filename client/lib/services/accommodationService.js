@@ -39,8 +39,8 @@ export const reviewAccommodation = async (id, action, data = {}) => {
 
 // ── Sprint B1 : cycle de vie propriétaire (désactiver/dupliquer/supprimer) ──
 
-export const deactivateAccommodation = async (id) => {
-  const res = await api.patch(`/accommodations/${id}/deactivate`);
+export const deactivateAccommodation = async (id, { platformScoped = false } = {}) => {
+  const res = await api.patch(`/accommodations/${id}/deactivate`, undefined, platformScoped ? { platformScoped: true } : undefined);
   return res.data.data.accommodation;
 };
 
@@ -61,8 +61,8 @@ export const deleteAccommodation = async (id) => {
 // ── Sprint B1 : dashboard admin — "Tous les hébergements" ──
 
 /** @param {{status?, type?, search?, sort?, page?, limit?}} params */
-export const getAccommodationsAdmin = async (params = {}) => {
-  const res = await api.get('/accommodations/admin/list', { params });
+export const getAccommodationsAdmin = async (params = {}, { platformScoped = false } = {}) => {
+  const res = await api.get('/accommodations/admin/list', { params, ...(platformScoped ? { platformScoped: true } : {}) });
   return res.data.data; // { accommodations, total, page, limit }
 };
 

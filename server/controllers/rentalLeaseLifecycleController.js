@@ -4,13 +4,15 @@
 // métier ici, même convention que dossierController.js (DOC-EVO-1).
 const mongoose = require('mongoose');
 const Contrat = require('../models/Contrat');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant, tenantRentalPropertyIds } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const lifecycle = require('../services/rentalLeaseLifecycleService');
 const { renewLease, previewRenewal } = require('../services/rentalLeaseRenewalService');
 const { addAvenant } = require('../services/rentalLeaseAmendmentService');
 const caution = require('../services/rentalLeaseCautionService');
 const { getLeaseLifecycleDashboard } = require('../services/rentalLeaseDashboardService');
+const { assertIndividualRentalResourceAccess } = require('../services/rentalIndividualResourceAccessService');
+const { individualRentalPropertyIds } = require('../services/rentalIndividualAccessService');
 
 const fail = (res, error) => res.status(error.statusCode || 500).json({ status: (error.statusCode || 500) >= 500 ? 'error' : 'fail', message: error.message });
 
@@ -25,9 +27,15 @@ exports.assertContratTenantAccessParam = async (req, res, next, contratId) => {
     if (!mongoose.isValidObjectId(contratId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const contrat = await Contrat.findById(contratId);
     if (!contrat) return res.status(404).json({ status: 'fail', message: 'Contrat introuvable.' });
+    if (req.query?.scope === 'individual') {
+      await assertIndividualRentalResourceAccess({ resourceType: 'Contrat', resource: contrat, userId: req.user._id || req.user.id });
+      return next();
+    }
     const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
     const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-    await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
+    // C2.10A — cycle de vie du bail (préavis, renouvellement, caution…) :
+    // frontière locative stricte Contrat.bien → Property.tenant.
+    await assertRentalResourceInTenant({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
     next();
   } catch (error) {
     res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Contrat introuvable.' });
@@ -103,9 +111,13 @@ exports.restituerCaution = async (req, res) => {
   } catch (error) { fail(res, error); }
 };
 
-exports.dashboard = async (_req, res) => {
+exports.dashboard = async (req, res) => {
   try {
-    const dashboard = await getLeaseLifecycleDashboard();
+    // C2.10A — agrégat borné à la population canonique du tenant sélectionné.
+    const propertyIds = req.rentalScope?.mode === 'individual'
+      ? await individualRentalPropertyIds(req.user._id || req.user.id)
+      : await tenantRentalPropertyIds(req.platformTenant?._id);
+    const dashboard = await getLeaseLifecycleDashboard({ propertyIds });
     res.status(200).json({ status: 'success', data: { dashboard } });
   } catch (error) { fail(res, error); }
 };

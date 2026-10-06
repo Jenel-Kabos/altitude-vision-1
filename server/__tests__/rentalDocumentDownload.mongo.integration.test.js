@@ -10,6 +10,7 @@ jest.mock('../services/storage/secureStorageService', () => ({
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const User = require('../models/User');
 const Property = require('../models/Property');
@@ -53,6 +54,10 @@ const makeUser = (overrides = {}) => {
 
 async function fixture() {
   const admin = await makeUser({ role: 'Admin' });
+  // C2.10A — le staff lit un document de bail via Property.tenant : l'admin est
+  // membre du tenant T et le bien appartient à T.
+  const { tenant: docTenant, bootstrap: docBootstrap } = await createTenantFixture({ label: 'Rental Doc T' });
+  await addTenantMember({ tenant: docTenant, user: admin, bootstrap: docBootstrap, businessRole: 'Admin' });
   const ownerUser = await makeUser({ role: 'Proprietaire' });
   const otherOwnerUser = await makeUser({ role: 'Proprietaire' });
   const tenantUser = await makeUser({ role: 'Client' });
@@ -63,7 +68,7 @@ async function fixture() {
     pole: 'Altimmo', type: 'Maison', status: 'location', price: 300000,
     address: { arrondissement: 'Moungali', city: 'Brazzaville' }, latitude: -4.25, longitude: 15.27,
     images: ['https://placehold.co/1200x800/png?text=Test'], surface: 90, bedrooms: 2, bathrooms: 1,
-    statusAdmin: 'Validée', owner: ownerUser._id,
+    statusAdmin: 'Validée', owner: ownerUser._id, tenant: docTenant._id,
   });
   const locataire = await Locataire.create({ nom: 'Locataire', prenom: 'Test', telephone: '+242060000000', user: tenantUser._id });
   const contrat = await Contrat.create({
@@ -71,7 +76,7 @@ async function fixture() {
     documents: [{ nom: 'Bail signé', type: 'bail', url: fakeCdnUrl }],
   });
   const documentId = String(contrat.documents[0]._id);
-  return { admin, ownerUser, otherOwnerUser, tenantUser, otherTenantUser, contrat, documentId };
+  return { admin, ownerUser, otherOwnerUser, tenantUser, otherTenantUser, contrat, documentId, property };
 }
 
 test('admin autorisé : reçoit le flux du document', async () => {
@@ -95,7 +100,7 @@ test('contrôle tenant staff : Admin B lit son document B, Admin A connaissant s
     organizationService.grantMembership({ userId: adminB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
     organizationService.grantMembership({ userId: ownerB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
   ]);
-  const propertyB = await Property.create({ title: 'Bien document B', description: 'Description suffisamment longue pour le document B.', pole: 'Altimmo', type: 'Maison', status: 'location', price: 300000, address: { city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2, images: ['https://placehold.co/1200x800/png'], surface: 80, statusAdmin: 'Validée', owner: ownerB._id });
+  const propertyB = await Property.create({ title: 'Bien document B', description: 'Description suffisamment longue pour le document B.', pole: 'Altimmo', type: 'Maison', status: 'location', price: 300000, address: { city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2, images: ['https://placehold.co/1200x800/png'], surface: 80, statusAdmin: 'Validée', owner: ownerB._id, tenant: tenantB._id });
   const contratB = await Contrat.create({ type: 'location', statut: 'actif', bien: propertyB._id, documents: [{ nom: 'Bail B privé', type: 'bail', url: fakeCdnUrl }] });
   const id = contratB.documents[0]._id;
   const positive = await request(app).get(`/api/rental-documents/${id}/download`).set('Authorization', `Bearer ${signToken(adminB._id)}`);
@@ -116,7 +121,7 @@ test('nouvel asset authenticated : B peut le streamer, A connaissant documentId 
     organizationService.grantMembership({ userId: adminB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
     organizationService.grantMembership({ userId: ownerB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
   ]);
-  const propertyB = await Property.create({ title: 'Bien coffre B', description: 'Description suffisamment longue pour le coffre B.', pole: 'Altimmo', type: 'Maison', status: 'location', price: 300000, address: { city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2, images: ['https://placehold.co/1200x800/png'], surface: 80, statusAdmin: 'Validée', owner: ownerB._id });
+  const propertyB = await Property.create({ title: 'Bien coffre B', description: 'Description suffisamment longue pour le coffre B.', pole: 'Altimmo', type: 'Maison', status: 'location', price: 300000, address: { city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2, images: ['https://placehold.co/1200x800/png'], surface: 80, statusAdmin: 'Validée', owner: ownerB._id, tenant: tenantB._id });
   const contratB = await Contrat.create({ type: 'location', statut: 'actif', bien: propertyB._id, documents: [{ nom: 'Bail authenticated', type: 'bail', asset: { assetClass: 'PRIVATE_DOCUMENT', purpose: 'lease', provider: 'cloudinary', publicId: 'tenant-b/known-public-id', resourceType: 'raw', deliveryType: 'authenticated', version: '1', format: 'pdf', mimeType: 'application/pdf', originalFilename: 'bail.pdf', size: 42 } }] });
   expect(contratB.documents[0].url).toBeUndefined();
   const positive = await request(app).get(`/api/rental-documents/${contratB.documents[0]._id}/download`).set('Authorization', `Bearer ${signToken(adminB._id)}`);
@@ -177,8 +182,9 @@ test('document absent (ObjectId valide mais inexistant)', async () => {
 });
 
 test('document sans URL associée : 404 explicite, jamais un flux vide silencieux', async () => {
-  const { admin } = await fixture();
-  const contratSansUrl = await Contrat.create({ type: 'location', statut: 'actif', adresseBien: 'Test sans URL', documents: [{ nom: 'Doc cassé', type: 'bail' }] });
+  const { admin, property } = await fixture();
+  // C2.10A — bail rattaché au bien du tenant de l'admin (Property.tenant).
+  const contratSansUrl = await Contrat.create({ type: 'location', statut: 'actif', bien: property._id, adresseBien: 'Test sans URL', documents: [{ nom: 'Doc cassé', type: 'bail' }] });
   const res = await request(app).get(`/api/rental-documents/${contratSansUrl.documents[0]._id}/download`).set('Authorization', `Bearer ${signToken(admin._id)}`);
   expect(res.status).toBe(404);
 });
@@ -187,15 +193,15 @@ test('ancienne structure de document (sans dateEnvoi/envoiEmail explicites) rest
   // Un Contrat.documents[] créé avant l'ajout d'un champ optionnel reste
   // strictement identique au niveau schéma (aucun champ requis ajouté) —
   // ce test simule un document minimal, comme les anciens.
-  const admin = await makeUser({ role: 'Admin' });
-  const contrat = await Contrat.create({ type: 'location', statut: 'actif', adresseBien: 'Legacy', documents: [{ nom: 'Ancienne quittance', type: 'quittance', url: fakeCdnUrl }] });
+  const { admin, property } = await fixture(); // C2.10A — admin membre du tenant du bien
+  const contrat = await Contrat.create({ type: 'location', statut: 'actif', bien: property._id, adresseBien: 'Legacy', documents: [{ nom: 'Ancienne quittance', type: 'quittance', url: fakeCdnUrl }] });
   const res = await request(app).get(`/api/rental-documents/${contrat.documents[0]._id}/download`).set('Authorization', `Bearer ${signToken(admin._id)}`);
   expect(res.status).toBe(200);
 });
 
 test('erreur en amont (CDN renvoie 404) propagée en 502 sans planter le serveur', async () => {
-  const admin = await makeUser({ role: 'Admin' });
-  const contrat = await Contrat.create({ type: 'location', statut: 'actif', adresseBien: 'CDN cassé', documents: [{ nom: 'Doc CDN cassé', type: 'bail', url: fakeCdnUrl.replace('document.pdf', 'missing.pdf') }] });
+  const { admin, property } = await fixture(); // C2.10A — admin membre du tenant du bien
+  const contrat = await Contrat.create({ type: 'location', statut: 'actif', bien: property._id, adresseBien: 'CDN cassé', documents: [{ nom: 'Doc CDN cassé', type: 'bail', url: fakeCdnUrl.replace('document.pdf', 'missing.pdf') }] });
   const res = await request(app).get(`/api/rental-documents/${contrat.documents[0]._id}/download`).set('Authorization', `Bearer ${signToken(admin._id)}`);
   expect(res.status).toBe(502);
 });

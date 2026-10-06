@@ -32,7 +32,7 @@ LOW (nécessite validation humaine).
 |---|---|---|---|---|---|---|---|---|
 | Name | YES | NO (service providers seulement) | NO | Required | Account management, App functionality | `server/models/User.js` (nom/prénom via inscription), écrans `EditProfileScreen.jsx`, `ProfilScreen.jsx` | HIGH | Stocké MongoDB (Render), transmis pour messagerie/annonces |
 | Email address | YES | NO (service providers) | NO | Required | Account management, Developer communications (transactionnel), App functionality | `server/models/User.js:21 (email)`, `server/config/email.js` (Zoho SMTP) | HIGH | Envoi via Zoho pour vérif email/reset password/notifications transactionnelles |
-| User IDs | YES | NO (service providers) | NO | Required | Account management, App functionality | JWT contient `userId`, Mongo `_id`, tokens Sentry via Sentry.setUser (à vérifier — voir NOTES_HUMAN) | HIGH | Sentry peut recevoir un identifiant utilisateur si `Sentry.setUser` est appelé — à confirmer humainement |
+| User IDs | YES | NO (service providers) | NO | Required | Account management, App functionality | JWT contient `userId`, Mongo `_id`; aucun appel applicatif `Sentry.setUser` trouvé | HIGH | Réévaluer si l'identité Sentry est ajoutée ultérieurement |
 | Address | YES (biens immobiliers) | NO | NO | Optional | App functionality | `server/models/Property.js`, `PublierBienScreen.jsx` | HIGH | Il s'agit de l'adresse d'un **bien**, pas nécessairement du domicile de l'utilisateur. À déclarer sous "Other personal info" plutôt qu'"Address" si Play Console distingue |
 | Phone number | YES | NO (service providers) | NO | Optional (inscription email) / Required (inscription phone) | Account management, App functionality | `server/models/User.js:69 (phone)`, `authProvider: 'phone'` | HIGH | Format international, utilisé pour contact |
 | Race and ethnicity | NO | – | – | – | – | Aucune preuve dans le code | HIGH | – |
@@ -69,13 +69,13 @@ LOW (nécessite validation humaine).
 | DATA_TYPE | COLLECTED | SHARED | EPHEMERAL | REQ/OPT | PURPOSES | CODE_EVIDENCE | CONFIDENCE | NOTES |
 |---|---|---|---|---|---|---|---|---|
 | Photos | YES | NO (Cloudinary = service provider) | NO | Optional | App functionality | `PhotoManager.jsx`, `expo-image-picker`, `expo-camera`, backend `server/config/cloudinary.js`, routes `rentalPropertyRoutes.js`, `estimationRoutes.js`… | HIGH | Photos de biens, photo de profil, pièces jointes messagerie. Uploadées via Cloudinary (URL retournée au client) |
-| Videos | POSSIBLE — `expo-video` importé, mais pas de flow d'upload vidéo confirmé côté utilisateur | – | – | Optional | App functionality | `app.config.js:102 (expo-video plugin)` ; usage lecture (annonces) plutôt qu'upload | MEDIUM | À valider : les utilisateurs peuvent-ils publier des vidéos ? Le code actuel ne montre qu'une lecture |
+| Videos | YES | YES (Cloudinary) | NO | Optional | App functionality | `PublierBienScreen.jsx` autorise `mediaTypes: ['images', 'videos']`; `annonceService.js` traite les MIME vidéo et uploade vers Cloudinary | HIGH | Publication volontaire par l'utilisateur |
 
 ## Audio files
 
 | DATA_TYPE | COLLECTED | SHARED | EPHEMERAL | REQ/OPT | PURPOSES | CODE_EVIDENCE | CONFIDENCE | NOTES |
 |---|---|---|---|---|---|---|---|---|
-| Voice or sound recordings | NO — pas d'appel à `expo-audio`/`Audio.Recording` dans `src/` | – | – | – | – | `expo-audio` inclus (plugin) et RECORD_AUDIO permission ajoutée par le module natif mais aucun flow enregistrement dans le code applicatif | MEDIUM | Permission RECORD_AUDIO présente au niveau manifeste **héritée** d'`expo-audio`/RN. À supprimer ou à justifier — cf. section permissions |
+| Voice or sound recordings | NO — aucun appel d'enregistrement audio dans `src/` | – | – | – | – | `expo-audio` sert à la lecture dans `ChatScreen.jsx`; `RECORD_AUDIO` est bloquée par `android.blockedPermissions` | HIGH | Manifest généré : directive de retrait confirmée ; manifest fusionné release à revalider dans le prochain build signé |
 | Music files | NO | – | – | – | – | – | HIGH | – |
 | Other audio files | NO | – | – | – | – | – | HIGH | – |
 
@@ -155,12 +155,12 @@ LOW (nécessite validation humaine).
 
 ## Unresolved items (`HUMAN_REVIEW_REQUIRED`)
 
-1. Confirmer si `Sentry.setUser(...)` est appelé avec l'identifiant
+1. Aucun appel applicatif `Sentry.setUser(...)` trouvé ; réévaluer si ce comportement est ajouté
    utilisateur (à ce jour non trouvé dans `App.js` mais possible via un
    wrapper d'auth). Si oui : Sentry reçoit un `userId` — à déclarer.
-2. Confirmer si les utilisateurs peuvent uploader des vidéos (`expo-video`
+2. Upload vidéo confirmé dans le flux `PublierBienScreen` vers Cloudinary ; aligner la réponse Console
    est branché en lecture).
-3. Vérifier que RECORD_AUDIO / FOREGROUND_SERVICE_MEDIA_PLAYBACK / SYSTEM_ALERT_WINDOW
+3. Vérifier sur le prochain AAB signé que RECORD_AUDIO / SYSTEM_ALERT_WINDOW sont absentes ; FOREGROUND_SERVICE_MEDIA_PLAYBACK reste justifiée par la lecture `expo-audio`
    sont réellement nécessaires (héritages Expo) — voir la section permissions
    du rapport d'audit.
 4. Confirmer le moyen de paiement effectif (hors application ? redirection

@@ -5,6 +5,12 @@ const OrgMembership = require('../../models/OrgMembership');
 const OrgUnit = require('../../models/OrgUnit');
 const PlatformTenant = require('../../models/PlatformTenant');
 const User = require('../../models/User');
+const Property = require('../../models/Property');
+const Accommodation = require('../../models/Accommodation');
+const AccommodationReservation = require('../../models/AccommodationReservation');
+const Hotel = require('../../models/Hotel');
+const HotelReservation = require('../../models/HotelReservation');
+const Transaction = require('../../models/Transaction');
 const platformTenantService = require('./platformTenantService');
 const organizationService = require('../organizationService');
 const { logAction, buildAuteur } = require('../actionLogService');
@@ -12,6 +18,7 @@ const { notify } = require('../notificationService');
 const { resolveEffectiveTenantContext, resolveAvailableTenantsForUser } = require('./tenantContextService');
 const storage = require('../storage/tenantApplicationStorageService');
 const { resolveActiveOperator, hasCapability, resolveActiveOperatorsByCapability } = require('../platformOperator/platformOperatorService');
+const { ASSET_CLASSIFICATION, classifyOrganizationAsset } = require('./organizationAssetInvariantService');
 
 const EDITABLE_FIELDS = Object.freeze([
   'organizationName', 'organizationType', 'professionalContact',
@@ -362,17 +369,69 @@ async function rejectApplication({ applicationId, actor, reason, req }) {
 async function assertApplicantEligibleForProvisioning(application, session) {
   const user = await User.findOne({ _id: application.applicant, role: 'Proprietaire', isActive: { $ne: false }, status: { $nin: ['Suspendu', 'Banni', 'Supprimé'] } }).session(session);
   if (!user) fail('TENANT_APPLICATION_APPLICANT_INVALID', 'Le demandeur n’est plus éligible.', 409);
-  const membershipCount = await OrgMembership.countDocuments({ user: user._id }).session(session);
-  if (membershipCount) fail('TENANT_APPLICATION_MEMBERSHIP_CONFLICT', 'Un rattachement organisationnel existe déjà.', 409);
-  const [rootCount, tenantCount] = await Promise.all([
-    OrgUnit.countDocuments({ createdBy: user._id }).session(session),
-    PlatformTenant.countDocuments({ createdBy: user._id }).session(session),
-  ]);
-  if (rootCount || tenantCount) fail('TENANT_APPLICATION_LEGACY_CONFLICT', 'Un historique organisationnel nécessite une revue.', 409);
+  const ownerMemberships = await OrgMembership.find({ user: user._id, roleInUnit: 'owner', status: 'active' }).session(session).lean();
+  if (ownerMemberships.length > 1) fail('ORGANIZATION_SELECTION_REQUIRED', 'Plusieurs organisations détenues nécessitent une sélection explicite.', 409);
+  const inactiveOwner = await OrgMembership.exists({ user: user._id, roleInUnit: 'owner', status: { $ne: 'active' } }).session(session);
+  if (inactiveOwner) fail('TENANT_APPLICATION_MEMBERSHIP_CONFLICT', 'Un rattachement propriétaire historique nécessite une revue.', 409);
+  let ownedOrganization = null;
+  if (ownerMemberships.length === 1) {
+    const membership = ownerMemberships[0];
+    if (membership.businessRole !== 'Admin') fail('TENANT_APPLICATION_MEMBERSHIP_CONFLICT', 'Le détenteur doit porter le businessRole Admin canonique.', 409);
+    const tenant = await PlatformTenant.findOne({ rootOrgUnit: membership.orgUnit }).session(session);
+    if (!tenant) fail('TENANT_APPLICATION_MEMBERSHIP_CONFLICT', 'La membership propriétaire ne résout aucune organisation.', 409);
+    ownedOrganization = { tenant, membership };
+  }
   const deterministicSlug = `first-owner-${crypto.createHash('sha256').update(String(user._id)).digest('hex').slice(0, 40)}`;
-  const collision = await PlatformTenant.findOne({ slug: deterministicSlug }).select('_id createdBy').session(session);
-  if (collision) fail('TENANT_APPLICATION_FOREIGN_PROVISIONING_COLLISION', 'Identité de provisioning déjà utilisée.', 409);
-  return user;
+  if (!ownedOrganization) {
+    const collision = await PlatformTenant.findOne({ slug: deterministicSlug }).select('_id').session(session);
+    if (collision) fail('TENANT_APPLICATION_FOREIGN_PROVISIONING_COLLISION', 'Identité de provisioning déjà utilisée.', 409);
+  }
+  return { user, ownedOrganization };
+}
+
+async function transitionEligibleApplicantAssets({ applicantId, tenantId, session }) {
+  const properties = await Property.find({ owner: applicantId }).select('_id owner tenant pole status availability assetCycle').session(session).lean();
+  const propertyIds = properties.map((property) => property._id);
+  const accommodations = propertyIds.length
+    ? await Accommodation.find({ property: { $in: propertyIds } }).select('_id property tenant').session(session).lean()
+    : [];
+  const accommodationIds = accommodations.map((item) => item._id);
+  const hotels = propertyIds.length
+    ? await Hotel.find({ property: { $in: propertyIds } }).select('_id property tenant').session(session).lean()
+    : [];
+  const hotelIds = hotels.map((item) => item._id);
+  const [activeTransactions, activeAccommodationReservations, activeHotelReservations] = await Promise.all([
+    propertyIds.length ? Transaction.find({ property: { $in: propertyIds }, status: { $in: ['En cours', 'Paiement en attente', 'Litigée'] } }).select('property').session(session).lean() : [],
+    accommodationIds.length ? AccommodationReservation.find({ accommodation: { $in: accommodationIds }, status: { $in: ['pending', 'pending_payment', 'confirmed', 'checked_in'] } }).select('accommodation').session(session).lean() : [],
+    hotelIds.length ? HotelReservation.find({ hotel: { $in: hotelIds }, status: { $in: ['pending', 'confirmed', 'checked_in'] } }).select('hotel').session(session).lean() : [],
+  ]);
+  const propertyByAccommodation = new Map(accommodations.map((item) => [String(item._id), String(item.property)]));
+  const propertyByHotel = new Map(hotels.map((item) => [String(item._id), String(item.property)]));
+  const blocked = new Set(activeTransactions.map((item) => String(item.property)));
+  activeAccommodationReservations.forEach((item) => blocked.add(propertyByAccommodation.get(String(item.accommodation))));
+  activeHotelReservations.forEach((item) => blocked.add(propertyByHotel.get(String(item.hotel))));
+  const classified = properties.map((property) => ({ property, ...classifyOrganizationAsset({
+    property, ownerId: applicantId, targetTenantId: tenantId, activeWorkflow: blocked.has(String(property._id)),
+  }) }));
+  const conflict = classified.find(({ classification }) => [
+    ASSET_CLASSIFICATION.OTHER_TENANT_CONFLICT,
+    ASSET_CLASSIFICATION.OWNERSHIP_AMBIGUOUS,
+    ASSET_CLASSIFICATION.ACTIVE_WORKFLOW_BLOCKER,
+  ].includes(classification));
+  if (conflict) {
+    const code = conflict.classification === ASSET_CLASSIFICATION.ACTIVE_WORKFLOW_BLOCKER
+      ? 'ACTIVE_ASSET_WORKFLOW_BLOCKER' : 'ASSET_OWNERSHIP_AMBIGUOUS';
+    fail(code, 'Le patrimoine contient un actif qui nécessite une résolution explicite.', 409);
+  }
+  const eligibleIds = classified.filter((item) => item.migratable).map((item) => item.property._id);
+  if (hotels.some((hotel) => !hotel.tenant && eligibleIds.some((value) => String(value) === String(hotel.property)))) {
+    fail('HOTEL_TENANT_NULL_BLOCKER', 'Un hôtel historique sans organisation nécessite une résolution explicite.', 409);
+  }
+  if (eligibleIds.length) {
+    await Property.updateMany({ _id: { $in: eligibleIds }, tenant: null }, { $set: { tenant: tenantId } }, { session });
+    await Accommodation.updateMany({ property: { $in: eligibleIds }, tenant: null }, { $set: { tenant: tenantId } }, { session });
+  }
+  return { scanned: properties.length, migrated: eligibleIds.length, classifications: classified.map(({ property, classification }) => ({ propertyId: String(property._id), classification })) };
 }
 
 async function approveApplication({ applicationId, actor, req, failurePoint = null }) {
@@ -387,12 +446,13 @@ async function approveApplication({ applicationId, actor, req, failurePoint = nu
     await session.withTransaction(async () => {
       const application = await TenantApplication.findOne({ _id: applicationId, status: 'UNDER_REVIEW' }).session(session);
       if (!application) fail('TENANT_APPLICATION_APPROVAL_CONFLICT', 'La demande a déjà changé d’état.', 409);
-      const applicant = await assertApplicantEligibleForProvisioning(application, session);
-      const tenant = await platformTenantService.createFirstOwnerTenant({ name: application.organizationName, actor: applicant, req, session });
+      const { user: applicant, ownedOrganization } = await assertApplicantEligibleForProvisioning(application, session);
+      const tenant = ownedOrganization?.tenant || await platformTenantService.createFirstOwnerTenant({ name: application.organizationName, actor: applicant, req, session });
       if (failurePoint === 'after_tenant') throw new Error('TENANT_APPLICATION_TEST_FAILURE_AFTER_TENANT');
-      const membership = await organizationService.grantMembership({ userId: applicant._id, orgUnitId: tenant.rootOrgUnit,
+      const membership = ownedOrganization?.membership || await organizationService.grantMembership({ userId: applicant._id, orgUnitId: tenant.rootOrgUnit,
         roleInUnit: 'owner', businessRole: 'Admin', actor, metadata: { tenantApplicationId: application._id }, req, session });
       if (failurePoint === 'after_membership') throw new Error('TENANT_APPLICATION_TEST_FAILURE_AFTER_MEMBERSHIP');
+      const assetTransition = await transitionEligibleApplicantAssets({ applicantId: applicant._id, tenantId: tenant._id, session });
       const now = new Date();
       const approved = await TenantApplication.findOneAndUpdate(
         { _id: application._id, status: 'UNDER_REVIEW', revision: application.revision },
@@ -404,7 +464,7 @@ async function approveApplication({ applicationId, actor, req, failurePoint = nu
       if (!approved) fail('TENANT_APPLICATION_APPROVAL_CONFLICT', 'La demande a déjà changé d’état.', 409);
       if (failurePoint === 'before_commit') throw new Error('TENANT_APPLICATION_TEST_FAILURE_BEFORE_COMMIT');
       await auditApplication('approved', { application: approved, actor, session, req, tenant });
-      result = { application: approved, tenant, membership, idempotent: false };
+      result = { application: approved, tenant, membership, assetTransition, idempotent: false };
     });
   } catch (error) {
     const final = await TenantApplication.findById(applicationId);
@@ -438,5 +498,6 @@ module.exports = {
   createDraft, getOwnApplication, editOwnApplication, submitOwnApplication,
   getCurrentOwnApplication, getOnboardingStatus, uploadOwnDocument, readOwnDocument, deleteOwnDocument,
   listForReview, readForReview, startReview, requestAdditionalInfo, rejectApplication, approveApplication, readDocumentForReview,
+  transitionEligibleApplicantAssets,
   transitionApprovedInternal, countPendingReview,
 };

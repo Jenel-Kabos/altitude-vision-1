@@ -18,8 +18,13 @@ const {
 } = require('../services/propertyPublicationInputService');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
-const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { hasCapability } = require('../services/platformOperator/platformOperatorService');
+const {
+  ADMINISTRATION_SCOPE_MODE,
+  accommodationScopeFilter,
+  assertAccommodationInAdministrationScope,
+  assertPropertyInAdministrationScope,
+} = require('../services/administrationScopeService');
 
 // TENANT-CERT-3-PRE — vulnérabilité critique découverte et corrigée : chaque
 // route staff/Admin de ce contrôleur (getOne/update/submit/reviewDecision/
@@ -44,18 +49,24 @@ const { resolveTenantForUser } = require('../services/platformTenant/tenantConte
 // (ex. un autre `Proprietaire`) doit continuer à être refusé, quel que soit
 // son tenant — sans quoi deux propriétaires du même tenant pourraient agir
 // l'un sur l'autre, une régression distincte de celle visée par ce sprint.
-async function assertAccommodationAccessible(req, accommodation, allowedStaffRoles = ['Admin']) {
+async function assertAccommodationAccessible(req, accommodation, allowedStaffRoles = ['Admin'], capability = 'platform.accommodations.manage') {
+  const scope = req.adminScope;
+  if (scope?.mode === ADMINISTRATION_SCOPE_MODE.PLATFORM) {
+    if (!hasCapability(req.platformOperator, capability)) {
+      const error = new Error('Capacité PlatformOperator requise.'); error.statusCode = 403; throw error;
+    }
+    return assertAccommodationInAdministrationScope(scope, accommodation);
+  }
   if (accommodation.createdBy && accommodation.createdBy.toString() === req.user.id.toString()) return;
   if (!allowedStaffRoles.includes(req.user.role)) {
     const error = new Error('Accès refusé.');
     error.statusCode = 403;
     throw error;
   }
-  // PLATFORM-ADMIN-CERT-1 — sans l'en-tête, un PlatformOperator ne pouvait
-  // jamais administrer l'Accommodation d'aucun tenant après sélection.
-  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
-  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-  await assertResourceTenantOrUnattributed({ resourceType: 'Accommodation', resource: accommodation, tenantId: tenant?._id });
+  if (scope?.mode === ADMINISTRATION_SCOPE_MODE.TENANT) {
+    return assertAccommodationInAdministrationScope(scope, accommodation);
+  }
+  const error = new Error("Contexte d'administration requis."); error.statusCode = 403; throw error;
 }
 
 const fail = (res, statusCode, message, extra = {}) =>
@@ -322,7 +333,7 @@ exports.create = async (req, res) => {
     }
     const property = await Property.findById(req.body.property);
     if (!property) return fail(res, 404, 'Bien introuvable.');
-    if (property.owner.toString() !== req.user.id.toString() && req.user.role !== 'Admin') {
+    if (property.owner.toString() !== req.user.id.toString()) {
       return fail(res, 403, "Vous n'êtes pas propriétaire de ce bien.");
     }
     if (property.status !== 'hebergement') {
@@ -341,7 +352,7 @@ exports.create = async (req, res) => {
       accommodation = await Accommodation.create({
         property: property._id,
         createdBy: req.user.id,
-        tenant: req.platformTenant?._id || null,
+        tenant: property.tenant || null,
         ...details,
       });
     } catch (error) {
@@ -429,7 +440,7 @@ exports.getOne = async (req, res) => {
     const accommodation = await Accommodation.findById(req.params.id).populate('property');
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
     try {
-      await assertAccommodationAccessible(req, accommodation, ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager']);
+      await assertAccommodationAccessible(req, accommodation, ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'], 'platform.accommodations.read');
     } catch (error) {
       return fail(res, error.statusCode || 403, 'Accès refusé.');
     }
@@ -517,10 +528,9 @@ exports.submit = async (req, res) => {
 exports.pending = async (req, res) => {
   try {
     const { accommodationModerationFilter } = require('../services/moderationClassificationService');
-    const tenantId = req.platformTenant?._id || req.platformTenant || null;
     const accommodations = await Accommodation.find(accommodationModerationFilter({
       publicationStatus: 'soumis',
-      ...(tenantId ? { tenant: tenantId } : {}),
+      ...accommodationScopeFilter(req.adminScope),
     }))
       .populate('property', 'title images address owner bedrooms bathrooms')
       .sort({ submittedAt: 1 });
@@ -546,7 +556,7 @@ exports.listAdmin = async (req, res) => {
     const { status, type, city, availability, search, sort, page, limit } = req.query;
     const result = await listAccommodationsForAdmin({
       status, type, city, availability, search, sort, page, limit,
-      tenantId: req.platformTenant?._id || req.platformTenant || null,
+      scopeFilter: accommodationScopeFilter(req.adminScope),
       independentOnly: req.query.independentOnly === 'true',
       validatedOnly: req.query.validatedOnly === 'true',
       activeOnly: req.query.activeOnly === 'true',
@@ -591,7 +601,7 @@ exports.reviewDecision = async (req, res) => {
     // aucune vérification tenant, un staff du Tenant A pouvait valider/
     // rejeter/suspendre un hébergement du Tenant B.
     try {
-      await assertAccommodationAccessible(req, accommodation, ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager']);
+      await assertAccommodationAccessible(req, accommodation, ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'], 'platform.accommodations.manage');
     } catch (error) {
       return fail(res, error.statusCode || 403, 'Accès refusé.');
     }
@@ -739,6 +749,9 @@ exports.duplicate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id).populate('property');
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
+    if (req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.PLATFORM) {
+      return fail(res, 403, 'Duplication plateforme différée : sélectionnez un tenant.', { code: 'PLATFORM_ACCOMMODATION_DUPLICATION_DEFERRED' });
+    }
     try {
       await assertAccommodationAccessible(req, accommodation);
     } catch (error) {
@@ -785,6 +798,9 @@ exports.remove = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const accommodation = await Accommodation.findById(req.params.id).populate('property');
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
+    if (req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.PLATFORM) {
+      return fail(res, 403, 'Suppression plateforme différée : sélectionnez un tenant.', { code: 'PLATFORM_ACCOMMODATION_DELETE_DEFERRED' });
+    }
     try {
       await assertAccommodationAccessible(req, accommodation);
     } catch (error) {
@@ -831,7 +847,7 @@ exports.listRates = async (req, res) => {
     const accommodation = await Accommodation.findById(req.params.id);
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
     try {
-      await assertAccommodationAccessible(req, accommodation);
+      await assertAccommodationAccessible(req, accommodation, ['Admin'], 'platform.accommodations.read');
     } catch (error) {
       return fail(res, error.statusCode || 403, 'Accès refusé.');
     }
@@ -988,6 +1004,15 @@ exports.updateFull = async (req, res) => {
     if (!property) return fail(res, 404, 'Bien introuvable.');
     if (property.status !== 'hebergement') {
       return fail(res, 422, "Ce bien n'est pas de type hébergement.");
+    }
+    try {
+      if (req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.PLATFORM
+        && !hasCapability(req.platformOperator, 'platform.accommodations.manage')) {
+        const error = new Error('Capacité PlatformOperator requise.'); error.statusCode = 403; throw error;
+      }
+      assertPropertyInAdministrationScope(req.adminScope, property);
+    } catch (error) {
+      return fail(res, error.statusCode || 403, error.message);
     }
 
     const { accommodationType } = req.body;

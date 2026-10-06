@@ -45,6 +45,7 @@ async function buildTenantFixture(label) {
     organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: admin }),
   ]);
   const property = await Property.create({
+    tenant: tenant._id,
     title: `Villa P1E ${label}`, description: 'Description suffisamment longue pour la validation du modele Property.',
     pole: 'Altimmo', type: 'Studio', status: 'hebergement', price: 300000,
     address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.24,

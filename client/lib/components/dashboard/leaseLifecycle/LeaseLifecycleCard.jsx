@@ -12,6 +12,8 @@ import { toast } from "react-hot-toast";
 import { useAuth } from "../../../context/AuthContext";
 import { isStaffImmo } from "../../../utils/staffRoles";
 import { getAvailableTransitions, transitionLease } from "../../../services/rentalLeaseLifecycleService";
+import { useRentalOperationContext } from "../../../context/RentalOperationContext";
+import { callWithRentalContext } from "../../../services/rentalRequestContext";
 
 const STATE_LABELS = {
   projet: "Projet de bail", en_preparation: "En préparation", a_signer: "À signer",
@@ -33,6 +35,7 @@ const TRANSITION_LABELS = {
 };
 
 const LeaseLifecycleCard = ({ contratId, onChanged }) => {
+  const rentalContext = useRentalOperationContext();
   const { user } = useAuth();
   const [state, setState] = useState(null); // { cycleVie, allowed }
   const [loading, setLoading] = useState(true);
@@ -41,7 +44,7 @@ const LeaseLifecycleCard = ({ contratId, onChanged }) => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getAvailableTransitions(contratId);
+      const data = await callWithRentalContext(getAvailableTransitions, rentalContext, contratId);
       setState(data);
     } catch {
       setState(null);
@@ -55,7 +58,7 @@ const LeaseLifecycleCard = ({ contratId, onChanged }) => {
   const handleTransition = async (target) => {
     setPending(target);
     try {
-      await transitionLease(contratId, target);
+      await callWithRentalContext(transitionLease, rentalContext, contratId, target);
       toast.success("Étape du bail mise à jour.");
       await load();
       onChanged?.();

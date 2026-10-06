@@ -18,6 +18,7 @@ router.get('/public/:id', ctrl.getPublic);
 router.get('/:id/availability', reservationCtrl.availability);
 
 router.use(auth.protect);
+router.use(attachTenantScopeIfResolvable);
 
 // Staff (dashboard admin) — création/édition complète Property+Accommodation+
 // RatePlan. Placées AVANT '/:id' pour que '/admin' ne soit jamais capturé par
@@ -31,7 +32,7 @@ router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantSc
 // Property + Accommodation + RatePlan + soumission en une transaction). Mêmes
 // rôles que POST /api/properties/mobile (seule route qui crée une Property
 // depuis l'app) — jamais ouverte à un rôle qui ne peut pas publier de bien.
-router.post('/mobile/full', auth.restrictTo(...STAFF_CM, 'Proprietaire'), attachTenantScopeIfResolvable, ctrl.createFullMobile);
+router.post('/mobile/full', auth.restrictTo(...STAFF_CM, 'Proprietaire'), ctrl.createFullMobile);
 
 // Propriétaire
 router.get('/mine', ctrl.mine);

@@ -12,10 +12,13 @@ export const getMyOperatorStatus = async () => {
   return operator ? { ...operator, platformViewEligible: platformViewEligible === true } : null;
 };
 export const listOperators = async () => (await api.get('/platform-operators')).data.data.operators;
-export const grantOperator = async (payload) => (await api.post('/platform-operators', payload)).data.data.operator;
-export const suspendOperator = async (userId, reason) => (await api.patch(`/platform-operators/${userId}/suspend`, { reason })).data.data.operator;
-export const reactivateOperator = async (userId, reason) => (await api.patch(`/platform-operators/${userId}/reactivate`, { reason })).data.data.operator;
-export const revokeOperator = async (userId, reason) => (await api.patch(`/platform-operators/${userId}/revoke`, { reason })).data.data.operator;
+// PLATFORM-ADMIN-04C2 (D14) — la gestion des opérateurs est une opération
+// PLATFORM : le backend refuse toute mutation portant une sélection de tenant.
+const PLATFORM_SCOPED = Object.freeze({ platformScoped: true });
+export const grantOperator = async (payload) => (await api.post('/platform-operators', payload, PLATFORM_SCOPED)).data.data.operator;
+export const suspendOperator = async (userId, reason) => (await api.patch(`/platform-operators/${userId}/suspend`, { reason }, PLATFORM_SCOPED)).data.data.operator;
+export const reactivateOperator = async (userId, reason) => (await api.patch(`/platform-operators/${userId}/reactivate`, { reason }, PLATFORM_SCOPED)).data.data.operator;
+export const revokeOperator = async (userId, reason) => (await api.patch(`/platform-operators/${userId}/revoke`, { reason }, PLATFORM_SCOPED)).data.data.operator;
 
 // Sélection de tenant côté client (voir intercepteur dans api.js). `null`
 // = mode plateforme (aucun tenant sélectionné) — jamais l'état par défaut

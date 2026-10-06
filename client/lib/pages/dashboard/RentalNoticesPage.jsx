@@ -17,6 +17,8 @@ import {
 import {
   DashboardPage, DashboardPageHeader, DashboardCard, DashboardState,
 } from "../../components/dashboard/DashboardUI";
+import { useRentalOperationContext } from "../../context/RentalOperationContext";
+import { callWithRentalContext, rentalBasePath } from "../../services/rentalRequestContext";
 
 const joursRestants = (plannedExitAt) => {
   if (!plannedExitAt) return null;
@@ -25,6 +27,7 @@ const joursRestants = (plannedExitAt) => {
 };
 
 const RentalNoticesPage = () => {
+  const rentalContext = useRentalOperationContext();
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -33,7 +36,7 @@ const RentalNoticesPage = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await getRentalManagement({ occupancyStatus: 'sortie_programmee', limit: 100 });
+      const res = await callWithRentalContext(getRentalManagement, rentalContext, { occupancyStatus: 'sortie_programmee', limit: 100 });
       setNotices(res.rentals || []);
     } catch (err) {
       toast.error("Erreur lors du chargement des préavis.");
@@ -48,7 +51,7 @@ const RentalNoticesPage = () => {
     e.preventDefault();
     if (!form.rentalManagementId || !form.plannedExitAt) { toast.error("Dossier et date de sortie requis."); return; }
     try {
-      await startNotice(form.rentalManagementId, form.plannedExitAt);
+      await callWithRentalContext(startNotice, rentalContext, form.rentalManagementId, form.plannedExitAt);
       toast.success("Préavis créé.");
       setCreating(false);
       setForm({ rentalManagementId: '', plannedExitAt: '' });
@@ -59,19 +62,19 @@ const RentalNoticesPage = () => {
   };
 
   const handleAcknowledge = async (id) => {
-    try { await acknowledgeNotice(id); toast.success("Préavis accusé réception."); load(); }
+    try { await callWithRentalContext(acknowledgeNotice, rentalContext, id); toast.success("Préavis accusé réception."); load(); }
     catch (err) { toast.error(err.response?.data?.message || "Erreur."); }
   };
 
   const handleCancel = async (id) => {
     if (!window.confirm("Annuler ce préavis ? Le locataire reste en place.")) return;
-    try { await cancelNotice(id, "Annulé depuis le tableau de bord."); toast.success("Préavis annulé."); load(); }
+    try { await callWithRentalContext(cancelNotice, rentalContext, id, "Annulé depuis le tableau de bord."); toast.success("Préavis annulé."); load(); }
     catch (err) { toast.error(err.response?.data?.message || "Erreur."); }
   };
 
   const handleValidateExit = async (id) => {
     try {
-      await runRentalAction(id, 'validate-exit', {});
+      await callWithRentalContext(runRentalAction, rentalContext, id, 'validate-exit', {});
       toast.success("Sortie validée.");
       load();
     } catch (err) {
@@ -86,7 +89,7 @@ const RentalNoticesPage = () => {
         title="Préavis"
         description="Sorties programmées en cours — dates saisies manuellement, jamais de délai légal codé en dur."
         actions={(
-          <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+          <Link href={rentalBasePath(rentalContext)} className="text-sm text-blue-600 underline">
             Vue d'ensemble Gestion Locative
           </Link>
         )}
@@ -146,7 +149,7 @@ const RentalNoticesPage = () => {
                   {n.noticeAcknowledgedAt && <span className="text-xs text-green-700 self-center">Réception accusée</span>}
                   <button onClick={() => handleValidateExit(n._id)} className="bg-green-600 text-white px-3 py-1.5 rounded text-sm">Valider la sortie</button>
                   <button onClick={() => handleCancel(n._id)} className="bg-gray-500 text-white px-3 py-1.5 rounded text-sm">Annuler le préavis</button>
-                  <Link href="/dashboard/documents?pole=Altimmo&service=gestion_locative" className="text-sm text-blue-600 underline self-center">Documents →</Link>
+                  <Link href={`${rentalBasePath(rentalContext)}/documents`} className="text-sm text-blue-600 underline self-center">Documents →</Link>
                 </div>
               </DashboardCard>
             );

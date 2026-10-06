@@ -62,8 +62,8 @@ export const reviewHotel = async (id, action, data = {}) => {
   return res.data.data.hotel;
 };
 
-export const deactivateHotel = async (id) => {
-  const res = await api.patch(`/hotels/${id}/deactivate`);
+export const deactivateHotel = async (id, { platformScoped = false } = {}) => {
+  const res = await api.patch(`/hotels/${id}/deactivate`, undefined, platformScoped ? { platformScoped: true } : undefined);
   return res.data.data.hotel;
 };
 
@@ -87,14 +87,14 @@ export const getPendingHotels = async ({ platformScoped = false } = {}) => {
 };
 
 /** @param {{status?, search?, sort?, page?, limit?}} params */
-export const getHotelsAdmin = async (params = {}) => {
-  const res = await api.get('/hotels/admin/list', { params });
+export const getHotelsAdmin = async (params = {}, { platformScoped = false } = {}) => {
+  const res = await api.get('/hotels/admin/list', { params, ...(platformScoped ? { platformScoped: true } : {}) });
   return res.data.data; // { hotels, total, page, limit }
 };
 
 /** Portefeuille hôtelier validé. Les statuts de modération sont imposés par le serveur. */
-export const getHotelPortfolio = async (params = {}) => {
-  const res = await api.get('/hotels/portfolio', { params });
+export const getHotelPortfolio = async (params = {}, { platformScoped = false } = {}) => {
+  const res = await api.get('/hotels/portfolio', { params, ...(platformScoped ? { platformScoped: true } : {}) });
   return res.data.data;
 };
 

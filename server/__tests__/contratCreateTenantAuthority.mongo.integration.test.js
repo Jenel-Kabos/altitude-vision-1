@@ -52,13 +52,14 @@ async function buildTenant(label) {
   return { admin, owner, tenant };
 }
 
-async function buildProperty(owner, availability = 'Disponible') {
+// C2.10A — un bien « de A » est attribué par Property.tenant = A.
+async function buildProperty(owner, availability = 'Disponible', tenant = null) {
   return Property.create({
     title: `Villa FCA1-01 ${owner._id}`, description: 'Description suffisamment longue pour la validation du modele Property.',
     pole: 'Altimmo', type: 'Villa', status: 'location', price: 300000,
     address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.24,
     images: ['https://placehold.co/1200x800/png?text=Test'], surface: 90,
-    statusAdmin: 'Validée', availability, owner: owner._id,
+    statusAdmin: 'Validée', availability, owner: owner._id, tenant: tenant?._id || null,
   });
 }
 
@@ -77,7 +78,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
     // marketplace ; la garde a migré vers `platform.commercial.manage`
     // (Admin global + PlatformOperator + capacité exacte).
     const a = await buildTenant('A1');
-    const property = await buildProperty(a.owner);
+    const property = await buildProperty(a.owner, 'Disponible', a.tenant);
     const res = await request(app).post('/api/contrats').set(bearer(a.admin, a.tenant._id)).send(createBody(property));
     expect(res.status).toBe(403);
     const created = await Contrat.findOne({ bien: property._id });
@@ -87,7 +88,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
   test('2. Admin A + Property B -> refuse, zero Contrat, zero Paiement', async () => {
     const a = await buildTenant('A2');
     const b = await buildTenant('B2');
-    const propertyB = await buildProperty(b.owner);
+    const propertyB = await buildProperty(b.owner, 'Disponible', b.tenant);
     const res = await request(app).post('/api/contrats').set(bearer(a.admin, a.tenant._id)).send(createBody(propertyB));
     expect(res.status).not.toBe(201);
     const created = await Contrat.findOne({ bien: propertyB._id });
@@ -101,7 +102,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
   test('3. Admin B + Property A -> refuse symetrique', async () => {
     const a = await buildTenant('A3');
     const b = await buildTenant('B3');
-    const propertyA = await buildProperty(a.owner);
+    const propertyA = await buildProperty(a.owner, 'Disponible', a.tenant);
     const res = await request(app).post('/api/contrats').set(bearer(b.admin, b.tenant._id)).send(createBody(propertyA));
     expect(res.status).not.toBe(201);
     const created = await Contrat.findOne({ bien: propertyA._id });
@@ -110,7 +111,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
 
   test('4. Staff sans tenant resolu -> refuse (fail-closed), pas de fallback global', async () => {
     const b = await buildTenant('B4');
-    const propertyB = await buildProperty(b.owner);
+    const propertyB = await buildProperty(b.owner, 'Disponible', b.tenant);
     const orphanStaff = await User.create({ name: 'Orphan Admin', email: `fca101-orphan-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
     const res = await request(app).post('/api/contrats').set(bearer(orphanStaff)).send(createBody(propertyB));
     expect(res.status).not.toBe(201);
@@ -120,7 +121,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
 
   test('5. PlatformOperator SANS platform.commercial.manage -> REFUSÉ (capabilities strictes)', async () => {
     const a = await buildTenant('A5');
-    const propertyA = await buildProperty(a.owner);
+    const propertyA = await buildProperty(a.owner, 'Disponible', a.tenant);
     const operator = await User.create({ name: 'PO Global', email: `fca101-po-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
     await grantOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-01 certification', capabilities: [] });
     const res = await request(app).post('/api/contrats').set(bearer(operator, a.tenant._id)).send(createBody(propertyA));
@@ -129,7 +130,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
 
   test('6. PlatformOperator + platform.commercial.manage -> autorisé (marketplace conclusion PLATFORM-only)', async () => {
     const a = await buildTenant('A6');
-    const propertyA = await buildProperty(a.owner);
+    const propertyA = await buildProperty(a.owner, 'Disponible', a.tenant);
     const operator = await User.create({ name: 'PO Commercial', email: `fca101-po-commercial-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
     await grantOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-01 platform.commercial.manage', capabilities: ['platform.commercial.manage'] });
     const res = await request(app).post('/api/contrats').set(bearer(operator, a.tenant._id)).send(createBody(propertyA));
@@ -138,7 +139,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
 
   test('7. Invalid tenant header -> fail-closed', async () => {
     const a = await buildTenant('A7');
-    const propertyA = await buildProperty(a.owner);
+    const propertyA = await buildProperty(a.owner, 'Disponible', a.tenant);
     const res = await request(app).post('/api/contrats').set(bearer(a.admin, '000000000000000000000000')).send(createBody(propertyA));
     expect(res.status).not.toBe(201);
   });

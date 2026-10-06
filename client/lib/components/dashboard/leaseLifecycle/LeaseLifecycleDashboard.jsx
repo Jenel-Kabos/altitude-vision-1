@@ -6,6 +6,8 @@
 import React, { useEffect, useState } from "react";
 import { getLeaseLifecycleDashboard } from "../../../services/rentalLeaseLifecycleService";
 import { DashboardCard, DashboardState } from "../DashboardUI";
+import { useRentalOperationContext } from "../../../context/RentalOperationContext";
+import { callWithRentalContext } from "../../../services/rentalRequestContext";
 
 const SECTIONS = [
   { key: "bauxAEcheance", label: "Baux à échéance", empty: "Aucun bail à échéance." },
@@ -17,6 +19,7 @@ const SECTIONS = [
 ];
 
 const LeaseLifecycleDashboard = () => {
+  const rentalContext = useRentalOperationContext();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,7 +27,7 @@ const LeaseLifecycleDashboard = () => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await getLeaseLifecycleDashboard();
+        const data = await callWithRentalContext(getLeaseLifecycleDashboard, rentalContext);
         if (!cancelled) setDashboard(data);
       } finally {
         if (!cancelled) setLoading(false);

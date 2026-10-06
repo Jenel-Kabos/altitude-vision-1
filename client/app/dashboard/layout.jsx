@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { usePlatformTenantRuntime } from '@/lib/context/PlatformTenantRuntimeContext';
 import AdminDashboard from "@/lib/pages/dashboard/AdminDashboard";
 import { Loader2 } from 'lucide-react';
-import { isPlatformScopedDashboardRoute } from '@/lib/navigation/dashboardRouteScope';
+import { dashboardRequirementForRoute } from '@/lib/navigation/dashboardRouteScope';
 
 const ALLOWED_ROLES = [
   'Admin',
@@ -28,7 +28,7 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
-  const { tenantLoading, tenantRequired, selectedTenantId, tenants } = usePlatformTenantRuntime();
+  const { tenantLoading, tenantRequired, selectedTenantId, tenants, scope, can } = usePlatformTenantRuntime();
   const { data: session, status: sessionStatus } = useSession();
 
   // Resolve role from either auth system (email/password or Google OAuth)
@@ -37,9 +37,15 @@ export default function DashboardLayout({ children }) {
   // Utiliser uniquement user (JWT local) pour décider de l'accès
   // sessionStatus 'authenticated' (Google OAuth) sans user local → redirection login
   const isAuthenticated = !!user;
-  const requiresTenantSelection = tenantRequired
-    && !isPlatformScopedDashboardRoute(pathname)
-    && !selectedTenantId;
+  const routeRequirement = dashboardRequirementForRoute(pathname);
+  const runtimeMode = scope?.mode || (selectedTenantId ? 'tenant' : 'unresolved');
+  const requiresTenantSelection = routeRequirement.kind === 'administration'
+    ? runtimeMode === 'unresolved'
+    : routeRequirement.kind === 'tenant-only' && tenantRequired && !selectedTenantId;
+  const lacksPlatformCapability = routeRequirement.kind === 'administration'
+    && runtimeMode === 'platform'
+    && typeof can === 'function'
+    && !can(routeRequirement.platform.capability);
 
   useEffect(() => {
     if (isLoading) return;
@@ -72,6 +78,11 @@ export default function DashboardLayout({ children }) {
         <div className="mx-auto max-w-xl rounded-xl border border-amber-300 bg-amber-50 p-6 text-center text-amber-950">
           <h1 className="text-lg font-bold">Sélectionnez un tenant à administrer</h1>
           <p className="mt-2 text-sm">Les modules du dashboard restent en attente afin qu’aucune requête tenant-scoped ne parte sans contexte valide.</p>
+        </div>
+      ) : lacksPlatformCapability ? (
+        <div className="mx-auto max-w-xl rounded-xl border border-red-300 bg-red-50 p-6 text-center text-red-950">
+          <h1 className="text-lg font-bold">Accès non autorisé</h1>
+          <p className="mt-2 text-sm">La capability {routeRequirement.platform.capability} est requise dans la Vue plateforme.</p>
         </div>
       ) : children}
     </AdminDashboard>

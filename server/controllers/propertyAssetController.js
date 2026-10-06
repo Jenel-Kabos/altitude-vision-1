@@ -7,25 +7,63 @@
 // de cycle de vie reste strictement staff.
 const mongoose = require('mongoose');
 const Property = require('../models/Property');
-const { ROLES_DOCS } = require('../utils/roles');
 const lifecycle = require('../services/propertyAssetLifecycleService');
 const { getPropertyHistory } = require('../services/propertyPatrimonialHistoryService');
 const { getMaintenanceLogbook } = require('../services/propertyMaintenanceLogbookService');
 const { computeValuation } = require('../services/propertyAssetValuationService');
 const { computeAlerts } = require('../services/propertyAlertsService');
 const { getPortfolioDashboard } = require('../services/propertyAssetPortfolioService');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
-const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
+const { resolveTenantMembership } = require('../services/tenantMembershipService');
+const {
+  ADMINISTRATION_SCOPE_MODE,
+  assertPropertyInAdministrationScope,
+} = require('../services/administrationScopeService');
 
 const fail = (res, error) => res.status(error.statusCode || 500).json({ status: (error.statusCode || 500) >= 500 ? 'error' : 'fail', message: error.message });
 
+const READ_TENANT_ROLES = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
+const MANAGE_TENANT_ROLES = ['Admin', 'GestionnaireImmobilier', 'Collaborateur'];
+
+function forbidden(message = 'Accès refusé.') {
+  const error = new Error(message);
+  error.statusCode = 403;
+  error.code = 'PROPERTY_SCOPE_FORBIDDEN';
+  return error;
+}
+
+async function hasTenantAuthority(req, roles) {
+  const resolved = await resolveTenantMembership(
+    req.user?._id || req.user?.id,
+    req.adminScope?.tenantId,
+    { allowLegacyRoleFallback: false },
+  ).catch(() => null);
+  return Boolean(resolved && !resolved.ambiguous && roles.includes(resolved.businessRole));
+}
+
+async function assertAdministrationAccess(req, property, { capability, tenantRoles }) {
+  assertPropertyInAdministrationScope(req.adminScope, property);
+  if (req.adminScope.mode === ADMINISTRATION_SCOPE_MODE.PLATFORM) {
+    if (!req.platformOperatorCapabilities?.includes(capability)) throw forbidden('Capacité plateforme requise.');
+    return;
+  }
+  if (req.adminScope.mode === ADMINISTRATION_SCOPE_MODE.TENANT) {
+    const operatorAuthorized = req.platformOperator?.status === 'active'
+      && req.platformOperatorCapabilities?.includes(capability);
+    if (operatorAuthorized || await hasTenantAuthority(req, tenantRoles)) return;
+  }
+  throw forbidden();
+}
+
 async function assertReadAccess(req, propertyId) {
   if (!mongoose.isValidObjectId(propertyId)) { const e = new Error('Identifiant invalide.'); e.statusCode = 400; throw e; }
-  const property = await Property.findById(propertyId).select('owner');
+  const property = await Property.findById(propertyId).select('owner tenant');
   if (!property) { const e = new Error('Bien introuvable.'); e.statusCode = 404; throw e; }
-  const isStaff = ROLES_DOCS.includes(req.user.role);
   const isOwner = String(property.owner) === String(req.user._id || req.user.id);
-  if (!isStaff && !isOwner) { const e = new Error('Accès refusé.'); e.statusCode = 403; throw e; }
+  if (isOwner) return;
+  await assertAdministrationAccess(req, property, {
+    capability: 'platform.properties.read',
+    tenantRoles: READ_TENANT_ROLES,
+  });
 }
 
 // SECURITY-CLOSURE-P1-WAVE-1 (P1-G, finding RA-12) — la route
@@ -39,13 +77,14 @@ async function assertReadAccess(req, propertyId) {
 // Même primitive canonique que P1-F, réutilisée directement.
 async function assertTransitionAccess(req, propertyId) {
   if (!mongoose.isValidObjectId(propertyId)) { const e = new Error('Identifiant invalide.'); e.statusCode = 400; throw e; }
-  const property = await Property.findById(propertyId).select('owner');
+  const property = await Property.findById(propertyId).select('owner tenant');
   if (!property) { const e = new Error('Bien introuvable.'); e.statusCode = 404; throw e; }
   const isOwner = String(property.owner) === String(req.user._id || req.user.id);
   if (isOwner) return;
-  const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
-  const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-  await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: tenant?._id });
+  await assertAdministrationAccess(req, property, {
+    capability: 'platform.properties.manage',
+    tenantRoles: MANAGE_TENANT_ROLES,
+  });
 }
 
 exports.getLifecycle = async (req, res) => {

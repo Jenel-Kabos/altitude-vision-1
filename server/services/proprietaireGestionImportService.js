@@ -15,6 +15,7 @@
 //      le staff via `overrides` ; sinon 422 avec la liste précise.
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const { resolvePropertyCreationTenant } = require('./platformTenant/organizationAssetInvariantService');
 const Proprietaire = require('../models/Proprietaire');
 const Property = require('../models/Property');
 const RentalManagement = require('../models/RentalManagement');
@@ -216,7 +217,10 @@ async function importBienPropreVersGestion({ proprietaireId, bienIndex, override
   // l'acteur staff (ou null si l'acteur n'est rattaché à aucun tenant). Le
   // contrat de quota est per-tenant : sans tenant, aucun budget à appliquer,
   // conformément à Lot E/G.
-  const tenantId = actor?.platformTenant?._id || actor?.platformTenant || null;
+  const tenantId = await resolvePropertyCreationTenant({
+    ownerId: ownerUser._id,
+    contextualTenantId: actor?.platformTenant?._id || actor?.platformTenant || null,
+  });
 
   let property;
   try {

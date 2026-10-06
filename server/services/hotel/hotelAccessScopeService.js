@@ -2,8 +2,12 @@ const mongoose = require('mongoose');
 const Hotel = require('../../models/Hotel');
 const HotelStaffAssignment = require('../../models/HotelStaffAssignment');
 const { DEFAULT_CAPABILITIES_BY_ASSIGNMENT_ROLE } = require('../../constants/hotelAccessConstants');
+const { HOTEL_TENANT_ROLES } = require('../../constants/hotelAccessConstants');
 const { fail } = require('./hotelAccessError');
 const { assertResourceTenant } = require('../platformTenant/tenantResourceAttributionService');
+const { resolveTenantMembership } = require('../tenantMembershipService');
+const { resolveActiveOperator, hasCapability } = require('../platformOperator/platformOperatorService');
+const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../../constants/hotelAccessConstants');
 
 const id = (value) => String(value?._id || value?.id || value || '');
 
@@ -37,6 +41,39 @@ async function loadAccessSources(userId, { session } = {}) {
   return { effectiveAssignments, legacyHotels };
 }
 
+// PLATFORM-ADMIN-04C2 — troisième chemin d'autorité : un PlatformOperator actif
+// agissant dans le tenant qu'il a explicitement sélectionné. Pour un opérateur
+// actif, `actor.platformTenant` ne peut provenir que de cette sélection
+// (tenantContextService résout le contexte opérateur avant toute membership).
+// Jamais une OrgMembership artificielle, jamais User.role : capability
+// plateforme exacte, et ressource strictement attribuée au tenant sélectionné
+// (`Hotel.tenant` direct — ni Tenant B, ni tenant:null, ni inférence).
+// Correspondance sans capability nouvelle : une capability opérationnelle
+// `*.view` exige platform.hotels.read OU platform.hotels.manage (INVARIANTS.md,
+// séparation read/manage) ; toute autre capability opérationnelle exige
+// platform.hotels.manage. Une capability non opérationnelle (financière…)
+// n'ouvre jamais ce chemin.
+const OPERATIONAL_CAPABILITY_VALUES = new Set(Object.values(HOTEL_OPERATIONAL_CAPABILITIES));
+
+function platformCapabilitiesFor(requiredCapability) {
+  if (!requiredCapability || (OPERATIONAL_CAPABILITY_VALUES.has(requiredCapability) && requiredCapability.endsWith('.view'))) {
+    return ['platform.hotels.read', 'platform.hotels.manage'];
+  }
+  if (OPERATIONAL_CAPABILITY_VALUES.has(requiredCapability)) return ['platform.hotels.manage'];
+  return [];
+}
+
+async function resolveOperatorTenantAuthority(actor, requiredCapability) {
+  const tenantId = actor?.platformTenant?._id || actor?.platformTenant;
+  if (!tenantId) return null;
+  const operator = await resolveActiveOperator(id(actor)).catch(() => null);
+  if (!operator) return null;
+  const granted = platformCapabilitiesFor(requiredCapability).some((capability) => hasCapability(operator, capability));
+  return granted ? { tenantId: String(tenantId) } : null;
+}
+
+const belongsToTenant = (hotel, tenantId) => Boolean(hotel?.tenant) && id(hotel.tenant) === String(tenantId);
+
 /**
  * Résout la portée hôtelière effective d'un acteur pour une capacité donnée.
  * Ne modifie aucune donnée. Retourne :
@@ -45,8 +82,31 @@ async function loadAccessSources(userId, { session } = {}) {
 async function resolveHotelAccessScope({ actor, requiredCapability, requestedHotelId, session } = {}) {
   if (!actor) fail('HOTEL_ACCESS_DENIED', 'Authentification requise.', 401);
 
-  if (actor.role === 'Admin') {
-    if (!actor.platformTenant) fail('HOTEL_SCOPE_REQUIRED', 'Contexte tenant requis.', 403);
+  const operatorAuthority = await resolveOperatorTenantAuthority(actor, requiredCapability);
+  if (operatorAuthority) {
+    if (requestedHotelId) {
+      const query = Hotel.findById(requestedHotelId).select('tenant');
+      if (session) query.session(session);
+      const hotel = await query.lean();
+      if (!belongsToTenant(hotel, operatorAuthority.tenantId)) fail('HOTEL_ACCESS_DENIED', 'Hôtel introuvable.', 404);
+      return { globalAccess: false, hotelIds: [String(requestedHotelId)], assignment: null, effectiveCapabilities: null };
+    }
+    const query = Hotel.find({ tenant: operatorAuthority.tenantId }).select('_id');
+    if (session) query.session(session);
+    const hotelIds = (await query.lean()).map((hotel) => String(hotel._id));
+    if (hotelIds.length === 0) fail('HOTEL_SCOPE_REQUIRED', "Aucun hôtel accessible dans ce tenant.", 403);
+    if (hotelIds.length > 1) fail('HOTEL_SCOPE_REQUIRED', 'Plusieurs hôtels accessibles : un hotelId explicite est requis.', 409);
+    return { globalAccess: false, hotelIds, assignment: null, effectiveCapabilities: null };
+  }
+
+  const actorTenantId = actor.platformTenant?._id || actor.platformTenant;
+  const membership = actorTenantId
+    ? await resolveTenantMembership(id(actor), actorTenantId).catch(() => null)
+    : null;
+  const tenantAdministrator = !membership?.ambiguous
+    && HOTEL_TENANT_ROLES.manage.includes(membership?.businessRole);
+
+  if (tenantAdministrator) {
     if (requestedHotelId) {
       const hotel = await (session ? Hotel.findById(requestedHotelId).session(session) : Hotel.findById(requestedHotelId));
       if (!hotel) fail('HOTEL_ACCESS_DENIED', 'Hôtel introuvable.', 404);
@@ -54,12 +114,8 @@ async function resolveHotelAccessScope({ actor, requiredCapability, requestedHot
         .catch(() => fail('HOTEL_ACCESS_DENIED', 'Hôtel introuvable.', 404));
       return { globalAccess: false, hotelIds: [String(requestedHotelId)], assignment: null, effectiveCapabilities: null };
     }
-    const tenantId = actor.platformTenant._id || actor.platformTenant;
-    const candidates = await Hotel.find({ $or: [
-      { tenant: tenantId },
-      { tenant: null, manager: { $in: actor.tenantScopeUserIds || [id(actor)] } },
-      { tenant: null, createdBy: { $in: actor.tenantScopeUserIds || [id(actor)] } },
-    ] }).select('tenant manager property createdBy').lean();
+    const tenantId = actorTenantId;
+    const candidates = await Hotel.find({ tenant: tenantId }).select('tenant manager property createdBy').lean();
     const allowed = [];
     for (const hotel of candidates) {
       try {
@@ -114,14 +170,17 @@ async function assertHotelCapability({ actor, requiredCapability, hotelId, sessi
 
 /** Liste les hôtels accessibles à l'acteur (pour le sélecteur frontend), sans capacité requise. */
 async function listAccessibleHotels(actor) {
-  if (actor.role === 'Admin') {
-    if (!actor.platformTenant) return { globalAccess: false, hotels: [] };
-    const tenantId = actor.platformTenant._id || actor.platformTenant;
-    const candidates = await Hotel.find({ $or: [
-      { tenant: tenantId },
-      { tenant: null, manager: { $in: actor.tenantScopeUserIds || [id(actor)] } },
-      { tenant: null, createdBy: { $in: actor.tenantScopeUserIds || [id(actor)] } },
-    ] }).select('_id tenant manager property createdBy name brand').sort({ name: 1 }).lean();
+  const operatorAuthority = await resolveOperatorTenantAuthority(actor, null);
+  if (operatorAuthority) {
+    const hotels = await Hotel.find({ tenant: operatorAuthority.tenantId }).select('_id tenant manager property createdBy name brand').sort({ name: 1 }).lean();
+    return { globalAccess: false, hotels };
+  }
+  const tenantId = actor.platformTenant?._id || actor.platformTenant;
+  const membership = tenantId
+    ? await resolveTenantMembership(id(actor), tenantId).catch(() => null)
+    : null;
+  if (!membership?.ambiguous && HOTEL_TENANT_ROLES.read.includes(membership?.businessRole)) {
+    const candidates = await Hotel.find({ tenant: tenantId }).select('_id tenant manager property createdBy name brand').sort({ name: 1 }).lean();
     const hotels = [];
     for (const hotel of candidates) {
       try {
@@ -153,12 +212,16 @@ async function assertOperationalHotelAccess({ actor, hotelId, capability }) {
   if (!hotel) return { error: 404 };
   if (!actor.platformTenant && hotel.manager && String(hotel.manager) === id(actor)) return {};
   if (!actor.platformTenant) return { error: 403 };
+  const operatorAuthority = await resolveOperatorTenantAuthority(actor, capability);
+  if (operatorAuthority) return belongsToTenant(hotel, operatorAuthority.tenantId) ? {} : { error: 404 };
   try {
     await assertResourceTenant({ resourceType: 'Hotel', resource: hotel, tenantId: actor.platformTenant._id || actor.platformTenant });
   } catch {
     return { error: 404 };
   }
-  if (actor.role === 'Admin' || (hotel.manager && String(hotel.manager) === id(actor))) return {};
+  const membership = await resolveTenantMembership(id(actor), actor.platformTenant._id || actor.platformTenant).catch(() => null);
+  if ((!membership?.ambiguous && HOTEL_TENANT_ROLES.manage.includes(membership?.businessRole))
+    || (hotel.manager && String(hotel.manager) === id(actor))) return {};
   const scope = await resolveHotelAccessScope({ actor, requiredCapability: capability, requestedHotelId: hotelId }).catch(() => null);
   if (!scope) return { error: 403 };
   return {};

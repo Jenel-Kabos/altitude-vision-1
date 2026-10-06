@@ -40,4 +40,9 @@ describe('PolitiqueConfidentialite — remédiation P0', () => {
   test('sous-traitants Sentry / Expo / Google Sign-In / Google Maps référencés', () => {
     expect(screen.getByRole('heading', { level: 2, name: /hébergement.*sous-traitants/i })).toBeInTheDocument();
   });
+
+  test('ne promet aucune durée de conservation ou de réponse non juridiquement confirmée', () => {
+    expect(document.body.textContent).not.toMatch(/30 jours|90 jours|12 mois|24 mois/i);
+    expect(document.body.textContent).toMatch(/revue juridique humaine requise/i);
+  });
 });

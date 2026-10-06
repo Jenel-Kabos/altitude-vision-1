@@ -15,14 +15,16 @@ const Property = require('../models/Property');
 const Reconciliation = require('../models/RentalContractReconciliation');
 
 let seq = 0;
-async function makeAttributedProperty(owner) {
+// C2.10A — un bien « de Tenant B » est attribué par Property.tenant (autorité
+// canonique de la gestion locative), jamais par l'OrgMembership de son owner.
+async function makeAttributedProperty(owner, tenant) {
   seq += 1;
   return Property.create({
     title: `Cert1Vuln Property ${seq}`, description: 'Description suffisamment longue pour une fixture PLATFORM-ADMIN-CERT-1.',
     pole: 'Altimmo', type: 'Villa', status: 'location', price: 300000,
     address: { city: 'Brazzaville', arrondissement: 'Centre' }, latitude: -4.2, longitude: 15.2,
     images: ['https://placehold.co/1200x800/png'], surface: 70, statusAdmin: 'Validée', isPublished: true,
-    availability: 'Disponible', owner: owner._id,
+    availability: 'Disponible', owner: owner._id, tenant: tenant._id,
   });
 }
 const { grantOperator } = require('../services/platformOperator/platformOperatorService');
@@ -153,7 +155,7 @@ describe('V2 — Locataire/Proprietaire CRUD', () => {
     // Proprietaire sans aucun Contrat attribué reste authentiquement non
     // attribuable (accessible à tous, comportement voulu et inchangé) — pas
     // un cas utile pour démontrer V2.
-    const property = await makeAttributedProperty(staffB);
+    const property = await makeAttributedProperty(staffB, tenantB);
     locataireB = await Locataire.create({
       nom: 'Nom B', prenom: 'Prenom B', email: `locataire-b-${Date.now()}@example.test`, telephone: '+242060000000',
     });
@@ -198,7 +200,9 @@ describe('V3 — Centre de régularisation (17 contrats historiques)', () => {
   beforeAll(async () => {
     const proprietaire = await Proprietaire.create({
       nom: 'Historique', prenom: 'B', email: `historique-b-${Date.now()}@example.test`,
-      telephone: '+242060000002', user: staffB._id,
+      // C2.10A — dossier « de B » par provenance explicite de la fiche (plus via
+      // la membership de Proprietaire.user).
+      telephone: '+242060000002', user: staffB._id, tenant: tenantB._id,
     });
     historicalContractB = await Contrat.create({
       type: 'location', statut: 'actif', bien: null, proprietaire: proprietaire._id,
@@ -249,7 +253,7 @@ describe('V4 — gestionDocumentRoutes.js (bail/quittance/mise en demeure/préav
   let contratB;
 
   beforeAll(async () => {
-    const property = await makeAttributedProperty(staffB);
+    const property = await makeAttributedProperty(staffB, tenantB);
     const proprietaire = await Proprietaire.create({
       nom: 'DocGen', prenom: 'B', email: `docgen-b-${Date.now()}@example.test`,
       telephone: '+242060000003', user: staffB._id,
@@ -273,10 +277,16 @@ describe('V4 — gestionDocumentRoutes.js (bail/quittance/mise en demeure/préav
     expect([403, 404]).toContain(res.status);
   });
 
-  test('POSITIF : PlatformOperator avec Tenant B sélectionné accède au Contrat ; avec Tenant A, refusé', async () => {
+  // OPTION-3 SLICE-8 PHASE-2A.1 — GET /contrat/:contratId compose PATH A
+  // (GESTION_STAFF_READ) OU PATH B (platform.documents.read/manage + tenant
+  // sélectionné). Cet opérateur ne détient que platform.users.* et
+  // platform.rentals.* : aucune capability documents → refus, même avec le
+  // bon tenant sélectionné (read/manage d'un autre domaine n'ouvre jamais les
+  // documents). Le PATH B positif est certifié par P-DOC-G05/G06.
+  test('PlatformOperator SANS platform.documents.* : refusé avec Tenant B sélectionné ; refusé avec Tenant A', async () => {
     const withB = await request(app).get(`/api/documents-gestion/contrat/${contratB._id}`).set(bearer(operatorUser, tenantB));
-    expect(withB.status).not.toBe(403);
-    expect(withB.status).not.toBe(404);
+    expect(withB.status).toBe(403);
+    expect(withB.body.documents).toBeUndefined();
     const withA = await request(app).get(`/api/documents-gestion/contrat/${contratB._id}`).set(bearer(operatorUser, tenantA));
     expect([403, 404]).toContain(withA.status);
   });

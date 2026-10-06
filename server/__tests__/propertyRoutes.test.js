@@ -8,6 +8,9 @@ jest.mock('../models/SaleManagement');
 jest.mock('../models/RentalManagement');
 jest.mock('../models/Transaction');
 jest.mock('../models/Contrat');
+jest.mock('../models/OrgMembership', () => ({
+  find: jest.fn(() => ({ select: () => ({ lean: async () => [] }) })),
+}));
 // TENANT-CERT-2 — propertyController.js vérifie désormais la frontière
 // tenant pour tout accès Admin non-propriétaire (voir
 // __tests__/tenantCert2.adversarial.mongo.integration.test.js pour la
@@ -52,6 +55,15 @@ jest.mock('../services/tenantMembershipService', () => ({
     return { membership: { _id: 'MEMBERSHIP-1', businessRole: role, status: 'active' }, businessRole: role, status: 'active' };
   }),
 }));
+// PATH B de requireTenantMembershipRoleOrPlatformCapability : sans stub,
+// `resolveActiveOperator` interroge PlatformOperator sans connexion Mongo et
+// n'échoue qu'au bufferTimeoutMS Mongoose (10 s) — au-delà du timeout Jest.
+// Aucun opérateur plateforme dans ce test unitaire ; PATH B est certifié sur
+// Mongo réel par les suites platform*Administration.
+jest.mock('../services/platformOperator/platformOperatorService', () => ({
+  ...jest.requireActual('../services/platformOperator/platformOperatorService'),
+  resolveActiveOperator: jest.fn().mockResolvedValue(null),
+}));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
 const mockMiddleware = () => (req, res, next) => next();
 jest.mock('../config/cloudinary', () => ({
@@ -68,6 +80,10 @@ const mockNotifyMany = jest.fn().mockResolvedValue();
 jest.mock('../services/notificationService', () => ({
   notify: (...args) => mockNotify(...args),
   notifyMany: (...args) => mockNotifyMany(...args),
+}));
+jest.mock('../services/platformTenant/organizationAssetInvariantService', () => ({
+  ...jest.requireActual('../services/platformTenant/organizationAssetInvariantService'),
+  resolvePropertyCreationTenant: jest.fn().mockImplementation(async ({ contextualTenantId }) => contextualTenantId || null),
 }));
 
 const request  = require('supertest');
@@ -234,6 +250,7 @@ describe('GET /api/properties/status/pending', () => {
 
   test('403 — rôle non-Admin refusé (endpoint backoffice uniquement)', async () => {
     User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
     const res = await request(app)
       .get('/api/properties/status/pending')
       .set('Authorization', `Bearer ${makeToken('Client')}`);
@@ -728,7 +745,7 @@ describe('Rental management route security', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  test('403 — un propriétaire ne peut pas forcer une publication', async () => {
+  test('404 — un propriétaire ne peut ni découvrir ni publier un dossier hors de son scope', async () => {
     User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Proprietaire')) });
     User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
     // Le dossier existe et appartient à un autre utilisateur (sinon router.param
@@ -738,7 +755,7 @@ describe('Rental management route security', () => {
       .post('/api/rental-management/507f191e810c19729de860ea/publish')
       .set('Authorization', `Bearer ${makeToken('Proprietaire')}`)
       .send({});
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(404);
   });
 
   test('400 — ObjectId de dossier invalide contrôlé pour le staff', async () => {

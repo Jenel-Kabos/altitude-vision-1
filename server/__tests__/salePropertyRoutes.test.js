@@ -29,6 +29,9 @@ jest.mock('../services/platformTenant/tenantContextService', () => ({
 jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
   assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
 }));
+jest.mock('../services/platformTenant/organizationAssetInvariantService', () => ({
+  resolvePropertyCreationTenant: jest.fn().mockResolvedValue(null),
+}));
 
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
@@ -37,6 +40,7 @@ const Property = require('../models/Property');
 const SaleManagement = require('../models/SaleManagement');
 const RentalManagement = require('../models/RentalManagement');
 const User = require('../models/User');
+const { resolvePropertyCreationTenant } = require('../services/platformTenant/organizationAssetInvariantService');
 
 const OWNER_ID = '507f1f77bcf86cd799439011';
 const ADMIN_ID = '507f1f77bcf86cd799439012';
@@ -115,6 +119,14 @@ describe('POST /api/sale-properties — création complète (dashboard admin)', 
     const saleCreatedWith = SaleManagement.create.mock.calls[0][0];
     expect(saleCreatedWith).not.toHaveProperty('agencyCommission');
     expect(res.body.data.sale._id).toBe(sale._id);
+  });
+
+  test('C29 — un owner organisationnel reçoit le tenant canonique dans la Property Vente', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire'); mockCreatedDocs();
+    resolvePropertyCreationTenant.mockResolvedValueOnce('607f1f77bcf86cd799439001');
+    const res = await request(app).post('/api/sale-properties').set('Authorization', `Bearer ${makeToken(OWNER_ID)}`).send(validBody());
+    expect(res.statusCode).toBe(201);
+    expect(Property.create).toHaveBeenCalledWith(expect.objectContaining({ tenant: '607f1f77bcf86cd799439001' }));
   });
 
   test('201 — un admin crée une annonce de vente complète (Property + SaleManagement)', async () => {

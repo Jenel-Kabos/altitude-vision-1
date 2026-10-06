@@ -33,6 +33,21 @@ jest.mock('../services/platformTenant/tenantContextService', () => ({
   resolveEffectiveTenantContext: jest.fn().mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }),
   resolveTenantScope: jest.fn().mockResolvedValue({ scopeUserIds: new Set(['507f1f77bcf86cd799439011', '507f1f77bcf86cd799439012']) }),
 }));
+// PA-04C2 (C2.2) — l'autorité Hotel/Accommodation administrative vient de
+// l'OrgMembership canonique (businessRole), plus de User.role au niveau route.
+// Ce fichier teste l'ORDRE des routes : l'Admin du scénario est donc un Admin
+// tenant canonique ; aucun acteur n'est PlatformOperator.
+jest.mock('../services/tenantMembershipService', () => ({
+  resolveTenantMembership: jest.fn(async (userId) => (
+    String(userId) === '507f1f77bcf86cd799439012'
+      ? { membership: { _id: 'membership-admin', roleInUnit: 'owner' }, roleInUnit: 'owner', businessRole: 'Admin', source: 'membership_business_role' }
+      : null
+  )),
+}));
+jest.mock('../services/platformOperator/platformOperatorService', () => ({
+  ...jest.requireActual('../services/platformOperator/platformOperatorService'),
+  resolveActiveOperator: jest.fn().mockResolvedValue(null),
+}));
 jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
   assertResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
   resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),

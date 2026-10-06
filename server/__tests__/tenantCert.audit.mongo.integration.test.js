@@ -27,7 +27,9 @@ const makeUser = (name, role = 'Admin') => User.create({
 });
 const auth = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: user.tokenVersion }, process.env.JWT_SECRET, { expiresIn: '1h' })}`;
 
-async function fixture() {
+// `adminBusinessRole` : businessRole tenant des Admin A/B. Par défaut null
+// (profil « User.role Admin global sans rôle tenant », requis par FINANCE).
+async function fixture({ adminBusinessRole = null } = {}) {
   const bootstrap = await makeUser('Bootstrap');
   const [tenantA, tenantB] = await Promise.all([
     platformTenantService.createTenant({ name: `CERT A ${Date.now()}`, actor: bootstrap }),
@@ -37,8 +39,8 @@ async function fixture() {
     makeUser('AdminA'), makeUser('AdminB'), makeUser('ClientB', 'Client'),
   ]);
   await Promise.all([
-    organizationService.grantMembership({ userId: adminA._id, orgUnitId: tenantA.rootOrgUnit, actor: bootstrap }),
-    organizationService.grantMembership({ userId: adminB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
+    organizationService.grantMembership({ userId: adminA._id, orgUnitId: tenantA.rootOrgUnit, businessRole: adminBusinessRole, actor: bootstrap }),
+    organizationService.grantMembership({ userId: adminB._id, orgUnitId: tenantB.rootOrgUnit, businessRole: adminBusinessRole, actor: bootstrap }),
     organizationService.grantMembership({ userId: clientB._id, orgUnitId: tenantB.rootOrgUnit, actor: bootstrap }),
   ]);
   return { tenantA, tenantB, adminA, adminB, clientB };
@@ -48,8 +50,11 @@ beforeAll(startFinancialMongo);
 afterEach(clearFinancialMongo);
 afterAll(stopFinancialMongo);
 
+// OPTION-3 SLICE-8 — /api/documents exige OrgMembership.businessRole ∈
+// {Admin, Collaborateur, Secretaire} (aucun bypass User.role). Pour atteindre
+// la frontière tenant A/B, Admin A doit être un véritable Admin tenant.
 test('DOCUMENT — Admin A ne lit ni ne liste un Document attribué à B', async () => {
-  const { tenantA, adminA, adminB } = await fixture();
+  const { tenantA, adminA, adminB } = await fixture({ adminBusinessRole: 'Admin' });
   const documentB = await Document.create({ type: 'Contrat', status: 'Brouillon', content: 'SECRET TENANT B', createdBy: adminB._id });
   const headers = { Authorization: auth(adminA), 'X-Platform-Tenant-Id': String(tenantA._id) };
   const detail = await request(app).get(`/api/documents/${documentB._id}`).set(headers);
@@ -57,6 +62,17 @@ test('DOCUMENT — Admin A ne lit ni ne liste un Document attribué à B', async
   expect(detail.status).toBe(404);
   expect(list.status).toBe(200);
   expect(list.body.data.documents.map((item) => String(item._id))).not.toContain(String(documentB._id));
+});
+
+test('DOCUMENT — User.role Admin global sans businessRole tenant → 403 avant tout lookup', async () => {
+  const { tenantA, adminA, adminB } = await fixture();
+  const documentB = await Document.create({ type: 'Contrat', status: 'Brouillon', content: 'SECRET TENANT B', createdBy: adminB._id });
+  const headers = { Authorization: auth(adminA), 'X-Platform-Tenant-Id': String(tenantA._id) };
+  const detail = await request(app).get(`/api/documents/${documentB._id}`).set(headers);
+  const list = await request(app).get('/api/documents').set(headers);
+  expect(detail.status).toBe(403);
+  expect(list.status).toBe(403);
+  expect(JSON.stringify(detail.body)).not.toContain('SECRET TENANT B');
 });
 
 test('CONVERSATION — un staff A ne lit pas le thread B par ObjectId', async () => {

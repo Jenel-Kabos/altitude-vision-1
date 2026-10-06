@@ -1,4 +1,5 @@
 import { createStackNavigator } from '@react-navigation/stack';
+import MonEspaceScreen      from '../../screens/MonEspace/MonEspaceScreen';
 import ProfilScreen         from '../../screens/Profil/ProfilScreen';
 import EditProfileScreen    from '../../screens/Profil/EditProfileScreen';
 import ChangePasswordScreen from '../../screens/Profil/ChangePasswordScreen';
@@ -35,9 +36,16 @@ import PersonalDocumentDetailScreen from '../../screens/Documents/PersonalDocume
 
 const Stack = createStackNavigator();
 
+// GL-MOBILE-CLIENT-SPACE-01 — MonEspace devient le hub d'entrée du stack
+// Profil : dashboard personnel piloté par les APIs backend réelles
+// (compteurs, statut locataire, services accessibles). Le ProfilScreen
+// historique reste disponible via la route ProfilHome pour compatibilité
+// (tests existants + EditProfile) — non supprimé pour préserver le
+// worktree.
 export default function ProfilStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="MonEspace">
+      <Stack.Screen name="MonEspace"       component={MonEspaceScreen} />
       <Stack.Screen name="ProfilHome"      component={ProfilScreen} />
       <Stack.Screen name="EditProfile"     component={EditProfileScreen} />
       <Stack.Screen name="ChangePassword"  component={ChangePasswordScreen} />

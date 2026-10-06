@@ -15,14 +15,17 @@ const ctrl = require('../controllers/rentalManagementController');
 // déjà utilisée par Hotel/Finance/Documents/Conversations pour
 // `RentalManagement`.
 const RentalManagement = require('../models/RentalManagement');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { requireTenantScope } = require('../middleware/tenantContext');
 const { requireTenantModule } = require('../middleware/tenantModuleGate');
 const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 const { requireTenantMembershipRoleOrPlatformCapability } = require('../middleware/tenantMembershipRoleOrPlatformCapability');
+const { selectIndividualRoute, requireIndividualRentalScope } = require('../middleware/rentalScopeAccess');
+const { assertIndividualRentalResourceAccess } = require('../services/rentalIndividualResourceAccessService');
 
 const router = express.Router();
+const individualIdPath = '/:id([0-9a-fA-F]{24})';
 router.use(auth.protect);
 
 // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — OWNERSHIP path.
@@ -33,6 +36,27 @@ router.use(auth.protect);
 router.get('/owner/payments', auth.restrictTo('Proprietaire'), ctrl.ownerPayments);
 router.get('/owner/my', auth.restrictTo('Proprietaire'), ctrl.ownerList);
 router.post('/:id/owner/:action', auth.restrictTo('Proprietaire'), ctrl.ownerRequest);
+
+// C2.10B — mêmes handlers métier, frontière explicite INDIVIDUAL. Le
+// sélecteur ne constitue jamais une preuve d'autorité : les listes sont
+// forcées à owner exact + tenant:null et les IDs sont re-résolus via Property.
+router.get('/stats', selectIndividualRoute, requireIndividualRentalScope, ctrl.stats);
+router.get('/', selectIndividualRoute, requireIndividualRentalScope, ctrl.list);
+router.post('/', selectIndividualRoute, requireIndividualRentalScope, ctrl.create);
+router.get(individualIdPath, selectIndividualRoute, requireIndividualRentalScope, ctrl.getOne);
+router.patch(individualIdPath, selectIndividualRoute, requireIndividualRentalScope, ctrl.update);
+router.post(`${individualIdPath}/deactivate`, selectIndividualRoute, requireIndividualRentalScope, ctrl.deactivate);
+router.get(`${individualIdPath}/history`, selectIndividualRoute, requireIndividualRentalScope, ctrl.history);
+router.post(`${individualIdPath}/publish`, selectIndividualRoute, requireIndividualRentalScope, ctrl.publish);
+router.post(`${individualIdPath}/suspend-listing`, selectIndividualRoute, requireIndividualRentalScope, ctrl.suspend);
+router.post(`${individualIdPath}/mark-rented`, selectIndividualRoute, requireIndividualRentalScope, ctrl.markRented);
+router.post(`${individualIdPath}/mark-vacant`, selectIndividualRoute, requireIndividualRentalScope, ctrl.markVacant);
+router.post(`${individualIdPath}/maintenance`, selectIndividualRoute, requireIndividualRentalScope, ctrl.markMaintenance);
+router.post(`${individualIdPath}/complete-maintenance`, selectIndividualRoute, requireIndividualRentalScope, ctrl.completeMaintenance);
+router.post(`${individualIdPath}/start-notice`, selectIndividualRoute, requireIndividualRentalScope, ctrl.startNotice);
+router.post(`${individualIdPath}/acknowledge-notice`, selectIndividualRoute, requireIndividualRentalScope, ctrl.acknowledgeNotice);
+router.post(`${individualIdPath}/cancel-notice`, selectIndividualRoute, requireIndividualRentalScope, ctrl.cancelNotice);
+router.post(`${individualIdPath}/validate-exit`, selectIndividualRoute, requireIndividualRentalScope, ctrl.validateExitInspection);
 
 // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-C — TENANT path.
 // À partir d'ici toute route est tenant-scopée. La chaîne canonique est :
@@ -105,31 +129,24 @@ router.param('id', async (req, res, next, rentalId) => {
     if (!mongoose.isValidObjectId(rentalId)) return res.status(400).json({ status: 'fail', message: 'Identifiant invalide.' });
     const rental = await RentalManagement.findById(rentalId);
     if (!rental) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
-    // Ce paramètre est partagé par la route self-service `/:id/owner/:action`
-    // (Proprietaire, souvent sans aucun OrgMembership) : la propriété directe
-    // du dossier suffit à elle seule, exactement comme le reste du domaine
-    // Property/GL — jamais bloquée par l'absence de contexte tenant.
-    if (rental.owner && String(rental.owner) === String(req.user._id || req.user.id)) return next();
-    // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-3 (2026-09-22) — un PlatformOperator
-    // qui a sélectionné un tenant via X-Platform-Tenant-Id ne peut PAS accéder
-    // à une ressource dont l'attribution tenant est `null` (legacy non
-    // attribuée) : le fail-open historique
-    // `assertResourceTenantOrUnattributed` est motivé par l'ownership self-
-    // service (Proprietaire sans OrgMembership) et n'a pas de sens pour un
-    // opérateur plateforme qui n'a jamais eu de rapport ownership avec la
-    // ressource. On refuse fail-closed avant même que le middleware
-    // d'autorité ne s'exécute — la frontière tenant est protégée.
-    if (req.isPlatformOperatorContext && rental.tenant == null) {
-      return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
+    if (req.query?.scope === 'individual') {
+      await assertIndividualRentalResourceAccess({
+        resourceType: 'RentalManagement',
+        resource: rental,
+        userId: req.user._id || req.user.id,
+      });
+      return next();
     }
-    // Un dossier dont le propriétaire n'a lui-même aucune attribution
-    // tenant traçable (données antérieures à PlatformTenant) n'a aucune
-    // frontière tenant à faire respecter pour l'utilisateur owner/staff
-    // légitime — voir assertResourceTenantOrUnattributed.
-    // PLATFORM-ADMIN-CERT-1 — voir accommodationController.js pour la même justification.
+    // C2.10A — frontière ORGANIZATION stricte : Property.tenant du bien du
+    // dossier doit être EXACTEMENT le tenant de la requête. Plus aucun accès
+    // tenant fondé sur `rental.owner` (le chemin propriétaire est `/owner/*`,
+    // déjà exclu ci-dessus), ni sur l'OrgMembership du propriétaire, ni sur le
+    // manager, ni sur l'ancien fail-open « non attribué » : un dossier
+    // tenant:null (INDIVIDUAL) n'est jamais administrable par un staff tenant
+    // ou un PlatformOperator en Vue tenant.
     const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
     const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-    await assertResourceTenantOrUnattributed({ resourceType: 'RentalManagement', resource: rental, tenantId: tenant?._id });
+    await assertRentalResourceInTenant({ resourceType: 'RentalManagement', resource: rental, tenantId: tenant?._id });
     next();
   } catch (error) {
     res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Dossier introuvable.' });

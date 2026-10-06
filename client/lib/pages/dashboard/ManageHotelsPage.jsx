@@ -8,7 +8,7 @@
 // window.confirm), pagination numérotée avec flèches. Aucune logique métier
 // modifiée (filtres, chargement, archivage, blockers).
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Archive, AlertTriangle, ArrowLeft, ArrowRight, BedDouble, Building2,
@@ -22,14 +22,19 @@ import PropertyManagementCard from "../../components/dashboard/PropertyManagemen
 import { DashboardActionMenu, DashboardSection } from "../../components/dashboard/DashboardUI";
 import { deactivateHotel, getHotelPortfolio } from "../../services/hotelService";
 import { getDashboardAnalytics } from "../../services/dashboardAnalyticsService";
-import { useAuth } from "../../context/AuthContext";
+import { usePlatformTenantRuntime } from "../../context/PlatformTenantRuntimeContext";
 
 const PAGE_SIZE = 12;
 const money = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XAF", maximumFractionDigits: 0 });
 const inputClass = "w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm";
 
 export default function ManageHotelsPage() {
-  const { user } = useAuth();
+  const { scope, can, tenantBusinessRole } = usePlatformTenantRuntime();
+  const canManage = scope.mode === 'platform'
+    ? can('platform.hotels.manage')
+    : ['Admin', 'Collaborateur', 'GestionnaireImmobilier'].includes(tenantBusinessRole);
+  const canCreate = scope.mode === 'tenant' && canManage;
+  const requestEpoch = useRef(0);
   const [filters, setFilters] = useState({ search: "", city: "", starRating: "", sort: "recent" });
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ hotels: [], total: 0 });
@@ -39,24 +44,38 @@ export default function ManageHotelsPage() {
   const [analytics, setAnalytics] = useState(null);
   const [archiveTarget, setArchiveTarget] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (scope.mode === 'unresolved') { setData({ hotels: [], total: 0 }); setLoading(false); return; }
+    const epoch = requestEpoch.current;
     setLoading(true);
     try {
       const params = Object.fromEntries(Object.entries({ ...filters, page, limit: PAGE_SIZE }).filter(([, value]) => value !== ""));
-      setData(await getHotelPortfolio(params));
+      const result = await getHotelPortfolio(params, { platformScoped: scope.mode === 'platform' });
+      if (epoch === requestEpoch.current) setData(result);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Impossible de charger les établissements.");
+      if (epoch === requestEpoch.current) toast.error(error.response?.data?.message || "Impossible de charger les établissements.");
     } finally {
-      setLoading(false);
+      if (epoch === requestEpoch.current) setLoading(false);
     }
-  };
+  }, [filters, page, scope.mode]);
 
-  useEffect(() => { load(); }, [page, filters.city, filters.starRating, filters.sort]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    requestEpoch.current += 1;
+    setData({ hotels: [], total: 0 }); setAnalytics(null);
+    setCreating(false); setEditing(null); setArchiveTarget(null);
+  }, [scope.key]);
+  useEffect(() => { load(); }, [page, filters.city, filters.starRating, filters.sort, scope.key]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const timer = setTimeout(() => { setPage(1); load(); }, 300);
     return () => clearTimeout(timer);
   }, [filters.search]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { getDashboardAnalytics("hotels").then(setAnalytics).catch(() => setAnalytics({ kpis: {} })); }, []);
+  useEffect(() => {
+    if (scope.mode === 'unresolved') return;
+    const epoch = requestEpoch.current;
+    getDashboardAnalytics("hotels", {}, { platformScoped: scope.mode === 'platform' })
+      .then((result) => { if (epoch === requestEpoch.current) setAnalytics(result); })
+      .catch(() => { if (epoch === requestEpoch.current) setAnalytics({ kpis: {} }); });
+  }, [scope.key, scope.mode]);
 
   const updateFilter = (key, value) => { setFilters((current) => ({ ...current, [key]: value })); setPage(1); };
   const closeForm = () => { setCreating(false); setEditing(null); };
@@ -64,7 +83,7 @@ export default function ManageHotelsPage() {
   const archive = async () => {
     if (!archiveTarget) return;
     try {
-      await deactivateHotel(archiveTarget._id);
+      await deactivateHotel(archiveTarget._id, { platformScoped: scope.mode === 'platform' });
       toast.success("Établissement archivé.");
       setArchiveTarget(null);
       load();
@@ -143,7 +162,7 @@ export default function ManageHotelsPage() {
               </p>
             </div>
           </div>
-          {!creating && !editing && (
+          {canCreate && !creating && !editing && (
             <button
               onClick={() => setCreating(true)}
               className="flex min-h-11 w-full sm:w-auto items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold rounded-full shadow-lg hover:from-emerald-600 hover:to-green-700 transition-all hover:scale-105"
@@ -255,17 +274,17 @@ export default function ManageHotelsPage() {
                           className="flex-1 p-2.5 text-blue-700 bg-blue-50 hover:text-white hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center font-semibold text-sm gap-2">
                           Ouvrir
                         </Link>
-                        <DashboardActionMenu
+                        {(canManage || scope.mode === 'tenant') && <DashboardActionMenu
                           label={`Actions pour ${hotel.name}`}
                           items={[
-                            { label: "Modifier", icon: Edit3, onSelect: () => setEditing(hotel) },
-                            { label: "Chambres", icon: BedDouble, href: `/dashboard/hotels/${hotel._id}/rooms` },
-                            { label: "Réservations", icon: ListChecks, href: `/dashboard/hotel-reservations?hotelId=${hotel._id}` },
-                            { label: "Calendrier", icon: CalendarDays, href: `/dashboard/hotels/${hotel._id}/inventory` },
-                            { label: "Finances", icon: CreditCard, href: `/dashboard/hotel-finance?hotelId=${hotel._id}` },
-                            { label: "Archiver", icon: Archive, danger: true, onSelect: () => setArchiveTarget(hotel) },
-                          ]}
-                        />
+                            canManage && { label: "Modifier", icon: Edit3, onSelect: () => setEditing(hotel) },
+                            scope.mode === 'tenant' && { label: "Chambres", icon: BedDouble, href: `/dashboard/hotels/${hotel._id}/rooms` },
+                            scope.mode === 'tenant' && { label: "Réservations", icon: ListChecks, href: `/dashboard/hotel-reservations?hotelId=${hotel._id}` },
+                            scope.mode === 'tenant' && { label: "Calendrier", icon: CalendarDays, href: `/dashboard/hotels/${hotel._id}/inventory` },
+                            scope.mode === 'tenant' && { label: "Finances", icon: CreditCard, href: `/dashboard/hotel-finance?hotelId=${hotel._id}` },
+                            canManage && { label: "Archiver", icon: Archive, danger: true, onSelect: () => setArchiveTarget(hotel) },
+                          ].filter(Boolean)}
+                        />}
                       </>
                     }
                   />
@@ -316,7 +335,7 @@ export default function ManageHotelsPage() {
               </div>
               <div className="p-3 sm:p-6 overflow-y-auto flex-grow">
                 <HotelPropertyForm
-                  scope={user?.role === "Proprietaire" ? "owner" : "admin"}
+                  scope="admin"
                   hotelId={editing?._id}
                   accommodationType={editing?.accommodationType || "hotel"}
                   initialProperty={editing?.property}

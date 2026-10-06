@@ -3,6 +3,20 @@
 // Couvre explicitement le scénario demandé par la mission : tentative
 // d'accès au dossier d'un AUTRE locataire → 403/404 (jamais de fuite).
 
+// C2.10A — primitive canonique du scope locatif (Property.tenant), mockée
+// comme l'attribution ci-dessus ; la frontière réelle est certifiée par
+// __tests__/rentalScopeC210A.mongo.integration.test.js.
+jest.mock('../services/platformTenant/rentalScopeService', () => ({
+  ...jest.requireActual('../services/platformTenant/rentalScopeService'),
+  assertRentalResourceInTenant: jest.fn().mockResolvedValue({ status: 'resolved', scope: 'ORGANIZATION' }),
+}));
+// C2.10A — `POST /:id/invite` passe désormais par assertLocataireInScope, qui
+// résout le tenant de la requête : résolution mockée (aucune base dans ce test).
+jest.mock('../services/platformTenant/tenantContextService', () => ({
+  ...jest.requireActual('../services/platformTenant/tenantContextService'),
+  resolveTenantForUser: jest.fn().mockResolvedValue({ _id: '607f1f77bcf86cd799439001' }),
+}));
+
 jest.mock('../models/Locataire');
 jest.mock('../models/TenantLinkRequest');
 jest.mock('../models/Contrat');

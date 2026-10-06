@@ -102,13 +102,39 @@ describe('RCA — PlatformOperator et membership tenant restent orthogonaux', ()
     expect(res.status).toBe(403);
   });
 
-  test('opérateur AVEC tenant A sélectionné mais sans membership → refusé', async () => {
+  // ARCH-AUTH-03 Pattern 1 (Option 3) — /api/properties/portfolio accepte le
+  // PATH B : PlatformOperator actif + platform.properties.read + tenant
+  // explicitement sélectionné, sans OrgMembership (voir P-PROPERTY-01..03).
+  // Le PATH B reste strictement borné au tenant sélectionné.
+  const portfolioTitles = (res) => {
+    // propertyPortfolioController.list → { data: { items: [...] } }.
+    const arr = res.body.data?.items;
+    expect(Array.isArray(arr)).toBe(true);
+    return arr.map((p) => ({ title: p.title, tenant: p.tenant == null ? null : String(p.tenant?._id || p.tenant) }));
+  };
+
+  test('opérateur AVEC tenant A sélectionné, sans membership, avec platform.properties.read → PATH B borné au Tenant A', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser, tenantA));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    const items = portfolioTitles(res);
+    expect(items.map((p) => p.title)).toContain('Bien Tenant A');
+    expect(items.map((p) => p.title)).not.toContain('Bien Tenant B');
+    expect(items.map((p) => p.title)).not.toContain('Bien propriétaire simple');
+    for (const p of items) expect(p.tenant).toBe(String(tenantA._id));
   });
 
-  test('opérateur AVEC tenant B sélectionné mais sans membership → refusé', async () => {
+  test('opérateur AVEC tenant B sélectionné, sans membership, avec platform.properties.read → PATH B borné au Tenant B', async () => {
     const res = await request(app).get('/api/properties/portfolio').set(bearer(operatorUser, tenantB));
+    expect(res.status).toBe(200);
+    const items = portfolioTitles(res);
+    expect(items.map((p) => p.title)).toContain('Bien Tenant B');
+    expect(items.map((p) => p.title)).not.toContain('Bien Tenant A');
+    expect(items.map((p) => p.title)).not.toContain('Bien propriétaire simple');
+    for (const p of items) expect(p.tenant).toBe(String(tenantB._id));
+  });
+
+  test('User.role=Admin SANS PlatformOperator, avec tenant A sélectionné → refusé (aucun bypass de rôle global)', async () => {
+    const res = await request(app).get('/api/properties/portfolio').set(bearer(plainAdminNoTenant, tenantA));
     expect(res.status).toBe(403);
   });
 

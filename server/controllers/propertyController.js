@@ -36,7 +36,7 @@ const { STAFF_IMMO } = require('../utils/roles');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveTenantForUser, resolveTenantScope } = require('../services/platformTenant/tenantContextService');
 const { normalizePropertyRegistryQuery, projectPropertyRegistryRows } = require('../services/propertyRegistryQueryService');
-const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
+const { ADMINISTRATION_SCOPE_MODE } = require('../services/administrationScopeService');
 
 // TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traitait un
 // `Property.owner` sans OrgMembership (Proprietaire public-signup, cas
@@ -405,7 +405,7 @@ const createProperty = asyncHandler(async (req, res, next) => {
   // query ou header custom n'est lu ici.
   const newProperty = await Property.create({
     owner:           req.user.id,
-    tenant:          req.platformTenant?._id || null,
+    tenant:          req.propertyCreationTenantId || req.platformTenant?._id || null,
     title,
     description,
     price:           parseFloat(price),
@@ -566,7 +566,7 @@ const getAllProperties = asyncHandler(async (req, res) => {
     // capability plateforme reste vérifiée par le middleware canonique ; ce
     // garde empêche seulement qu'un opérateur suspendu/non reconnu ou un
     // Admin historique non rattaché tombe sur le catalogue public.
-    if (!req.user || (!isPlatformWideRequest(req) && !req.platformTenant)) {
+    if (!req.user || req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.UNRESOLVED) {
       res.status(403);
       throw new Error('Contexte administratif immobilier requis.');
     }
@@ -582,7 +582,9 @@ const getAllProperties = asyncHandler(async (req, res) => {
   }
   delete query.dashboardRegistry;
   delete query.dashboardClassification;
-  const tenantId = isAdmin ? (req.platformTenant?._id || req.platformTenant || null) : null;
+  const tenantId = isAdmin && req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.TENANT
+    ? req.adminScope.tenantId
+    : null;
   let { properties, total } = await runPropertySearch({ query, isAdmin, tenantId });
 
   // PA-03 — enrichissement purement informatif, exécuté après l'autorité et
@@ -909,9 +911,20 @@ const updateProperty = asyncHandler(async (req, res) => {
   const isAdmin = isTenantStaff;
 
   // Champs interdits à la modification directe
-  const excludedFields = ['_id', 'owner', 'createdAt', 'reviewedAt', 'images'];
+  // PLATFORM-ADMIN-04B0 — `tenant` est une donnée de PROVENANCE protégée : une
+  // mutation ordinaire (owner, staff tenant, opérateur ; web ou mobile) n'est
+  // jamais un transfert organisationnel. La valeur client est ignorée, comme
+  // les autres champs exclus ; `tenant:null` reste une provenance valide. Une
+  // réattribution éventuelle relèvera d'un workflow dédié (hors de ce
+  // contrôleur). Les clés opérateur (`$set`, `$unset`…) et les chemins pointés
+  // sont également retirés : défense en profondeur, indépendante du
+  // `express-mongo-sanitize` global de server.js.
+  const excludedFields = ['_id', 'owner', 'createdAt', 'reviewedAt', 'images', 'tenant'];
   const updateData = { ...req.body };
   excludedFields.forEach(field => delete updateData[field]);
+  Object.keys(updateData)
+    .filter((key) => key.startsWith('$') || key.includes('.'))
+    .forEach((key) => delete updateData[key]);
   delete updateData.statusAdmin; // toujours exclu du body
   // Les champs de cycle de vie sont pilotés par la modération, la gestion
   // locative ou la finalisation financière. Un propriétaire ne peut jamais

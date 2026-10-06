@@ -17,17 +17,43 @@ const userKpiService = require('../services/userKpiService'); // USER-KPI-1
 // primitives déjà canoniques (assertResourceTenantOrUnattributed +
 // resolveTenantForUser), sans importer propertyController.js (éviterait un
 // nouvel edge controller→controller suivi par architecture:check).
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const {
+  propertyScopeFilter,
+  assertPropertyInAdministrationScope,
+} = require('../services/administrationScopeService');
 const {
   guardUserViabilityMutation,
   assertNoPlatformOperatorForHardDelete,
   transitionOperatorForUserLifecycle,
+  assertOperatorAccountGovernance,
 } = require('../services/platformOperator/platformOperatorService');
+const { isPlatformGovernanceScope } = require('../middleware/platformAuthority');
+
+// PLATFORM-ADMIN-04C2 (C2.0b, F9) — l'administration globale des comptes
+// n'agit jamais sur le compte de l'acteur lui-même (même contrat que
+// `/api/users/:id/suspend`), indépendamment du garde « dernier opérateur ».
+function refuseSelfAccountAction(req, res) {
+    if (String(req.params.id) !== String(req.user?._id || req.user?.id)) return false;
+    res.status(403).json({
+        status: 'fail',
+        code: 'SELF_ACTION_FORBIDDEN',
+        message: 'Vous ne pouvez pas suspendre ou bannir votre propre compte depuis l’administration globale.',
+    });
+    return true;
+}
+
+// PLATFORM-ADMIN-04C2 (C2.0b, D14) — garde d'autorité exécutée dans la
+// transaction de `guardUserViabilityMutation` lorsque la cible porte un
+// PlatformOperator actif.
+async function operatorGovernanceGuard(req) {
+    const platformScope = await isPlatformGovernanceScope(req);
+    const actorId = req.user?._id || req.user?.id;
+    return (session) => assertOperatorAccountGovernance({ targetUserId: req.params.id, actorId, platformScope, session });
+}
 
 async function assertAdminPropertyTenantAccess(req, res, property) {
-  if (!req.platformTenant) return; // PlatformOperator en mode plateforme (allowPlatformWide) — aucun scope à imposer.
   try {
-    await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: req.platformTenant._id });
+    assertPropertyInAdministrationScope(req.adminScope, property);
   } catch (error) {
     res.status(error.statusCode || 403);
     throw error;
@@ -40,7 +66,7 @@ async function assertAdminPropertyTenantAccess(req, res, property) {
 exports.getDashboardStats = catchAsync(async (req, res) => {
     const tenantUserIds = req.platformTenant ? (req.tenantScopeUserIds || []) : null;
     const userFilter = tenantUserIds ? { _id: { $in: tenantUserIds } } : {};
-    const propertyFilter = req.platformTenant ? { tenant: req.platformTenant._id } : {};
+    const propertyFilter = propertyScopeFilter(req.adminScope);
     const ownerIds = await userKpiService.getProprietaireUserIds();
     const scopedOwnerIds = tenantUserIds
       ? ownerIds.filter((id) => tenantUserIds.some((tenantUserId) => String(tenantUserId) === String(id)))
@@ -91,7 +117,9 @@ exports.getConnectedUsers = catchAsync(async (req, res) => {
 
 // 🔹 Bannir un utilisateur
 exports.banUser = catchAsync(async (req, res, _next) => {
-    const user = await guardUserViabilityMutation({ userId: req.params.id, operation: async (session) => {
+    if (refuseSelfAccountAction(req, res)) return undefined;
+    const authorize = await operatorGovernanceGuard(req);
+    const user = await guardUserViabilityMutation({ userId: req.params.id, authorize, actor: req.user, req, operation: async (session) => {
         const query = User.findById(req.params.id);
         if (session) query.session(session);
         const target = await query;
@@ -199,7 +227,9 @@ exports.verifyOwner = catchAsync(async (req, res, next) => {
 
 // 🔹 Suspendre un utilisateur
 exports.suspendUser = catchAsync(async (req, res, _next) => {
-    const user = await guardUserViabilityMutation({ userId: req.params.id, operation: async (session) => {
+    if (refuseSelfAccountAction(req, res)) return undefined;
+    const authorize = await operatorGovernanceGuard(req);
+    const user = await guardUserViabilityMutation({ userId: req.params.id, authorize, actor: req.user, req, operation: async (session) => {
         const query = User.findById(req.params.id);
         if (session) query.session(session);
         const target = await query;
@@ -263,7 +293,7 @@ exports.deleteUser = catchAsync(async (req, res, _next) => {
 
 // 🔹 Récupérer toutes les propriétés
 exports.getAllProperties = catchAsync(async (req, res) => {
-    const properties = await Property.find(req.platformTenant ? { tenant: req.platformTenant._id } : {})
+    const properties = await Property.find(propertyScopeFilter(req.adminScope))
         .populate('owner', 'name email photo phone')
         .sort('-createdAt');
 
@@ -278,7 +308,7 @@ exports.getAllProperties = catchAsync(async (req, res) => {
 exports.getPendingProperties = catchAsync(async (req, res) => {
     const properties = await Property.find({
         adminStatus: 'pending',
-        ...(req.platformTenant ? { tenant: req.platformTenant._id } : {}),
+        ...propertyScopeFilter(req.adminScope),
     })
         .populate('owner', 'name email photo phone')
         .sort('-createdAt');
@@ -351,7 +381,7 @@ exports.getActivityReport = catchAsync(async (req, res) => {
         }),
         Property.countDocuments({
             createdAt: { $gte: last30days },
-            ...(req.platformTenant ? { tenant: req.platformTenant._id } : {}),
+            ...propertyScopeFilter(req.adminScope),
         }),
     ]);
 

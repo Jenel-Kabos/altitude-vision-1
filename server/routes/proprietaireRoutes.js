@@ -11,7 +11,7 @@ const { requireTenantMembershipRole } = require('../middleware/tenantMembershipR
 // PLATFORM-ADMIN-CERT-1 — vulnérabilité V2 corrigée, même patron que
 // locataireRoutes.js (voir son commentaire pour le détail complet).
 const Proprietaire = require('../models/Proprietaire');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 
 router.use(auth.protect);
@@ -28,7 +28,10 @@ async function assertProprietaireInScope(req, res, next) {
     if (!proprietaire) return res.status(404).json({ status: 'fail', message: 'Propriétaire introuvable.' });
     const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
     const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-    await assertResourceTenantOrUnattributed({ resourceType: 'Proprietaire', resource: proprietaire, tenantId: tenant?._id });
+    // C2.10A — fiche propriétaire : même frontière locative stricte que le
+    // locataire (biens liés par bail + `tenant` posé à la création). Plus aucune
+    // inférence via Proprietaire.user → OrgMembership.
+    await assertRentalResourceInTenant({ resourceType: 'Proprietaire', resource: proprietaire, tenantId: tenant?._id });
     next();
   } catch (error) {
     res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Propriétaire introuvable.' });

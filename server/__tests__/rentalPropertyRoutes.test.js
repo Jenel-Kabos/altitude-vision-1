@@ -1,5 +1,13 @@
 // __tests__/rentalPropertyRoutes.test.js — Sprint A (séparation Vente/Location)
 
+// C2.10A — primitive canonique du scope locatif (Property.tenant), mockée
+// comme l'attribution ci-dessus ; la frontière réelle est certifiée par
+// __tests__/rentalScopeC210A.mongo.integration.test.js.
+jest.mock('../services/platformTenant/rentalScopeService', () => ({
+  ...jest.requireActual('../services/platformTenant/rentalScopeService'),
+  assertRentalResourceInTenant: jest.fn().mockResolvedValue({ status: 'resolved', scope: 'ORGANIZATION' }),
+}));
+
 jest.mock('../models/Property');
 jest.mock('../models/RentalManagement');
 jest.mock('../models/User');
@@ -26,6 +34,9 @@ jest.mock('../services/platformTenant/tenantContextService', () => ({
 jest.mock('../services/platformTenant/tenantResourceAttributionService', () => ({
   assertResourceTenantOrUnattributed: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
 }));
+jest.mock('../services/platformTenant/organizationAssetInvariantService', () => ({
+  resolvePropertyCreationTenant: jest.fn().mockResolvedValue(null),
+}));
 
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
@@ -33,6 +44,7 @@ const { app } = require('../server');
 const Property = require('../models/Property');
 const RentalManagement = require('../models/RentalManagement');
 const User = require('../models/User');
+const { resolvePropertyCreationTenant } = require('../services/platformTenant/organizationAssetInvariantService');
 
 const OWNER_ID = '507f1f77bcf86cd799439011';
 const ADMIN_ID = '507f1f77bcf86cd799439012';
@@ -110,6 +122,14 @@ describe('POST /api/rental-properties — création complète (dashboard admin)'
     const rentalCreatedWith = RentalManagement.create.mock.calls[0][0];
     expect(rentalCreatedWith).not.toHaveProperty('managementFee');
     expect(res.body.data.rental._id).toBe(rental._id);
+  });
+
+  test('C29 — un owner organisationnel reçoit le tenant canonique dans la Property Location', async () => {
+    mockUserAuth(OWNER_ID, 'Proprietaire'); mockCreatedDocs();
+    resolvePropertyCreationTenant.mockResolvedValueOnce('607f1f77bcf86cd799439001');
+    const res = await request(app).post('/api/rental-properties').set('Authorization', `Bearer ${makeToken(OWNER_ID)}`).send(validBody());
+    expect(res.statusCode).toBe(201);
+    expect(Property.create).toHaveBeenCalledWith(expect.objectContaining({ tenant: '607f1f77bcf86cd799439001' }));
   });
 
   test('201 — un admin crée une annonce de location complète (Property + RentalManagement)', async () => {

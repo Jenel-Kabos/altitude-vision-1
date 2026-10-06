@@ -14,6 +14,8 @@ let mockTenants = [
   { _id: 'tenant-A', displayName: 'Mila Events' },
   { _id: 'tenant-B', displayName: 'Altimmo' },
 ];
+let mockIsTenantAdmin = true;
+let mockCaps = [];
 
 vi.mock('../services/tenantMemberService', () => ({
   listMembers: vi.fn(),
@@ -31,7 +33,12 @@ vi.mock('../services/userService', () => ({
   deleteAdminUser: vi.fn(),
 }));
 vi.mock('../context/PlatformTenantRuntimeContext', () => ({
-  usePlatformTenantRuntime: () => ({ selectedTenantId: mockSelectedTenantId, tenants: mockTenants }),
+  usePlatformTenantRuntime: () => ({
+    selectedTenantId: mockSelectedTenantId,
+    tenants: mockTenants,
+    isTenantAdmin: mockIsTenantAdmin,
+    can: (capability) => mockCaps.includes(capability),
+  }),
 }));
 
 const memberActive = (over = {}) => ({
@@ -44,6 +51,8 @@ const memberActive = (over = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockSelectedTenantId = 'tenant-A';
+  mockIsTenantAdmin = true;
+  mockCaps = [];
   mockTenants = [
     { _id: 'tenant-A', displayName: 'Mila Events' },
     { _id: 'tenant-B', displayName: 'Altimmo' },
@@ -265,5 +274,63 @@ describe('MEMUI — tenant switch & stale response protection', () => {
     render(<MembersPanel />);
     expect(screen.getByText(/Sélectionnez une organisation/i)).toBeInTheDocument();
     expect(memberSvc.listMembers).not.toHaveBeenCalled();
+  });
+});
+
+describe('C2.9 — vue tenant : colonnes, statistiques, permissions', () => {
+  test('C29UI-01: titre « Membres — tenant », colonnes tenant et statistiques membres', async () => {
+    memberSvc.listMembers.mockResolvedValueOnce([
+      memberActive({ user: { id: 'u-1', name: 'Alice Nkomo', email: 'alice@ex.io', accountStatus: { isActive: true, status: 'Actif' } } }),
+      memberActive({ membershipId: 'm-2', businessRole: 'Collaborateur', status: 'suspended', user: { id: 'u-2', name: 'Bob', email: 'b@x.io', accountStatus: { isActive: false, status: 'Suspendu' } } }),
+    ]);
+    render(<MembersPanel />);
+    await waitFor(() => expect(screen.getByText('Alice Nkomo')).toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: /Membres — Mila Events/ })).toBeInTheDocument();
+    ['Membre', 'Compte plateforme', "Rôle dans l'organisation", 'Statut', "Date d'ajout", 'Actions']
+      .forEach((name) => expect(screen.getByRole('columnheader', { name })).toBeInTheDocument());
+    expect(screen.queryByRole('columnheader', { name: /Compte \/ statut plateforme/ })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-stat="total"]')).toHaveTextContent('2');
+    expect(document.querySelector('[data-stat="active"]')).toHaveTextContent('1');
+    expect(document.querySelector('[data-stat="suspended"]')).toHaveTextContent('1');
+    expect(document.querySelector('[data-stat="admins"]')).toHaveTextContent('1');
+    expect(screen.getByText('Compte suspendu')).toBeInTheDocument();
+  });
+
+  test('C29UI-02: le rôle plateforme n’est jamais affiché comme rôle tenant', async () => {
+    memberSvc.listMembers.mockResolvedValueOnce([memberActive({ businessRole: 'Secretaire', user: { id: 'u-1', name: 'Alice Nkomo', email: 'a@x.io', role: 'Proprietaire' } })]);
+    render(<MembersPanel />);
+    await waitFor(() => expect(screen.getByText('Alice Nkomo')).toBeInTheDocument());
+    expect(screen.queryByText(/Propriétaire|Proprietaire/)).not.toBeInTheDocument();
+  });
+
+  test('C29UI-03: sans Admin métier ni capability, aucun bouton ni colonne d’action', async () => {
+    mockIsTenantAdmin = false;
+    memberSvc.listMembers.mockResolvedValueOnce([memberActive({ businessRole: 'Collaborateur' })]);
+    render(<MembersPanel />);
+    await waitFor(() => expect(screen.getByText('Alice Nkomo')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /Ajouter un membre/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Suspendre|Retirer|Modifier le rôle/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+  });
+
+  test('C29UI-04: un PlatformOperator platform.users.manage garde les actions sur le tenant sélectionné', async () => {
+    mockIsTenantAdmin = false;
+    mockCaps = ['platform.users.manage'];
+    memberSvc.listMembers.mockResolvedValueOnce([memberActive({ businessRole: 'Collaborateur' })]);
+    render(<MembersPanel />);
+    await waitFor(() => expect(screen.getByText('Alice Nkomo')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Ajouter un membre/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Suspendre/i })).toBeInTheDocument();
+  });
+
+  test('C29UI-05: une réponse de mutation sans user conserve l’identité de la ligne', async () => {
+    memberSvc.listMembers.mockResolvedValueOnce([memberActive({ businessRole: 'Collaborateur' })]);
+    memberSvc.suspendMember.mockResolvedValueOnce({ ...memberActive({ status: 'suspended', businessRole: 'Collaborateur' }), user: null });
+    render(<MembersPanel />);
+    await waitFor(() => expect(screen.getByText('Alice Nkomo')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: /Suspendre/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Suspendre dans Mila Events/i }));
+    await waitFor(() => expect(document.querySelector('[data-stat="suspended"]')).toHaveTextContent('1'));
+    expect(screen.getByText('Alice Nkomo')).toBeInTheDocument();
   });
 });

@@ -7,7 +7,7 @@
 // d'action colorés avec hover dégradé + scale, pagination numérotée avec
 // flèches. Aucune logique métier modifiée (filtres, chargement, archivage).
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,13 +21,13 @@ import AccommodationPropertyForm from "../../components/dashboard/AccommodationP
 import DashboardKpis from "../../components/dashboard/DashboardKpis";
 import { getDashboardAnalytics } from "../../services/dashboardAnalyticsService";
 import PropertyManagementCard from "../../components/dashboard/PropertyManagementCard";
-import { useAuth } from "../../context/AuthContext";
+import { usePlatformTenantRuntime } from "../../context/PlatformTenantRuntimeContext";
 import { formatCurrencyXAF } from "../../utils/normalizePropertyDetail";
 
 const PAGE_SIZE = 20;
 
 const kpis = (analytics) => [
-  { key: "total", label: "Hébergements", value: analytics?.kpis?.total },
+  { key: "total", label: "Hébergements", value: analytics?.kpis?.visibleTotal ?? analytics?.kpis?.total },
   { key: "published", label: "Publiés", value: analytics?.kpis?.published },
   { key: "unavailable", label: "Indisponibles", value: analytics?.kpis?.unavailable },
   { key: "maintenance", label: "Maintenance", value: analytics?.kpis?.maintenance },
@@ -46,8 +46,12 @@ const DEFAULT_FILTERS = { type: "tous", city: "", availability: "tous", sort: "r
 
 export default function ManageAccommodationsPage() {
   const router = useRouter();
-  const { user, canEdit } = useAuth();
-  const canCreate = ["Admin", "CommunityManager", "Collaborateur"].includes(user?.role);
+  const { scope, can, tenantBusinessRole } = usePlatformTenantRuntime();
+  const canManage = scope.mode === 'platform'
+    ? can('platform.accommodations.manage')
+    : ['Admin', 'Collaborateur', 'GestionnaireImmobilier'].includes(tenantBusinessRole);
+  const canCreate = scope.mode === 'tenant' && canManage;
+  const requestEpoch = useRef(0);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -59,28 +63,48 @@ export default function ManageAccommodationsPage() {
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [analytics, setAnalytics] = useState(null);
 
-  const loadAnalytics = () => getDashboardAnalytics("accommodations").then(setAnalytics).catch(() => setAnalytics({ kpis: {} }));
+  const loadAnalytics = useCallback(async () => {
+    if (scope.mode === 'unresolved') return;
+    const epoch = requestEpoch.current;
+    try {
+      const result = await getDashboardAnalytics("accommodations", {}, { platformScoped: scope.mode === 'platform' });
+      if (epoch === requestEpoch.current) setAnalytics(result);
+    } catch {
+      if (epoch === requestEpoch.current) setAnalytics({ kpis: {} });
+    }
+  }, [scope.mode]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (scope.mode === 'unresolved') { setData({ accommodations: [], total: 0 }); setLoading(false); return; }
+    const epoch = requestEpoch.current;
     setLoading(true);
     setError(false);
     try {
-      setData(await getAccommodationsAdmin({
+      const result = await getAccommodationsAdmin({
         status: "publie", type: filters.type, city: filters.city || undefined,
         availability: filters.availability === "tous" ? undefined : filters.availability,
         search: filters.search || undefined, sort: filters.sort, page, limit: PAGE_SIZE,
         independentOnly: true, validatedOnly: true, activeOnly: true,
-      }));
+      }, { platformScoped: scope.mode === 'platform' });
+      if (epoch === requestEpoch.current) setData(result);
     } catch {
-      setError(true);
-      toast.error("Erreur lors du chargement des hébergements.");
+      if (epoch === requestEpoch.current) {
+        setError(true);
+        toast.error("Erreur lors du chargement des hébergements.");
+      }
     } finally {
-      setLoading(false);
+      if (epoch === requestEpoch.current) setLoading(false);
     }
-  };
+  }, [filters.type, filters.city, filters.availability, filters.sort, filters.search, page, scope.mode]);
 
-  useEffect(() => { load(); }, [filters.type, filters.city, filters.availability, filters.sort, page]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { loadAnalytics(); }, []);
+  useEffect(() => {
+    requestEpoch.current += 1;
+    setData({ accommodations: [], total: 0 });
+    setAnalytics(null);
+    setEditing(null); setCreating(false); setArchiveTarget(null);
+  }, [scope.key]);
+  useEffect(() => { load(); }, [filters.type, filters.city, filters.availability, filters.sort, page, scope.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadAnalytics(); }, [scope.key]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const timeout = setTimeout(() => { setPage(1); load(); }, 300);
     return () => clearTimeout(timeout);
@@ -109,7 +133,7 @@ export default function ManageAccommodationsPage() {
   const archive = async () => {
     if (!archiveTarget) return;
     try {
-      await deactivateAccommodation(archiveTarget._id);
+      await deactivateAccommodation(archiveTarget._id, { platformScoped: scope.mode === 'platform' });
       toast.success("Hébergement archivé.");
       setArchiveTarget(null);
       await load();
@@ -319,25 +343,25 @@ export default function ManageAccommodationsPage() {
                           className="flex-1 p-2.5 text-blue-700 bg-blue-50 hover:text-white hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center">
                           <Eye className="w-5 h-5" />
                         </Link>
-                        {canEdit && (
+                        {canManage && (
                           <button type="button" onClick={() => setEditing(accommodation)} title="Modifier"
                             className="flex-1 p-2.5 text-blue-600 hover:text-white bg-blue-50 hover:bg-gradient-to-r hover:from-blue-600 hover:to-cyan-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center">
                             <Edit3 className="w-5 h-5" />
                           </button>
                         )}
-                        <Link href={`${detail}?view=reservations`} title="Réservations"
+                        {scope.mode === 'tenant' && <Link href={`${detail}?view=reservations`} title="Réservations"
                           className="flex-1 p-2.5 text-indigo-700 bg-indigo-50 hover:text-white hover:bg-gradient-to-r hover:from-indigo-600 hover:to-blue-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center">
                           <LayoutDashboard className="w-5 h-5" />
-                        </Link>
-                        <Link href={`${detail}?view=calendar`} title="Calendrier"
+                        </Link>}
+                        {scope.mode === 'tenant' && <Link href={`${detail}?view=calendar`} title="Calendrier"
                           className="flex-1 p-2.5 text-purple-700 bg-purple-50 hover:text-white hover:bg-gradient-to-r hover:from-purple-600 hover:to-fuchsia-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center">
                           <CalendarDays className="w-5 h-5" />
-                        </Link>
-                        <Link href={`${detail}?view=finance`} title="Finances"
+                        </Link>}
+                        {scope.mode === 'tenant' && <Link href={`${detail}?view=finance`} title="Finances"
                           className="flex-1 p-2.5 text-emerald-700 bg-emerald-50 hover:text-white hover:bg-gradient-to-r hover:from-emerald-600 hover:to-green-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center">
                           <Landmark className="w-5 h-5" />
-                        </Link>
-                        {canEdit && (
+                        </Link>}
+                        {canManage && (
                           <button type="button" onClick={() => setArchiveTarget(accommodation)} title="Archiver"
                             className="flex-1 p-2.5 text-red-600 hover:text-white bg-red-50 hover:bg-gradient-to-r hover:from-red-600 hover:to-pink-600 rounded-xl transition-all hover:scale-110 hover:shadow-lg flex items-center justify-center">
                             <Trash2 className="w-5 h-5" />

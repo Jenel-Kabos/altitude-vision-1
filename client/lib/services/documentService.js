@@ -1,4 +1,5 @@
 import api from './api';
+import { isIndividualRentalContext, rentalRequestConfig } from './rentalRequestContext';
 
 // ── /api/documents ────────────────────────────────────────────
 export const getAllDocuments = async (params = {}) => {
@@ -26,18 +27,24 @@ export const deleteDocument = async (id) => {
 };
 
 // ── /api/gestion-docs ─────────────────────────────────────────
-export const getContratDocuments = async (contratId) => {
-  const res = await api.get(`/gestion-docs/contrat/${contratId}`);
+export const getContratDocuments = async (contratId, rentalContext) => {
+  const res = isIndividualRentalContext(rentalContext)
+    ? await api.get(`/gestion-docs/contrat/${contratId}`, rentalRequestConfig(rentalContext))
+    : await api.get(`/gestion-docs/contrat/${contratId}`);
   return res.data.data;
 };
 
-export const generateBail = async (contratId) => {
-  const res = await api.post(`/gestion-docs/bail/${contratId}`);
+export const generateBail = async (contratId, rentalContext) => {
+  const res = isIndividualRentalContext(rentalContext)
+    ? await api.post(`/gestion-docs/bail/${contratId}`, {}, rentalRequestConfig(rentalContext))
+    : await api.post(`/gestion-docs/bail/${contratId}`);
   return res.data.data.document;
 };
 
-export const generateQuittance = async (paiementId) => {
-  const res = await api.post(`/gestion-docs/quittance/${paiementId}`);
+export const generateQuittance = async (paiementId, rentalContext) => {
+  const res = isIndividualRentalContext(rentalContext)
+    ? await api.post(`/gestion-docs/quittance/${paiementId}`, {}, rentalRequestConfig(rentalContext))
+    : await api.post(`/gestion-docs/quittance/${paiementId}`);
   return res.data.data.document;
 };
 

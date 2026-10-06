@@ -22,6 +22,8 @@ import {
   DashboardPage, DashboardPageHeader, DashboardToolbar, DashboardCard, DashboardState,
 } from "../../components/dashboard/DashboardUI";
 import DossierPanel from "../../components/dashboard/DossierPanel";
+import { useRentalOperationContext } from "../../context/RentalOperationContext";
+import { callWithRentalContext, isIndividualRentalContext, rentalBasePath } from "../../services/rentalRequestContext";
 
 const TYPE_LABELS = {
   bail: 'Bail', quittance: 'Quittance', mise_en_demeure: 'Mise en demeure', preavis: 'Préavis',
@@ -36,6 +38,7 @@ const TYPE_LABELS = {
 // Contrat.documents[], filtres, téléchargement sécurisé) est identique et
 // intégralement réutilisé, sans aucune duplication de logique.
 const RentalDocumentsContent = ({ embedded = false }) => {
+  const rentalContext = useRentalOperationContext();
   const searchParams = useSearchParams();
   const contratIdFilter = searchParams.get('contratId') || '';
 
@@ -62,8 +65,8 @@ const RentalDocumentsContent = ({ embedded = false }) => {
       setLoading(true);
       try {
         const [contratsData, docsData] = await Promise.all([
-          getContrats({ type: 'location' }).catch(() => []),
-          getAllDocuments({ pole: 'Altimmo', service: 'gestion_locative' }).catch(() => []),
+          callWithRentalContext(getContrats, rentalContext, { type: 'location' }).catch(() => []),
+          isIndividualRentalContext(rentalContext) ? Promise.resolve([]) : getAllDocuments({ pole: 'Altimmo', service: 'gestion_locative' }).catch(() => []),
         ]);
         setContrats(contratsData || []);
         setGenericDocs(docsData || []);
@@ -118,7 +121,7 @@ const RentalDocumentsContent = ({ embedded = false }) => {
   // DOC-EVO-1 — évolution 8 : ouvrir sans téléchargement obligatoire (le
   // navigateur affiche nativement le PDF/l'image dans un nouvel onglet).
   const handleOpen = async (documentId) => {
-    try { await previewRentalDocument(documentId); }
+    try { await callWithRentalContext(previewRentalDocument, rentalContext, documentId); }
     catch (err) { toast.error(err.response?.status === 403 ? "Accès refusé à ce document." : "Impossible d'ouvrir ce document."); }
   };
 
@@ -131,6 +134,9 @@ const RentalDocumentsContent = ({ embedded = false }) => {
       statut: c.statut,
       documentCount: (c.documents || []).length,
     })), [contrats, contratIdFilter]);
+  const individualOpenDossier = isIndividualRentalContext(rentalContext)
+    ? contrats.find((contrat) => contrat._id === openDossierId)
+    : null;
 
   return (
     <DashboardPage>
@@ -140,7 +146,7 @@ const RentalDocumentsContent = ({ embedded = false }) => {
           title="Documents"
           description="Centre documentaire de la gestion locative — baux, quittances, préavis, états des lieux, mises en demeure."
           actions={(
-            <Link href="/dashboard/gestion-locative" className="text-sm text-blue-600 underline">
+            <Link href={rentalBasePath(rentalContext)} className="text-sm text-blue-600 underline">
               Vue d'ensemble Gestion Locative
             </Link>
           )}
@@ -149,7 +155,7 @@ const RentalDocumentsContent = ({ embedded = false }) => {
 
       {contratIdFilter && (
         <p className="mb-3 text-xs text-gray-500">
-          Filtré sur un bail précis — <Link href="/dashboard/documents?pole=Altimmo&service=gestion_locative" className="text-blue-600 underline">voir tous les documents</Link>
+          Filtré sur un bail précis — <Link href={`${rentalBasePath(rentalContext)}/documents`} className="text-blue-600 underline">voir tous les documents</Link>
         </p>
       )}
 
@@ -235,8 +241,43 @@ const RentalDocumentsContent = ({ embedded = false }) => {
         </DashboardCard>
       )}
 
-      {openDossierId && (
+      {openDossierId && !isIndividualRentalContext(rentalContext) && (
         <DossierPanel domain="gestion_locative" entityId={openDossierId} onClose={() => setOpenDossierId(null)} />
+      )}
+      {individualOpenDossier && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Dossier locatif individuel">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold">{individualOpenDossier.bien?.title || individualOpenDossier.adresseBien || 'Dossier locatif'}</h2>
+                <p className="text-sm text-gray-500">Bail {individualOpenDossier.statut || '—'} · {individualOpenDossier.locataire ? `${individualOpenDossier.locataire.prenom || ''} ${individualOpenDossier.locataire.nom || ''}`.trim() : 'Locataire non renseigné'}</p>
+              </div>
+              <button onClick={() => setOpenDossierId(null)} aria-label="Fermer le dossier" className="rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100">✕</button>
+            </div>
+            <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+              <div><dt className="text-gray-500">Début</dt><dd>{individualOpenDossier.dateEntree ? new Date(individualOpenDossier.dateEntree).toLocaleDateString('fr-FR') : '—'}</dd></div>
+              <div><dt className="text-gray-500">Fin</dt><dd>{individualOpenDossier.dateFinBail ? new Date(individualOpenDossier.dateFinBail).toLocaleDateString('fr-FR') : '—'}</dd></div>
+              <div><dt className="text-gray-500">Loyer</dt><dd>{individualOpenDossier.montantLoyer ? `${Number(individualOpenDossier.montantLoyer).toLocaleString('fr-FR')} FCFA` : '—'}</dd></div>
+              <div><dt className="text-gray-500">Cycle</dt><dd>{individualOpenDossier.cycleVie || individualOpenDossier.statut || '—'}</dd></div>
+            </dl>
+            <h3 className="mt-6 font-semibold">Documents</h3>
+            {(individualOpenDossier.documents || []).length ? (
+              <ul className="mt-2 space-y-2">
+                {individualOpenDossier.documents.map((doc) => (
+                  <li key={doc._id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
+                    <span>{doc.nom || TYPE_LABELS[doc.type] || 'Document'}</span>
+                    {doc._id && <button onClick={() => handleOpen(doc._id)} className="text-blue-600 underline">Ouvrir</button>}
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="mt-2 text-sm text-gray-500">Aucun document dans ce dossier.</p>}
+            {(individualOpenDossier.cycleHistory || []).length > 0 && (
+              <><h3 className="mt-6 font-semibold">Historique</h3><ol className="mt-2 space-y-1 text-sm text-gray-600">
+                {individualOpenDossier.cycleHistory.map((event, index) => <li key={`${event.at || ''}-${index}`}>{event.action || event.to} · {event.at ? new Date(event.at).toLocaleDateString('fr-FR') : '—'}</li>)}
+              </ol></>
+            )}
+          </div>
+        </div>
       )}
     </DashboardPage>
   );

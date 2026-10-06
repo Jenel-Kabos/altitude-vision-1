@@ -842,8 +842,13 @@ const LegacyManagePropertiesPage = ({ section = null, readOnly = false }) => {
   );
 };
 
-const ManagePropertiesPage = ({ section = null, readOnly = false }) => (
-  readOnly ? <PropertyRegistry /> : <LegacyManagePropertiesPage section={section} />
-);
+const ManagePropertiesPage = ({ section = null, readOnly = false }) => {
+  const runtime = usePlatformTenantRuntime();
+  // PA-04B Core: les quatre routes Core consomment le même domaine riche et
+  // paginé dès que le runtime explicite est disponible. Le fallback conserve
+  // uniquement la compatibilité des intégrations historiques hors provider.
+  if (runtime.scope) return <PropertyRegistry section={section} />;
+  return readOnly ? <PropertyRegistry section={section} /> : <LegacyManagePropertiesPage section={section} />;
+};
 
 export default ManagePropertiesPage;

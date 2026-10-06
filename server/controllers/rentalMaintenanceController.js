@@ -10,9 +10,10 @@ const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
 const rentalMaintenanceService = require('../services/rentalMaintenanceService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
 const { ROLES_GL } = require('../utils/roles');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant, tenantRentalPropertyIds } = require('../services/platformTenant/rentalScopeService');
 const { readPrivateAsset } = require('../services/storage/secureStorageService');
 const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
+const { assertIndividualRentalPropertyAccess, individualRentalPropertyIds } = require('../services/rentalIndividualAccessService');
 
 const fail = (res, statusCode, message) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message });
@@ -20,6 +21,11 @@ const fail = (res, statusCode, message) =>
 async function assertPropertyAccess(req, propertyId) {
   const property = await Property.findById(propertyId);
   if (!property) return { error: 404 };
+  if (req.rentalScope?.mode === 'individual') {
+    try { await assertIndividualRentalPropertyAccess({ property, userId: req.user._id || req.user.id }); }
+    catch (error) { return { error: error.statusCode || 403 }; }
+    return { property };
+  }
   const isOwner = property.owner && String(property.owner) === String(req.user.id);
   if (!isOwner && !ROLES_GL.includes(req.user.role)) return { error: 403 };
   if (ROLES_GL.includes(req.user.role)) {
@@ -27,7 +33,10 @@ async function assertPropertyAccess(req, propertyId) {
     // un `Property.owner` sans OrgMembership n'est pas une preuve
     // d'appartenance à un AUTRE tenant, juste une absence de frontière
     // traçable. Réutilise la primitive fail-open déjà certifiée.
-    try { await assertResourceTenantOrUnattributed({ resourceType: 'Property', resource: property, tenantId: req.platformTenant?._id }); }
+    // C2.10A — staff : Property.tenant doit valoir EXACTEMENT le tenant de la
+    // requête (tenant:null / autre tenant → refus) ; le propriétaire non-staff
+    // garde son accès self-service à ses propres biens.
+    try { await assertRentalResourceInTenant({ resourceType: 'Property', resource: property, tenantId: req.platformTenant?._id }); }
     catch { return { error: 403 }; }
   }
   return { property };
@@ -74,9 +83,14 @@ exports.list = async (req, res) => {
       // liste doit donc dériver ses Property de ce scope, exactement comme
       // les autres lectures Gestion locative, jamais retomber sur `{}`.
       // Un scope staff vide reste volontairement fail-closed (`$in: []`).
-      const ownerIds = isStaff ? (req.tenantScopeUserIds || []) : [req.user.id];
-      const properties = await Property.find({ owner: { $in: ownerIds } }).select('_id');
-      query.property = { $in: properties.map((p) => p._id) };
+      // C2.10A — staff : population = biens dont Property.tenant = tenant
+      // sélectionné (plus jamais `owner ∈ membres`). Propriétaire non-staff :
+      // ses propres biens (chemin self-service inchangé).
+      query.property = { $in: req.rentalScope?.mode === 'individual'
+        ? await individualRentalPropertyIds(req.user._id || req.user.id)
+        : isStaff
+        ? await tenantRentalPropertyIds(req.platformTenant?._id)
+        : (await Property.find({ owner: { $in: [req.user.id] } }).select('_id')).map((p) => p._id) };
     }
     if (status) query.status = status;
     if (priority) query.priority = priority;
@@ -141,7 +155,7 @@ exports.downloadAttachment = async (req, res) => {
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     return res.send(buffer);
-  } catch (error) { return fail(res, 502, 'Impossible de récupérer la pièce jointe.'); }
+  } catch { return fail(res, 502, 'Impossible de récupérer la pièce jointe.'); }
 };
 
 // ─────────────────────────────────────────────

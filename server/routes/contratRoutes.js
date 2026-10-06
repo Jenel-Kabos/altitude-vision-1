@@ -13,6 +13,7 @@ const ctrl    = require('../controllers/contratController');
 // jamais une modification contrôleur par contrôleur.
 const Contrat = require('../models/Contrat');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertRentalResourceInTenant } = require('../services/platformTenant/rentalScopeService');
 const { resolveTenantForUser } = require('../services/platformTenant/tenantContextService');
 const { requirePlatformOperatorCapability } = require('../middleware/platformAuthority');
 // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.2.XIII — POST-CONTRACT-CONTRAT-
@@ -51,7 +52,10 @@ router.param('id', async (req, res, next, contratId) => {
     // après sélection d'un tenant dans l'UI.
     const explicitTenantId = req.get('X-Platform-Tenant-Id') || req.get('X-Tenant-Id') || null;
     const tenant = await resolveTenantForUser(req.user._id || req.user.id, explicitTenantId);
-    await assertResourceTenantOrUnattributed({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
+    // C2.10A — un bail (type location) suit la frontière locative stricte
+    // Property.tenant ; la vente (hors périmètre C2.10A) garde sa garde historique.
+    const assertScope = contrat.type === 'location' ? assertRentalResourceInTenant : assertResourceTenantOrUnattributed;
+    await assertScope({ resourceType: 'Contrat', resource: contrat, tenantId: tenant?._id });
     next();
   } catch (error) {
     res.status(error.statusCode || 404).json({ status: 'fail', message: error.statusCode ? error.message : 'Contrat introuvable.' });

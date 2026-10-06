@@ -18,6 +18,7 @@ const OrgMembership = require('../../models/OrgMembership');
 const OrgUnit = require('../../models/OrgUnit');
 const PlatformTenant = require('../../models/PlatformTenant');
 const User = require('../../models/User');
+const PlatformOperator = require('../../models/PlatformOperator');
 const { getScopeUserIds } = require('../organizationService');
 const { resolveActiveOperator, isPlatformViewEligible } = require('../platformOperator/platformOperatorService');
 
@@ -54,14 +55,23 @@ async function resolveAvailableTenantsForUser(userId) {
 // `PlatformTenant.createdBy` + `OrgUnit.createdBy`, l'antériorité du compte,
 // l'absence de TOUT membership et l'unicité du résultat empêchent qu'un rôle
 // (Admin ou autre) ne devienne un accès global implicite.
+//
+// PLATFORM-ADMIN-04C2 (C2.0, décision D0) — `PlatformTenant.createdBy` n'est
+// qu'une provenance technique : un PlatformOperator crée des tenants pour le
+// compte de clients. Toute identité ayant porté un PlatformOperator (actif,
+// suspendu ou révoqué) est donc exclue de ce fallback ; sa seule autorité
+// tenant possible est une OrgMembership canonique. Les fondateurs legacy
+// authentiques (jamais opérateurs) conservent ce fallback jusqu'à leur
+// migration attestée (D3/D15).
 async function resolveLegacyTenantForUser(userId) {
   if (!userId) return null;
-  const [user, membershipCount] = await Promise.all([
+  const [user, membershipCount, operatorHistory] = await Promise.all([
     User.findOne({ _id: userId, isActive: { $ne: false }, status: { $nin: ['Suspendu', 'Banni', 'Supprimé'] }, isTechnical: { $ne: true } })
       .select('_id createdAt').lean(),
     OrgMembership.countDocuments({ user: userId }),
+    PlatformOperator.exists({ user: userId }),
   ]);
-  if (!user || membershipCount !== 0) return null;
+  if (!user || membershipCount !== 0 || operatorHistory) return null;
 
   const roots = await OrgUnit.find({ type: 'organization', status: 'active', createdBy: userId })
     .select('_id createdAt').lean();

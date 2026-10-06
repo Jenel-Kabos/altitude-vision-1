@@ -71,13 +71,17 @@ afterAll(async () => stopFinancialMongo());
 // compris pour des tests antérieurs déjà exécutés dans d'autres describes.
 // L'ordre des describes est donc significatif : tout ce qui dépend du
 // tenant unique doit s'exécuter AVANT le bloc cross-tenant.
+// PLATFORM-ADMIN-04C1 — les administrateurs tenant de ce fichier portent une
+// adhésion canonique `businessRole: 'Admin'` (contrat PA-01, 145a6e9) : un
+// `User.role === 'Admin'` sans adhésion n'est plus une autorité tenant. Le cas
+// historique est conservé comme refus explicite (bloc IAM).
 let sharedFixture; let sharedProprietaireA; let sharedProprietaireB;
 
 describe('HOTFIX-OWNER-CONTRACT-RESEND-1 — scénario réel : Proprietaire signup sans OrgMembership, tenant unique', () => {
   let fixture; let proprietaire;
 
   beforeAll(async () => {
-    fixture = sharedFixture = await createTenantFixture({ label: 'HotfixResend1 Solo' });
+    fixture = sharedFixture = await createTenantFixture({ label: 'HotfixResend1 Solo', withAdminMembership: true });
     proprietaire = sharedProprietaireA = await createUnaffiliatedProprietaire({ name: 'Proprietaire A' });
     sharedProprietaireB = await createUnaffiliatedProprietaire({ name: 'Proprietaire B' });
   });
@@ -139,7 +143,7 @@ describe('HOTFIX-OWNER-CONTRACT-RESEND-1 — isolation cross-tenant préservée'
     await createTenantFixture({ label: 'HotfixResend1 CrossA' });
     proprietaireA = await createUnaffiliatedProprietaire({ name: 'Cross Proprietaire A' });
     fixtureB = await createTenantFixture({ label: 'HotfixResend1 CrossB' });
-    adminB = (await createTenantUser({ tenant: fixtureB.tenant, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } })).user;
+    adminB = (await createTenantUser({ tenant: fixtureB.tenant, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' }, businessRole: 'Admin' })).user;
   });
 
   test('AdminB (tenant distinct) ne peut pas renvoyer le contrat d’un Proprietaire non affilié au Tenant A dès qu’un second tenant existe', async () => {
@@ -156,7 +160,7 @@ describe('HOTFIX-OWNER-CONTRACT-RESEND-1 — IAM et non-régression', () => {
   let fixture; let collaborateur; let proprietaire;
 
   beforeAll(async () => {
-    fixture = await createTenantFixture({ label: 'HotfixResend1 IAM' });
+    fixture = await createTenantFixture({ label: 'HotfixResend1 IAM', withAdminMembership: true });
     collaborateur = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Collaborateur' } })).user;
     proprietaire = await createUnaffiliatedProprietaire();
   });
@@ -165,6 +169,19 @@ describe('HOTFIX-OWNER-CONTRACT-RESEND-1 — IAM et non-régression', () => {
     const res = await request(app)
       .post(`/api/users/${proprietaire._id}/renvoyer-contrat`)
       .set(bearer(collaborateur))
+      .send({});
+    expect(res.status).toBe(403);
+    expect(mockSendEmailWithAttachment).not.toHaveBeenCalled();
+  });
+
+  test('PA-04C1 — Admin historique (User.role Admin) sans adhésion ni PlatformOperator : 403, aucun envoi', async () => {
+    const legacyAdmin = await User.create({
+      name: 'Legacy Admin', email: `legacy-admin-${Date.now()}@example.test`,
+      password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
+    });
+    const res = await request(app)
+      .post(`/api/users/${proprietaire._id}/renvoyer-contrat`)
+      .set(bearer(legacyAdmin))
       .send({});
     expect(res.status).toBe(403);
     expect(mockSendEmailWithAttachment).not.toHaveBeenCalled();

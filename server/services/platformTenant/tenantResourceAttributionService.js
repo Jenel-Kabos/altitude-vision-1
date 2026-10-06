@@ -67,12 +67,8 @@ async function fromHotel(hotelOrId) {
     ? hotelOrId
     : validId(hotelOrId) && await Hotel.findById(validId(hotelOrId)).select('tenant manager property createdBy').lean();
   if (!hotel) return unresolved([`hotel:${rawId(hotelOrId)}→missing`]);
-  return mergeProofs(await Promise.all([
-    hotel.tenant ? resolved(hotel.tenant, [`hotel:${hotel._id}.tenant`]) : unresolved(),
-    fromUser(hotel.manager, `hotel:${hotel._id}.manager`),
-    fromProperty(hotel.property, `hotel:${hotel._id}.property`),
-    fromUser(hotel.createdBy, `hotel:${hotel._id}.createdBy`),
-  ]));
+  if (hotel.tenant) return resolved(hotel.tenant, [`hotel:${hotel._id}.tenant`]);
+  return unresolved([`hotel:${hotel._id}.tenant:null`]);
 }
 
 async function fromAccommodation(accommodationId) {
@@ -275,4 +271,22 @@ async function assertResourceTenantOrUnattributed({ resourceType, resource, tena
   return attribution;
 }
 
-module.exports = { resolveResourceTenant, assertResourceTenant, assertResourceTenantOrUnattributed, mergeProofs };
+// BACKEND-TENANT-ISOLATION-CLOSURE-01 — OPTION A STRICTE (contexte
+// PlatformOperator uniquement). Le tenant d'un Contrat est dérivé
+// EXCLUSIVEMENT de Contrat.bien → Property.tenant, sans le repli owner de
+// `fromProperty` (légitime pour PATH A/self-service, jamais pour un
+// opérateur). `tenantId` null ⇒ aucune autorité tenant ⇒ l'appelant refuse.
+// Ne modifie pas `resolveResourceTenant` (PATH A inchangé).
+async function resolveContractPropertyTenantStrict(contractId) {
+  const id = validId(contractId);
+  const contract = id && await Contrat.findById(id).select('bien').lean();
+  if (!contract) return { found: false, tenantId: null };
+  if (!contract.bien) return { found: true, tenantId: null };
+  const property = await Property.findById(contract.bien).select('tenant').lean();
+  return { found: true, tenantId: property?.tenant ? String(property.tenant) : null };
+}
+
+module.exports = {
+  resolveResourceTenant, assertResourceTenant, assertResourceTenantOrUnattributed, mergeProofs,
+  resolveContractPropertyTenantStrict,
+};

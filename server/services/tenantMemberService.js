@@ -39,7 +39,12 @@ async function resolveTenantOrFail(tenantId) {
 function projectMembership(m, user) {
   return {
     membershipId: String(m._id),
-    user: user ? { id: String(user._id), name: user.name, email: user.email, avatar: user.photo || null } : null,
+    // C2.9 (Users) — statut du compte plateforme (pas son rôle plateforme :
+    // la vue tenant n'expose que le businessRole de la membership).
+    user: user ? {
+      id: String(user._id), name: user.name, email: user.email, avatar: user.photo || null,
+      accountStatus: { isActive: user.isActive !== false, status: user.status || null },
+    } : null,
     businessRole: m.businessRole || null,
     roleInUnit: m.roleInUnit,
     status: m.status,
@@ -49,10 +54,12 @@ function projectMembership(m, user) {
 
 async function listMembers(tenantId) {
   const tenant = await resolveTenantOrFail(tenantId);
-  const memberships = await OrgMembership.find({ orgUnit: tenant.rootOrgUnit }).lean();
+  // C2.9 (Users) — « Retirer » révoque la membership : un membre révoqué ne fait
+  // plus partie de l'organisation et n'apparaît plus dans sa liste.
+  const memberships = await OrgMembership.find({ orgUnit: tenant.rootOrgUnit, status: { $ne: 'revoked' } }).lean();
   if (memberships.length === 0) return [];
   const userIds = [...new Set(memberships.map((m) => String(m.user)))];
-  const users = await User.find({ _id: { $in: userIds } }).select('_id name email photo').lean();
+  const users = await User.find({ _id: { $in: userIds } }).select('_id name email photo isActive status').lean();
   const userById = new Map(users.map((u) => [String(u._id), u]));
   return memberships.map((m) => projectMembership(m, userById.get(String(m.user))));
 }
@@ -78,9 +85,9 @@ async function addMember({ tenantId, userId, email, businessRole, actor }) {
   let user = null;
   if (userId) {
     if (!isValidId(userId)) fail('USER_ID_INVALID', 'userId invalide.', 400);
-    user = await User.findById(userId).select('_id name email photo').lean();
+    user = await User.findById(userId).select('_id name email photo isActive status').lean();
   } else if (email) {
-    user = await User.findOne({ email: String(email).trim().toLowerCase() }).select('_id name email photo').lean();
+    user = await User.findOne({ email: String(email).trim().toLowerCase() }).select('_id name email photo isActive status').lean();
     if (!user) fail('USER_NOT_FOUND_INVITATION_REQUIRED', 'Utilisateur inconnu — invitation requise.', 404);
   } else {
     fail('USER_REFERENCE_REQUIRED', 'userId ou email requis.', 400);

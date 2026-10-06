@@ -131,10 +131,16 @@ test('Admin et Collaborateur sans tenant échouent fermés sur leurs routes de f
 // role: platform-wide marketplace moderation lives on distinct routes
 // (`PATCH /:id/recommande`, guarded by `requirePlatformOperatorCapability`),
 // never absorbed into the tenant chain.
-test('PlatformOperator garde la lecture publique `/` (staff platform-wide), mais la file `/status/pending` reste TENANT-strict', async () => {
+// PLATFORM-ADMIN-04C1 — contrat PA-01 (145a6e9) / PA-04A : la lecture staff
+// du catalogue exige la capability exacte `platform.properties.read` (et, sans
+// tenant, l'éligibilité à la Vue plateforme). Cet opérateur n'a AUCUNE
+// capability : il est refusé en lecture comme en modération, avec ou sans
+// tenant sélectionné. L'invariant historique — la file de modération reste
+// fermée à un opérateur sans autorité — est conservé.
+test('PlatformOperator sans capability : lecture staff `/` refusée et file `/status/pending` refusée', async () => {
   const root = await request(app).get('/api/properties').set(bearer(operator));
-  expect(new Set(rootIds(root))).toEqual(new Set(expectedIds([...propertiesA, ...propertiesB])));
-  expect(root.body.total).toBe(5);
+  expect(root.status).toBe(403);
+  expect(root.body.data).toBeUndefined();
   // Sans membership tenant, l'opérateur ne peut pas atteindre la file de
   // modération TENANT-scoped, quel que soit son statut plateforme.
   expect((await request(app).get('/api/properties/status/pending').set(bearer(operator))).status).toBe(403);
@@ -144,10 +150,11 @@ test('PlatformOperator garde la lecture publique `/` (staff platform-wide), mais
 test.each([
   ['A', () => tenantA, () => propertiesA],
   ['B', () => tenantB, () => propertiesB],
-])('PlatformOperator scoped %s : lecture `/` isolée au tenant, file `/status/pending` toujours TENANT-strict (pas de bypass plateforme)', async (_label, tenant, expected) => {
+])('PlatformOperator sans capability, tenant %s sélectionné : lecture staff refusée, file `/status/pending` refusée (aucun bypass)', async (_label, tenant, expected) => {
   const root = await request(app).get('/api/properties').set(bearer(operator, tenant()));
-  expect(new Set(rootIds(root))).toEqual(new Set(expectedIds(expected())));
-  expect(root.body.total).toBe(expected().length);
+  expect(root.status).toBe(403);
+  expect(root.body.data).toBeUndefined();
+  expect(expected().length).toBeGreaterThan(0);
   // La sélection d'un tenant par un PlatformOperator ne synthétise pas une
   // membership : la file de modération reste refusée pour un opérateur sans
   // OrgMembership Admin sur ce tenant.

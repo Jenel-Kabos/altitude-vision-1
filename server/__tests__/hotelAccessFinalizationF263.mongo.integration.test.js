@@ -11,7 +11,7 @@ const { assertOperationalHotelAccess } = require('../services/hotel/hotelAccessS
 const { runHotelStaffAssignmentAudit } = require('../services/hotel/hotelStaffAssignmentAudit');
 const { runLegacyHotelManagerMigration } = require('../services/hotel/hotelStaffAssignmentMigration');
 const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
-const { createTenantFixture, tenantActor } = require('./helpers/tenantAwareFixture');
+const { createTenantFixture, tenantActor, addTenantMember } = require('./helpers/tenantAwareFixture');
 
 jest.setTimeout(180000);
 const id = () => new mongoose.Types.ObjectId();
@@ -179,7 +179,12 @@ test('lectures concurrentes pendant un changement de manager restent cohérentes
   const { tenant } = await createTenantFixture({ label: 'Hotel manager concurrency', bootstrap: admin });
   hotel.tenant = tenant._id;
   await hotel.save();
-  const tenantAdmin = tenantActor(admin, tenant);
+  // PA-04C2 (C2.2) — l'autorité tenant Hotel est une OrgMembership canonique
+  // (businessRole Admin), jamais un `User.role: 'Admin'` seul : l'Admin du
+  // scénario est donc un vrai membre Admin du tenant. Intention inchangée.
+  const canonicalAdmin = await makeUser({ role: 'Admin' });
+  await addTenantMember({ tenant, user: canonicalAdmin, bootstrap: admin, businessRole: 'Admin' });
+  const tenantAdmin = tenantActor(canonicalAdmin, tenant);
   const oldManager = await User.create({ _id: hotel.manager, name: 'Ancien Manager Concurrent', email: `oldconcurrent${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire' });
   await ensureHotelManagerAssignment({ hotelId: hotel._id, managerId: oldManager._id, actor: admin });
   const newManager = await makeUser();

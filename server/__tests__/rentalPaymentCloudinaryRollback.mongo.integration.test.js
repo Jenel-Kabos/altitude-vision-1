@@ -16,6 +16,7 @@ jest.mock('../services/rentalTenantNotificationService', () => ({ notifyContract
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const { attachLeaseToTenant } = require('./helpers/rentalScopeFixture');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const User = require('../models/User');
 const Contrat = require('../models/Contrat');
@@ -56,6 +57,8 @@ afterAll(stopFinancialMongo);
 async function fixtureEcheance() {
   const admin = await User.create({ name: 'Admin', email: `rollback${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin' });
   const contrat = await Contrat.create({ type: 'location', statut: 'actif', adresseBien: 'Test Rollback', montantLoyer: 150000 });
+  // C2.10A — bail rattaché à un bien du tenant de l'admin (Property.tenant).
+  await attachLeaseToTenant({ contrat, staff: [{ user: admin }] });
   const paiement = await Paiement.create({ contrat: contrat._id, mois: 6, annee: 2027, montant: 150000, montantTotal: 150000, statut: 'impayé' });
   return { admin, contrat, paiement, adminToken: signToken(admin._id) };
 }

@@ -8,6 +8,14 @@
 // manque est la dimension tenant : un staff de N'IMPORTE QUEL tenant
 // pouvait transitionner N'IMPORTE QUEL bien. Correctif : même primitive
 // canonique que P1-F (`assertResourceTenantOrUnattributed`).
+//
+// PLATFORM-ADMIN-04C1 — alignement fixture : l'autorité tenant est désormais
+// une adhésion canonique avec rôle métier (aucun repli sur User.role) et une
+// attribution DIRECTE `Property.tenant` (aucun repli propriétaire ; un bien
+// tenant:null est une ressource plateforme, jamais mutable en TENANT). Le
+// gestionnaire reçoit donc `businessRole: 'GestionnaireImmobilier'` et le
+// bien porte son tenant. Le contrat de sécurité (refus cross-tenant) est
+// inchangé et désormais exercé sur un bien réellement attribué au tenant B.
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
@@ -43,10 +51,11 @@ async function buildTenantFixture(label) {
   const owner = await User.create({ name: `Owner ${label}`, email: `p1g-owner-${label}-${seq}-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   const tenant = await platformTenantService.createTenant({ name: `P1G-${label}-${seq}-${Date.now()}`, actor: gestionnaire });
   await Promise.all([
-    organizationService.grantMembership({ userId: gestionnaire._id, orgUnitId: tenant.rootOrgUnit, actor: gestionnaire }),
+    organizationService.grantMembership({ userId: gestionnaire._id, orgUnitId: tenant.rootOrgUnit, businessRole: 'GestionnaireImmobilier', actor: gestionnaire }),
     organizationService.grantMembership({ userId: owner._id, orgUnitId: tenant.rootOrgUnit, actor: gestionnaire }),
   ]);
   const property = await Property.create({
+    tenant: tenant._id,
     title: `Villa P1G ${label}`, description: 'Description suffisamment longue pour la validation du modele Property.',
     pole: 'Altimmo', type: 'Villa', status: 'location', price: 300000,
     address: { arrondissement: 'Bacongo', city: 'Brazzaville' }, latitude: -4.26, longitude: 15.24,
@@ -79,5 +88,22 @@ describe('SECURITY-CLOSURE-P1-WAVE-1 (P1-G) — POST /:id/transition', () => {
     // un Proprietaire n'atteint jamais ce contrôleur, refusé au niveau RBAC de la route,
     // inchangé par ce correctif (uniquement une frontière tenant supplémentaire pour le staff).
     expect(res.status).toBe(403);
+  });
+
+  test('4. PA-04C1 — GestionnaireImmobilier (User.role) avec adhésion SANS rôle métier : refusé, aucune mutation', async () => {
+    const a = await buildTenantFixture('E');
+    const legacy = await User.create({ name: 'Gest legacy E', email: `p1g-legacy-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'GestionnaireImmobilier', isEmailVerified: true });
+    await organizationService.grantMembership({ userId: legacy._id, orgUnitId: a.tenant.rootOrgUnit, actor: a.gestionnaire });
+    const res = await request(app).post(`/api/property-asset/${a.property._id}/transition`).set(bearer(legacy, a.tenant._id)).send({ target: 'travaux' });
+    expect(res.status).toBe(403);
+    expect((await Property.findById(a.property._id)).assetCycle).not.toBe('travaux');
+  });
+
+  test('5. PA-04C1 — bien tenant:null (ressource plateforme) : jamais mutable en TENANT, même par un gestionnaire canonique', async () => {
+    const a = await buildTenantFixture('F');
+    await Property.updateOne({ _id: a.property._id }, { $set: { tenant: null } });
+    const res = await request(app).post(`/api/property-asset/${a.property._id}/transition`).set(bearer(a.gestionnaire, a.tenant._id)).send({ target: 'travaux' });
+    expect(res.status).toBe(403);
+    expect((await Property.findById(a.property._id)).assetCycle).not.toBe('travaux');
   });
 });

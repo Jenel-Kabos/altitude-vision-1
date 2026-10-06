@@ -81,12 +81,63 @@ async function assertCanRemoveViableOperator(userId, session) {
   }
 }
 
-async function guardUserViabilityMutation({ userId, operation }) {
-  return runInAuthorityTransaction(async (session) => {
+// PLATFORM-ADMIN-04C2 (C2.0b, D14) — `authorize` s'exécute DANS la transaction,
+// après le verrou sentinelle : la cible ne peut pas devenir opératrice entre
+// la décision et la mutation (grant/suspend prennent le même verrou).
+// Toute transition PlatformOperator provoquée par la mutation de compte est
+// journalisée après commit (jamais une entrée pour une transaction annulée).
+async function guardUserViabilityMutation({ userId, operation, authorize = null, actor = null, req = null }) {
+  let before = null;
+  let after = null;
+  const result = await runInAuthorityTransaction(async (session) => {
     await acquireAuthoritySentinelLock(session);
+    if (authorize) await authorize(session);
     await assertCanRemoveViableOperator(userId, session);
-    return operation(session);
+    const beforeQuery = PlatformOperator.findOne({ user: userId }).select('status');
+    if (session) beforeQuery.session(session);
+    before = await beforeQuery.lean();
+    const value = await operation(session);
+    const afterQuery = PlatformOperator.findOne({ user: userId }).select('status suspensionReason revokeReason');
+    if (session) afterQuery.session(session);
+    after = await afterQuery.lean();
+    return value;
   });
+  if (before && after && before.status !== after.status && ['suspended', 'revoked'].includes(after.status)) {
+    await audit(after.status, {
+      actor,
+      targetUserId: userId,
+      reason: after.status === 'suspended' ? after.suspensionReason : after.revokeReason,
+      before: { status: before.status },
+      after: { status: after.status },
+      req,
+    });
+  }
+  return result;
+}
+
+// PLATFORM-ADMIN-04C2 (C2.0b, D14) — une opération de COMPTE (suspension,
+// bannissement…) qui atteindrait un PlatformOperator actif est une mutation
+// d'autorité PLATFORM : elle exige un opérateur actif, éligible, détenteur de
+// `platform.operators.manage`, agissant en contexte PLATFORM (aucune
+// sélection de tenant), et jamais sur lui-même. Sans opérateur actif ciblé,
+// l'autorité de compte habituelle s'applique inchangée.
+async function assertOperatorAccountGovernance({ targetUserId, actorId, platformScope, session = null }) {
+  const targetQuery = PlatformOperator.findOne({ user: targetUserId, status: 'active' }).select('_id');
+  if (session) targetQuery.session(session);
+  if (!(await targetQuery.lean())) return;
+  if (String(targetUserId) === String(actorId)) {
+    fail('PLATFORM_OPERATOR_SELF_ACTION_FORBIDDEN', 'Un opérateur ne peut pas modifier sa propre autorité plateforme.', 403);
+  }
+  const actorQuery = PlatformOperator.findOne({ user: actorId, status: 'active' });
+  if (session) actorQuery.session(session);
+  const actorOperator = await actorQuery.lean();
+  if (!platformScope || !hasCapability(actorOperator, VIABILITY_CAPABILITY) || !isPlatformViewEligible(actorOperator)) {
+    fail(
+      'PLATFORM_OPERATOR_GOVERNANCE_REQUIRED',
+      "Action refusée : l'autorité d'un opérateur plateforme ne peut être modifiée qu'en Vue plateforme avec la capacité platform.operators.manage.",
+      403,
+    );
+  }
 }
 
 async function assertNoPlatformOperatorForHardDelete(userId, session = null) {
@@ -285,22 +336,35 @@ async function suspendOperator({ userId, actor, reason, req }) {
   return saved;
 }
 
+// REACTIVATE — `suspended` → `active` en restaurant les capacités conservées
+// pendant la suspension (décision D13). PLATFORM-ADMIN-04C2 (C2.0b, F10) :
+// défense en profondeur indépendante de la route — jamais d'auto-réactivation,
+// même verrou sentinelle et même transaction que suspend/revoke ; un opérateur
+// déjà actif est un no-op idempotent (aucune écriture, aucune entrée d'audit).
 async function reactivateOperator({ userId, actor, reason, req }) {
   if (!actor) fail('PLATFORM_OPERATOR_ACTOR_REQUIRED', 'Un acteur authentifié est requis.', 401);
   if (!reason || !reason.trim()) fail('PLATFORM_OPERATOR_REASON_REQUIRED', 'Un motif est requis.', 422);
-  const doc = await PlatformOperator.findOne({ user: userId });
-  if (!doc) fail('PLATFORM_OPERATOR_NOT_FOUND', 'Aucun opérateur trouvé pour cet utilisateur.', 404);
-  if (doc.status === 'revoked') fail('PLATFORM_OPERATOR_REVOKED', 'Cet opérateur a été révoqué ; une nouvelle attribution est requise.', 409);
+  if (String(userId) === String(actor._id || actor.id)) fail('PLATFORM_OPERATOR_SELF_ACTION_FORBIDDEN', 'Un opérateur ne peut pas réactiver sa propre capacité.', 403);
+  let before = null;
+  const saved = await runInAuthorityTransaction(async (session) => {
+    await acquireAuthoritySentinelLock(session);
+    const query = PlatformOperator.findOne({ user: userId });
+    if (session) query.session(session);
+    const doc = await query;
+    if (!doc) fail('PLATFORM_OPERATOR_NOT_FOUND', 'Aucun opérateur trouvé pour cet utilisateur.', 404);
+    if (doc.status === 'revoked') fail('PLATFORM_OPERATOR_REVOKED', 'Cet opérateur a été révoqué ; une nouvelle attribution est requise.', 409);
+    if (doc.status === 'active') return doc.toObject();
+    before = { status: doc.status };
+    doc.status = 'active';
+    doc.suspendedBy = null;
+    doc.suspendedAt = null;
+    doc.suspensionReason = null;
+    await doc.save({ session });
+    return doc.toObject();
+  });
 
-  const before = { status: doc.status };
-  doc.status = 'active';
-  doc.suspendedBy = null;
-  doc.suspendedAt = null;
-  doc.suspensionReason = null;
-  await doc.save();
-
-  await audit('reactivated', { actor, targetUserId: userId, reason, before, after: { status: doc.status }, req });
-  return doc.toObject();
+  if (before) await audit('reactivated', { actor, targetUserId: userId, reason, before, after: { status: saved.status }, req });
+  return saved;
 }
 
 // REVOKE — jamais de suppression physique (mission §9 : historique
@@ -366,6 +430,7 @@ module.exports = {
   assertCanRemoveViableOperator,
   acquireAuthoritySentinelLock,
   guardUserViabilityMutation,
+  assertOperatorAccountGovernance,
   assertNoPlatformOperatorForHardDelete,
   transitionOperatorForUserLifecycle,
 };

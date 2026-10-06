@@ -97,12 +97,13 @@ const SECTIONS = [
     content: [
       { type: 'table', rows: [
         { label: 'Données de compte', value: 'Durée du compte' },
-        { label: 'Transactions', value: '5 ans (légal)' },
-        { label: 'Notifications lues', value: '90 jours' },
-        { label: 'Logs de connexion', value: '12 mois' },
-        { label: 'Cookies analytiques', value: '24 mois' },
+        { label: 'Transactions', value: 'Selon les obligations applicables' },
+        { label: 'Notifications lues', value: 'Selon la nécessité du service' },
+        { label: 'Logs de connexion', value: 'Selon les besoins de sécurité' },
+        { label: 'Cookies analytiques', value: 'Selon le consentement et la configuration' },
       ]},
-      { type: 'text', value: 'Après suppression du compte, vos données sont effacées sous 30 jours.' },
+      { type: 'text', value: 'Après suppression du compte, les données du profil sont anonymisées ou effacées. Certaines données métier restent conservées lorsque cela est nécessaire à l\'intégrité des transactions ou aux obligations applicables.' },
+      { type: 'text', value: 'Revue juridique humaine requise pour confirmer et publier toute durée chiffrée de conservation.' },
     ],
   },
   {
@@ -183,7 +184,7 @@ const SECTIONS = [
       { type: 'text', value: 'Pour toute question ou réclamation relative à vos données :' },
       { type: 'contact', icon: 'mail-outline', value: 'support@altitudevision.agency', email: 'mailto:support@altitudevision.agency' },
       { type: 'contact', icon: 'call-outline', value: '+242 06 800 21 51', tel: 'tel:+24206800215' },
-      { type: 'text', value: 'Délai de réponse : 30 jours maximum.' },
+      { type: 'text', value: 'Chaque demande est traitée après vérification d\'identité. Revue juridique humaine requise avant de publier un délai de réponse chiffré.' },
     ],
   },
 ];
@@ -325,7 +326,7 @@ export default function PolitiqueConfidentialiteScreen() {
           <Ionicons name="mail-outline" size={28} color={colors.gold} />
           <Text style={[styles.ctaTitle, { color: c.text }]}>Une question sur vos données ?</Text>
           <Text style={[styles.ctaText, { color: c.text + 'AA' }]}>
-            Notre équipe vous répond dans les 30 jours.
+            Notre équipe traite chaque demande après vérification d'identité.
           </Text>
           <TouchableOpacity
             style={[styles.ctaBtn, { backgroundColor: colors.gold }]}

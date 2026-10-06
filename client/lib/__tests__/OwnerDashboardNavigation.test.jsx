@@ -64,6 +64,7 @@ describe('Navigation propriétaire', () => {
     expect(screen.getByRole('link', { name: 'Biens en location' })).toHaveAttribute('href', '/mes-biens?status=location');
     expect(screen.queryByRole('link', { name: 'Mes établissements' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Mes paiements' })).toHaveAttribute('href', '/mes-biens/paiements');
+    expect(screen.getByRole('link', { name: 'Gestion locative individuelle' })).toHaveAttribute('href', '/mes-biens/gestion-locative');
     fireEvent.change(screen.getByRole('combobox', { name: 'Espace de travail' }), { target: { value: 'etablissement' } });
     expect(pushMock).toHaveBeenCalledWith('/mes-hotels');
   });

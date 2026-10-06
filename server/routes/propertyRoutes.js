@@ -34,6 +34,7 @@ const { upload } = require('../config/cloudinary');
 const propertyController = require('../controllers/propertyController');
 const propertyPortfolioController = require('../controllers/propertyPortfolioController');
 const { createPropertyMobile } = require('../controllers/propertyMobileController');
+const { preventOrganizationOwnerPersonalProfessionalAsset } = require('../middleware/organizationAssetInvariant');
 
 const { requireTenantScope, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 const { requireTenantModule } = require('../middleware/tenantModuleGate');
@@ -92,6 +93,7 @@ router.post(
   requireTenantScope,
   requireTenantModule('immobilier'),
   propertyPortfolioManageAuthority,
+  preventOrganizationOwnerPersonalProfessionalAsset,
   upload.array('images', 10),
   propertyController.createProperty,
 );
@@ -142,12 +144,14 @@ router.post(
   '/mobile',
   authController.protect,
   authController.restrictTo('Proprietaire'),
+  preventOrganizationOwnerPersonalProfessionalAsset,
   createPropertyMobile,
 );
 router.post(
   '/',
   authController.protect,
   authController.restrictTo('Proprietaire'),
+  preventOrganizationOwnerPersonalProfessionalAsset,
   upload.array('images', 10),
   propertyController.createProperty,
 );

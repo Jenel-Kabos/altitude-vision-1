@@ -41,11 +41,18 @@ const {
 } = require('../services/propertyPublicationInputService');
 const { assertOperationalHotelAccess, listAccessibleHotels } = require('../services/hotel/hotelAccessScopeService');
 const { hasCapability } = require('../services/platformOperator/platformOperatorService');
-const { HOTEL_OPERATIONAL_CAPABILITIES: CAP } = require('../constants/hotelAccessConstants');
+const { isPlatformViewForbiddenRequest, platformViewNotEligibleError } = require('../middleware/tenantContext');
+const { HOTEL_OPERATIONAL_CAPABILITIES: CAP, HOTEL_TENANT_ROLES } = require('../constants/hotelAccessConstants');
+const { resolveTenantMembership } = require('../services/tenantMembershipService');
 const { buildExactCiRegexFilter } = require('../services/propertyFilterService');
 const { escapeRegex } = require('../utils/regexEscape');
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
-const { isPlatformWideRequest } = require('../middleware/tenantContext'); // PLATFORM-ADMIN-04A
+const {
+  ADMINISTRATION_SCOPE_MODE,
+  hotelScopeFilter,
+  assertHotelInAdministrationScope,
+  assertPropertyInAdministrationScope,
+} = require('../services/administrationScopeService');
 
 const fail = (res, statusCode, message, extra = {}) =>
   res.status(statusCode).json({ status: statusCode >= 500 ? 'error' : 'fail', message, ...extra });
@@ -58,9 +65,76 @@ async function assertHotelAccess(req, hotelId, capability) {
   return assertOperationalHotelAccess({ actor: req.user, hotelId, capability });
 }
 
-function platformCapability(req, capability) {
-  return req.isPlatformOperatorContext
-    && hasCapability({ status: 'active', capabilities: req.platformOperatorCapabilities || [] }, capability);
+async function assertHotelRequestAdministrationAuthority(req, capability, tenantRoles) {
+  if (req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.PLATFORM) {
+    if (!hasCapability(req.platformOperator, capability)) {
+      const error = new Error('Capacité PlatformOperator requise.');
+      error.statusCode = 403;
+      error.code = capability.endsWith('.read') ? 'PLATFORM_HOTELS_READ_REQUIRED' : 'PLATFORM_HOTELS_MANAGE_REQUIRED';
+      throw error;
+    }
+    return true;
+  }
+  if (req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.TENANT) {
+    if (hasCapability(req.platformOperator, capability)) return true;
+    const membership = await resolveTenantMembership(req.user?._id || req.user?.id, req.adminScope.tenantId);
+    if (membership?.ambiguous) {
+      const error = new Error('Adhésions actives multiples : accès refusé.');
+      error.statusCode = 403; error.code = 'AMBIGUOUS_ACTIVE_TENANT_MEMBERSHIP'; throw error;
+    }
+    const roles = tenantRoles || (capability.endsWith('.read') ? HOTEL_TENANT_ROLES.read : HOTEL_TENANT_ROLES.manage);
+    if (membership?.businessRole && roles.includes(membership.businessRole)) {
+      req.tenantMembership = membership.membership;
+      req.tenantBusinessRole = membership.businessRole;
+      return true;
+    }
+    const error = new Error('Autorité Hotel tenant ou capacité plateforme requise.');
+    error.statusCode = 403; error.code = 'HOTEL_TENANT_AUTHORITY_REQUIRED'; throw error;
+  }
+  // PA-04C1 — un opérateur partiel sans tenant reste refusé ; on conserve le
+  // code diagnostique canonique de PA-04A (PLATFORM_VIEW_NOT_ELIGIBLE).
+  if (isPlatformViewForbiddenRequest(req)) throw platformViewNotEligibleError();
+  const error = new Error("Contexte d'administration requis."); error.statusCode = 403; throw error;
+}
+
+async function assertHotelAdministrationAccess(req, hotel, capability, tenantRoles) {
+  if (req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.TENANT) {
+    assertHotelInAdministrationScope(req.adminScope, hotel);
+  }
+  await assertHotelRequestAdministrationAuthority(req, capability, tenantRoles);
+  return assertHotelInAdministrationScope(req.adminScope, hotel);
+}
+
+async function hasHotelAdministrationAuthority(req, capability, tenantRoles) {
+  try { await assertHotelRequestAdministrationAuthority(req, capability, tenantRoles); return true; }
+  catch { return false; }
+}
+
+async function assertSelfServiceHotelCreationAuthority(req) {
+  const tenantId = req.platformTenant?._id || req.platformTenant;
+  const membership = tenantId
+    ? await resolveTenantMembership(req.user?._id || req.user?.id, tenantId)
+    : null;
+  if (!membership?.ambiguous
+    && membership?.roleInUnit === 'owner'
+    && membership?.businessRole === 'Admin') return true;
+  const error = new Error('Une organisation active est requise pour créer un hôtel.');
+  error.statusCode = 403;
+  error.code = 'HOTEL_ORGANIZATION_REQUIRED';
+  throw error;
+}
+
+async function assertHotelLifecycleAccess(req, hotel, capability = 'platform.hotels.manage') {
+  try {
+    return await assertHotelAdministrationAccess(req, hotel, capability);
+  } catch (administrationError) {
+    if ((administrationError.statusCode === 404 && hotel?.tenant) || req.isPlatformOperatorContext) throw administrationError;
+  }
+  const result = await assertHotelAccess(req, hotel._id, capability.endsWith('.read') ? CAP.HOTEL_VIEW : CAP.HOTEL_MANAGE);
+  if (result.error) {
+    const error = new Error('Accès refusé.'); error.statusCode = result.error; throw error;
+  }
+  return true;
 }
 
 async function getHotelCompletion(hotel, property) {
@@ -114,11 +188,9 @@ async function batchCategoriesAndCompletion(hotels) {
 // ─────────────────────────────────────────────
 exports.list = async (req, res) => {
   try {
-    const query = { status: 'actif' };
-    if (req.user.role !== 'Admin') {
-      const { hotels: accessibleHotels } = await listAccessibleHotels(req.user);
-      query._id = { $in: accessibleHotels.map((h) => h._id) };
-    }
+    try { await assertHotelRequestAdministrationAuthority(req, 'platform.hotels.read'); }
+    catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.', error.code ? { code: error.code } : {}); }
+    const query = { status: 'actif', ...hotelScopeFilter(req.adminScope) };
     const hotels = await Hotel.find(query)
       .select('name starRating phone email')
       .sort({ name: 1 })
@@ -137,8 +209,8 @@ exports.getOne = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id).populate('property');
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_VIEW);
-    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : 'Accès refusé.');
+    try { await assertHotelLifecycleAccess(req, hotel, 'platform.hotels.read'); }
+    catch (error) { return fail(res, error.statusCode || 403, error.statusCode === 404 ? 'Hôtel introuvable.' : 'Accès refusé.'); }
     const completion = await getHotelCompletion(hotel, hotel.property);
     res.json({ status: 'success', data: { hotel, completion } });
   } catch (error) {
@@ -291,20 +363,13 @@ exports.mine = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.listAdmin = async (req, res) => {
   try {
-    if (req.isPlatformOperatorContext && !platformCapability(req, 'platform.hotels.read')) {
-      return fail(res, 403, 'Action refusée : capacité opérateur plateforme requise.');
-    }
+    try { await assertHotelRequestAdministrationAuthority(req, 'platform.hotels.read'); }
+    catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.', error.code ? { code: error.code } : {}); }
     const { status, search, sort, page, limit } = req.query;
-    const tenantId = req.user.role === 'Admin' ? (req.platformTenant?._id || req.platformTenant || null) : null;
-    // F2.6.2 : un non-Admin ne voit que ses hôtels réellement rattachés (jamais {} pour tout
-    // le staff Altimmo) — le total (pagination) utilise exactement le même scope que la liste.
-    let hotelIds;
-    if (req.user.role !== 'Admin') {
-      const { hotels: accessibleHotels } = await listAccessibleHotels(req.user);
-      hotelIds = accessibleHotels.map((h) => h._id);
-      if (hotelIds.length === 0) return res.json({ status: 'success', data: { hotels: [], total: 0, page: Number(page) || 1, limit: Number(limit) || 20 } });
-    }
-    const result = await listHotelsForAdmin({ status, search, sort, page, limit, hotelIds, tenantId });
+    const result = await listHotelsForAdmin({
+      status, search, sort, page, limit,
+      scopeFilter: hotelScopeFilter(req.adminScope),
+    });
     const { completionByHotel } = await batchCategoriesAndCompletion(result.hotels);
     const hotels = result.hotels.map((h) => ({ ...h.toObject(), completion: completionByHotel.get(String(h._id)) }));
     res.json({ status: 'success', data: { hotels, total: result.total, page: result.page, limit: result.limit } });
@@ -317,18 +382,21 @@ exports.listAdmin = async (req, res) => {
 // Aucun paramètre ne peut élargir le filtre de publication imposé par le service.
 exports.portfolio = async (req, res) => {
   try {
-    if (req.isPlatformOperatorContext && !platformCapability(req, 'platform.hotels.read')) {
+    const { search, city, district, starRating, sort, page, limit } = req.query;
+    const administrative = await hasHotelAdministrationAuthority(req, 'platform.hotels.read');
+    if (!administrative && req.isPlatformOperatorContext) {
       return fail(res, 403, 'Action refusée : capacité opérateur plateforme requise.');
     }
-    const { search, city, district, starRating, sort, page, limit } = req.query;
-    const tenantId = req.user.role === 'Admin' ? (req.platformTenant?._id || req.platformTenant || null) : null;
     let hotelIds;
-    if (req.user.role !== 'Admin') {
+    if (!administrative) {
       const { hotels } = await listAccessibleHotels(req.user);
       hotelIds = hotels.map((hotel) => hotel._id);
       if (!hotelIds.length) return res.json({ status: 'success', data: { hotels: [], total: 0, page: Number(page) || 1, limit: Number(limit) || 20 } });
     }
-    const result = await listValidatedHotelPortfolio({ search, city, district, starRating, sort, page, limit, hotelIds, tenantId });
+    const result = await listValidatedHotelPortfolio({
+      search, city, district, starRating, sort, page, limit, hotelIds,
+      scopeFilter: administrative ? hotelScopeFilter(req.adminScope) : null,
+    });
     const ids = result.hotels.map((hotel) => hotel._id);
     const roomRows = ids.length ? await Room.aggregate([
       { $match: { hotel: { $in: ids }, active: true } },
@@ -348,9 +416,15 @@ exports.portfolio = async (req, res) => {
 exports.portfolioOne = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
-    const { error } = await assertHotelAccess(req, req.params.id, CAP.HOTEL_VIEW);
-    if (error) return fail(res, error, error === 404 ? 'Établissement introuvable.' : 'Accès refusé.');
-    const result = await listValidatedHotelPortfolio({ hotelIds: [req.params.id], page: 1, limit: 1 });
+    const target = await Hotel.findById(req.params.id);
+    if (!target) return fail(res, 404, 'Établissement introuvable.');
+    try { await assertHotelLifecycleAccess(req, target, 'platform.hotels.read'); }
+    catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.'); }
+    const administrative = await hasHotelAdministrationAuthority(req, 'platform.hotels.read');
+    const result = await listValidatedHotelPortfolio({
+      hotelIds: [req.params.id], page: 1, limit: 1,
+      scopeFilter: administrative ? hotelScopeFilter(req.adminScope) : null,
+    });
     if (!result.hotels.length) return fail(res, 404, 'Établissement validé et actif introuvable.');
     const hotel = result.hotels[0];
     const completion = await getHotelCompletion(hotel, hotel.property);
@@ -457,6 +531,14 @@ function splitSensitiveUpdates(property, hotel, propertyUpdates, hotelUpdates) {
 // ─────────────────────────────────────────────
 exports.createFull = async (req, res) => {
   try {
+    const administrative = Boolean(req.hotelAdministrationRequest);
+    if (administrative) {
+      try { await assertHotelRequestAdministrationAuthority(req, 'platform.hotels.manage'); }
+      catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.', error.code ? { code: error.code } : {}); }
+    } else {
+      try { await assertSelfServiceHotelCreationAuthority(req); }
+      catch (error) { return fail(res, error.statusCode || 403, error.message, { code: error.code }); }
+    }
     // H-W1 — le nouveau formulaire Web envoie le même contrat métier que le
     // Mobile. L'URL historique /hotels/(admin|mine) reste disponible, mais
     // devient un adaptateur multipart (upload des photos) vers l'unique
@@ -511,7 +593,7 @@ exports.createFull = async (req, res) => {
     // existant à rattacher (donc sans portée à vérifier) — resserrée à Admin uniquement (au lieu
     // de tout le staff Altimmo). Un Proprietaire créant son propre hôtel (POST /mine) ne peut
     // jamais se faire passer pour un autre owner (défense en profondeur, inchangé).
-    const ownerId = (req.user.role === 'Admin' && mongoose.isValidObjectId(req.body.owner))
+    const ownerId = (administrative && mongoose.isValidObjectId(req.body.owner))
       ? req.body.owner
       : req.user.id;
     let propertyData;
@@ -561,10 +643,17 @@ exports.updateFull = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.hotelId)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.hotelId);
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
-    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez modifier que vos propres hôtels.");
+    try {
+      if (req.hotelAdministrationRequest) await assertHotelAdministrationAccess(req, hotel, 'platform.hotels.manage');
+      else await assertHotelLifecycleAccess(req, hotel);
+    }
+    catch (error) { return fail(res, error.statusCode || 403, "Vous ne pouvez modifier que vos propres hôtels."); }
     const property = hotel.property ? await Property.findById(hotel.property) : null;
     if (!property) return fail(res, 404, 'Bien introuvable.');
+    if (await hasHotelAdministrationAuthority(req, 'platform.hotels.manage')) {
+      try { assertPropertyInAdministrationScope(req.adminScope, property); }
+      catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.'); }
+    }
 
     const {
       title, description, price, availability, surface, bedrooms, bathrooms,
@@ -588,7 +677,7 @@ exports.updateFull = async (req, res) => {
     if (latitude !== undefined) propertyUpdates.latitude = latitude;
     if (location) propertyUpdates.location = parseGeoLocation(location);
     if (req.body.address) propertyUpdates.address = parseAddress(req);
-    if (req.body.owner && req.user.role === 'Admin' && mongoose.isValidObjectId(req.body.owner)) propertyUpdates.owner = req.body.owner;
+    if (req.body.owner && req.hotelAdministrationRequest && mongoose.isValidObjectId(req.body.owner)) propertyUpdates.owner = req.body.owner;
     if (honoraires !== undefined) {
       const parsed = parseNonNegativeAmount(honoraires, null);
       if (honoraires !== '' && parsed === null) return fail(res, 422, 'Honoraires invalides.');
@@ -663,8 +752,8 @@ exports.submit = async (req, res) => {
     // F2.6.3 (volet D) : dernière comparaison directe `Hotel.manager` restante dans ce
     // contrôleur — centralisée pour clôturer complètement l'audit (aucune régression : Admin
     // et manager exact conservent le même accès, un `hotel_manager` rattaché l'obtient aussi).
-    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
-    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez soumettre que vos propres hôtels.");
+    try { await assertHotelLifecycleAccess(req, hotel); }
+    catch (error) { return fail(res, error.statusCode || 403, "Vous ne pouvez soumettre que vos propres hôtels."); }
     if (!['brouillon', 'rejete'].includes(hotel.publicationStatus)) {
       return fail(res, 409, 'Cet hôtel a déjà été soumis.');
     }
@@ -683,16 +772,10 @@ exports.submit = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.pending = async (req, res) => {
   try {
-    if (req.isPlatformOperatorContext && !platformCapability(req, 'platform.hotels.read')) {
-      return fail(res, 403, 'Capacité PlatformOperator requise.', { code: 'PLATFORM_HOTELS_READ_REQUIRED' });
-    }
+    try { await assertHotelRequestAdministrationAuthority(req, 'platform.hotels.read', HOTEL_TENANT_ROLES.moderate); }
+    catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.', error.code ? { code: error.code } : {}); }
     const query = { $or: [{ publicationStatus: 'soumis' }, { 'proposedVersion.status': 'pending' }] };
-    const tenantId = req.user.role === 'Admin' ? (req.platformTenant?._id || req.platformTenant || null) : null;
-    if (tenantId) query.tenant = tenantId;
-    if (req.user.role !== 'Admin') {
-      const { hotels: accessibleHotels } = await listAccessibleHotels(req.user);
-      query._id = { $in: accessibleHotels.map((h) => h._id) };
-    }
+    Object.assign(query, hotelScopeFilter(req.adminScope));
     const hotels = await Hotel.find(query)
       .populate('property', 'title images address owner')
       .populate('tenant', 'name')
@@ -727,23 +810,8 @@ exports.reviewDecision = async (req, res) => {
     // F2.6.2 : cette action n'avait auparavant AUCUN contrôle de portée au-delà du filtre de
     // rôle global au niveau route — n'importe quel membre du staff Altimmo pouvait valider,
     // rejeter, suspendre ou réactiver n'importe quel hôtel.
-    if (req.isPlatformOperatorContext) {
-      if (!platformCapability(req, 'platform.hotels.manage')) {
-        return fail(res, 403, 'Capacité PlatformOperator requise.', { code: 'PLATFORM_HOTELS_MANAGE_REQUIRED' });
-      }
-      // PLATFORM-ADMIN-04A — sans tenant sélectionné, la décision relève de la
-      // Vue plateforme : réservée à un opérateur éligible (source canonique).
-      if (!req.platformTenant && !isPlatformWideRequest(req)) {
-        return fail(res, 403, 'Action refusée : la Vue plateforme est réservée aux administrateurs plateforme pleinement habilités.', { code: 'PLATFORM_VIEW_NOT_ELIGIBLE' });
-      }
-      if (req.platformTenant && String(req.platformTenant._id || req.platformTenant) !== String(hotel.tenant || '')) {
-        return fail(res, 404, 'Hôtel introuvable.');
-      }
-    }
-    const { error: scopeError } = req.isPlatformOperatorContext
-      ? { error: null }
-      : await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
-    if (scopeError) return fail(res, scopeError, scopeError === 404 ? 'Hôtel introuvable.' : 'Accès refusé.');
+    try { await assertHotelAdministrationAccess(req, hotel, 'platform.hotels.manage', HOTEL_TENANT_ROLES.moderate); }
+    catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.', error.code ? { code: error.code } : {}); }
 
     const proposed = hotel.proposedVersion?.status === 'pending' ? hotel.proposedVersion : null;
     if (proposed) {
@@ -852,6 +920,7 @@ exports.reviewDecision = async (req, res) => {
       suspend: { active: false },
       unsuspend: { active: true },
     }[action];
+    syncPayload.sourceTenant = hotel.tenant ?? null;
     const syncResult = await syncLinkedAccommodations(hotel._id, syncPayload);
     // Contrôle final (audit divergence Hotel↔Accommodation) : un échec de
     // synchronisation ne doit JAMAIS rester silencieux — Hotel reste la
@@ -908,8 +977,8 @@ exports.deactivate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
-    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez modifier que vos propres hôtels.");
+    try { await assertHotelLifecycleAccess(req, hotel); }
+    catch (error) { return fail(res, error.statusCode || 403, "Vous ne pouvez modifier que vos propres hôtels."); }
     const now = new Date();
     const [futureReservations, checkedIn, occupiedRooms, publishedRooms, openHousekeeping, openMaintenance, activeStaff, unpaidDocuments, pendingRefunds] = await Promise.all([
       HotelReservation.countDocuments({ hotel: hotel._id, status: { $in: ['pending', 'confirmed'] }, checkOutDate: { $gt: now } }),
@@ -929,7 +998,7 @@ exports.deactivate = async (req, res) => {
     hotel.active = false;
     hotel.status = 'inactif';
     await hotel.save();
-    const syncResult = await syncLinkedAccommodations(hotel._id, { active: false });
+    const syncResult = await syncLinkedAccommodations(hotel._id, { active: false, sourceTenant: hotel.tenant ?? null });
     if (!syncResult.ok) {
       logAction({
         action: 'Synchronisation Hôtel→Hébergement échouée',
@@ -952,8 +1021,8 @@ exports.reactivate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
-    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez modifier que vos propres hôtels.");
+    try { await assertHotelLifecycleAccess(req, hotel); }
+    catch (error) { return fail(res, error.statusCode || 403, "Vous ne pouvez modifier que vos propres hôtels."); }
     if (hotel.publicationStatus !== 'publie') return fail(res, 409, 'Un établissement non validé ne peut pas être activé.', { code: 'HOTEL_NOT_APPROVED' });
     const property = await Property.findById(hotel.property).select('statusAdmin availability');
     if (!property || property.statusAdmin !== 'Validée' || property.availability !== 'Disponible') {
@@ -962,7 +1031,7 @@ exports.reactivate = async (req, res) => {
     hotel.active = true;
     hotel.status = 'actif';
     await hotel.save();
-    const syncResult = await syncLinkedAccommodations(hotel._id, { active: true });
+    const syncResult = await syncLinkedAccommodations(hotel._id, { active: true, sourceTenant: hotel.tenant ?? null });
     if (!syncResult.ok) {
       logAction({
         action: 'Synchronisation Hôtel→Hébergement échouée',
@@ -991,8 +1060,8 @@ exports.resync = async (req, res) => {
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
     // F2.6.2 : aucun contrôle de portée n'existait auparavant sur cette action de récupération.
-    const { error: scopeError } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
-    if (scopeError) return fail(res, scopeError, scopeError === 404 ? 'Hôtel introuvable.' : 'Accès refusé.');
+    try { await assertHotelAdministrationAccess(req, hotel, 'platform.hotels.manage'); }
+    catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.'); }
     const syncResult = await resyncLinkedAccommodations(hotel._id, hotel);
     if (!syncResult.ok) return fail(res, 500, `Resynchronisation échouée : ${syncResult.error}`);
 
@@ -1020,8 +1089,14 @@ exports.duplicate = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id).populate('property');
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
-    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez dupliquer que vos propres hôtels.");
+    if (req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.PLATFORM) {
+      return fail(res, 403, 'Duplication plateforme différée : sélectionnez un tenant.', { code: 'PLATFORM_HOTEL_DUPLICATION_DEFERRED' });
+    }
+    try { await assertHotelLifecycleAccess(req, hotel); }
+    catch (error) { return fail(res, error.statusCode || 403, "Vous ne pouvez dupliquer que vos propres hôtels."); }
+    if (!hotel.tenant) {
+      return fail(res, 403, 'Une organisation active est requise pour dupliquer cet hôtel.', { code: 'HOTEL_ORGANIZATION_REQUIRED' });
+    }
     const result = await duplicateHotel({ hotel, property: hotel.property, actingUser: req.user });
 
     logAction({
@@ -1049,8 +1124,11 @@ exports.remove = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, 'Identifiant invalide.');
     const hotel = await Hotel.findById(req.params.id).populate('property');
     if (!hotel) return fail(res, 404, 'Hôtel introuvable.');
-    const { error } = await assertHotelAccess(req, hotel._id, CAP.HOTEL_MANAGE);
-    if (error) return fail(res, error, error === 404 ? 'Hôtel introuvable.' : "Vous ne pouvez supprimer que vos propres hôtels.");
+    if (req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.PLATFORM) {
+      return fail(res, 403, 'Suppression plateforme différée : sélectionnez un tenant.', { code: 'PLATFORM_HOTEL_DELETE_DEFERRED' });
+    }
+    try { await assertHotelLifecycleAccess(req, hotel); }
+    catch (error) { return fail(res, error.statusCode || 403, "Vous ne pouvez supprimer que vos propres hôtels."); }
     if (!['brouillon', 'rejete'].includes(hotel.publicationStatus) || hotel.publishedAt) {
       return fail(res, 409, 'Seul un brouillon ou un hôtel refusé jamais publié peut être supprimé.', { code: 'HOTEL_DELETE_NOT_ALLOWED' });
     }

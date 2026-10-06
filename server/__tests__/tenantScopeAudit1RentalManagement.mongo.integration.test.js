@@ -40,7 +40,7 @@ const promoteMembershipTo = (user, tenant, businessRole) => OrgMembership.update
 );
 
 let seq = 0;
-async function createActivatedRentalForUnaffiliatedOwner(actorId) {
+async function createActivatedRentalForUnaffiliatedOwner(actorId, tenant = null) {
   seq += 1;
   const owner = await User.create({
     name: 'Unaffiliated Rental Owner', email: `rental-owner-${Date.now()}-${seq}@example.test`,
@@ -51,7 +51,7 @@ async function createActivatedRentalForUnaffiliatedOwner(actorId) {
     pole: 'Altimmo', type: 'Villa', status: 'location', statusAdmin: 'Validée', isPublished: true,
     price: 250000, address: { street: 'Rue GL', city: 'Brazzaville', arrondissement: 'Centre' },
     latitude: -4.26, longitude: 15.24, images: ['https://placehold.co/1200x800/png?text=Test'],
-    surface: 90, availability: 'Disponible', owner: owner._id,
+    surface: 90, availability: 'Disponible', owner: owner._id, tenant: tenant?._id || null,
   });
   const rental = await ensureRentalManagementActive({ property, actor: actorId, monthlyRent: 250000 });
   return { owner, property, rental };
@@ -68,17 +68,27 @@ describe('TENANT-SCOPE-AUDIT-1 — Gestion Locative : propriétaire public-signu
     ({ rental } = await createActivatedRentalForUnaffiliatedOwner(fixture.bootstrap._id));
   });
 
-  test('GET /api/rental-management (liste, staff, tenant unique) inclut le dossier d’un propriétaire non affilié', async () => {
+  // C2.10A (D3/D4, §9) — l'extension « tenant unique » est retirée : un bien
+  // tenant:null reste INDIVIDUAL et n'entre dans aucune organisation.
+  test('C2.10A — tenant unique : le dossier tenant:null d’un propriétaire non affilié reste INDIVIDUAL (absent de la liste)', async () => {
     const res = await request(app).get('/api/rental-management').set(bearer(fixture.bootstrap, fixture.tenant._id));
     expect(res.status).toBe(200);
     const ids = res.body.data.rentals.map((r) => String(r._id));
-    expect(ids).toContain(String(rental._id));
+    expect(ids).not.toContain(String(rental._id));
   });
 
-  test('GET /api/rental-management/stats compte ce dossier dans les totaux', async () => {
+  test('C2.10A — stats : ce dossier INDIVIDUAL n’est pas compté', async () => {
     const res = await request(app).get('/api/rental-management/stats').set(bearer(fixture.bootstrap, fixture.tenant._id));
     expect(res.status).toBe(200);
-    expect(res.body.data.stats.total).toBeGreaterThanOrEqual(1);
+    expect(res.body.data.stats.total).toBe(0);
+  });
+
+  test('C2.10A (D5) — un bien Property.tenant = T d’un propriétaire non affilié est visible et compté dans T', async () => {
+    const { rental: attributed } = await createActivatedRentalForUnaffiliatedOwner(fixture.bootstrap._id, fixture.tenant);
+    const list = await request(app).get('/api/rental-management').set(bearer(fixture.bootstrap, fixture.tenant._id));
+    expect(list.body.data.rentals.map((r) => String(r._id))).toContain(String(attributed._id));
+    const stats = await request(app).get('/api/rental-management/stats').set(bearer(fixture.bootstrap, fixture.tenant._id));
+    expect(stats.body.data.stats.total).toBe(1);
   });
 });
 
@@ -107,7 +117,9 @@ describe('TENANT-SCOPE-AUDIT-1 — Gestion Locative : cross-tenant préservé', 
 });
 
 describe('TENANT-SCOPE-AUDIT-1 — Gestion Locative : non-régression staff avec OrgMembership normal', () => {
-  test('un dossier dont le propriétaire a un OrgMembership réel continue de fonctionner sans changement', async () => {
+  // C2.10A — c'est Property.tenant (et non la membership de l'owner) qui place
+  // le dossier dans le tenant ; le bien personnel tenant:null d'un membre n'y entre pas.
+  test('un dossier Property.tenant = T est inclus ; le bien personnel tenant:null d’un owner membre ne l’est pas', async () => {
     const fixture = await createTenantFixture({ label: 'ScopeAuditGL IAM', withAdminMembership: true });
     const owner = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Proprietaire' } })).user;
     seq += 1;
@@ -116,11 +128,20 @@ describe('TENANT-SCOPE-AUDIT-1 — Gestion Locative : non-régression staff avec
       pole: 'Altimmo', type: 'Villa', status: 'location', statusAdmin: 'Validée', isPublished: true,
       price: 250000, address: { street: 'Rue GL', city: 'Brazzaville', arrondissement: 'Centre' },
       latitude: -4.26, longitude: 15.24, images: ['https://placehold.co/1200x800/png?text=Test'],
-      surface: 90, availability: 'Disponible', owner: owner._id,
+      surface: 90, availability: 'Disponible', owner: owner._id, tenant: fixture.tenant._id,
     });
     const rental = await ensureRentalManagementActive({ property, actor: fixture.bootstrap._id, monthlyRent: 250000 });
+    const personal = await Property.create({
+      title: `Villa GL Personnelle ${seq}`, description: 'Description suffisamment longue pour la validation du modèle Property.',
+      pole: 'Altimmo', type: 'Villa', status: 'location', statusAdmin: 'Validée', isPublished: true,
+      price: 250000, address: { street: 'Rue GL', city: 'Brazzaville', arrondissement: 'Centre' },
+      latitude: -4.26, longitude: 15.24, images: ['https://placehold.co/1200x800/png?text=Test'],
+      surface: 90, availability: 'Disponible', owner: owner._id, tenant: null,
+    });
+    const personalRental = await ensureRentalManagementActive({ property: personal, actor: owner._id, monthlyRent: 250000 });
     const res = await request(app).get('/api/rental-management').set(bearer(fixture.bootstrap, fixture.tenant._id));
     const ids = res.body.data.rentals.map((r) => String(r._id));
     expect(ids).toContain(String(rental._id));
+    expect(ids).not.toContain(String(personalRental._id));
   });
 });

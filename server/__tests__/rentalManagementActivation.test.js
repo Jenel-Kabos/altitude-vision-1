@@ -7,6 +7,20 @@
 // explicite (POST /api/rental-management, module existant, inchangé) ou
 // création d'un Contrat de bail.
 
+// C2.10A — primitive canonique du scope locatif (Property.tenant), mockée
+// comme l'attribution ci-dessus ; la frontière réelle est certifiée par
+// __tests__/rentalScopeC210A.mongo.integration.test.js.
+jest.mock('../services/platformTenant/rentalScopeService', () => ({
+  ...jest.requireActual('../services/platformTenant/rentalScopeService'),
+  assertRentalResourceInTenant: jest.fn().mockResolvedValue({ status: 'resolved', scope: 'ORGANIZATION' }),
+}));
+// La résolution single-state est certifiée sur Mongo. Ce test unitaire isole
+// le contrat annonce simple -> dossier non activé, sans requête Mongoose.
+jest.mock('../services/platformTenant/organizationAssetInvariantService', () => ({
+  ...jest.requireActual('../services/platformTenant/organizationAssetInvariantService'),
+  resolvePropertyCreationTenant: jest.fn().mockImplementation(async ({ contextualTenantId }) => contextualTenantId || null),
+}));
+
 jest.mock('../models/Property');
 jest.mock('../models/RentalManagement');
 jest.mock('../models/Contrat');
@@ -116,7 +130,7 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
 
   test("l'activation explicite (POST /api/rental-management) marque managementActivated=true sur le dossier existant, sans le dupliquer", async () => {
     mockUserAuth(ADMIN_ID, 'GestionnaireImmobilier');
-    Property.findById = jest.fn().mockResolvedValue({ _id: PROPERTY_ID, status: 'location', owner: OWNER_ID, price: 150000 });
+    Property.findById = jest.fn().mockResolvedValue({ _id: PROPERTY_ID, status: 'location', owner: OWNER_ID, price: 150000, tenant: '607f1f77bcf86cd799439001' });
     Property.find = jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([PROPERTY_ID]) });
     const rental = {
       _id: 'rental1', occupancyStatus: 'vacant', workflowHistory: [], save: jest.fn().mockResolvedValue(),
@@ -145,7 +159,7 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
 
   test('un dossier déjà actif ne consomme pas un nouveau slot', async () => {
     mockUserAuth(ADMIN_ID, 'GestionnaireImmobilier');
-    Property.findById = jest.fn().mockResolvedValue({ _id: PROPERTY_ID, status: 'location', owner: OWNER_ID, price: 150000 });
+    Property.findById = jest.fn().mockResolvedValue({ _id: PROPERTY_ID, status: 'location', owner: OWNER_ID, price: 150000, tenant: '607f1f77bcf86cd799439001' });
     RentalManagement.findOne = jest.fn().mockReturnValue({
       select: jest.fn().mockResolvedValue({ _id: 'rental1', managementActivated: true }),
     });
@@ -196,7 +210,8 @@ describe('RentalManagement — annonce simple vs dossier activé (Sprint A, audi
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
 
     expect(res.statusCode).toBe(200);
-    expect(RentalManagement.find).toHaveBeenCalledWith(expect.objectContaining({ managementActivated: true, owner: { $in: expect.any(Array) } }));
+    // C2.10A — population canonique = biens Property.tenant du tenant (plus `owner ∈ membres`).
+    expect(RentalManagement.find).toHaveBeenCalledWith(expect.objectContaining({ managementActivated: true, property: { $in: expect.any(Array) } }));
   });
 
   test('GET /api/rental-management/stats agrège uniquement les dossiers activés', async () => {

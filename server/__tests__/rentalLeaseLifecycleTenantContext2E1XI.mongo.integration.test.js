@@ -327,12 +327,11 @@ describe('LEASE-ISO — cross-tenant lease isolation', () => {
     expect(resB.status).toBe(404);
   });
 
-  test('LEASE-ISO-05 (unattributed historical contract — bien:null — reste accessible aux membres tenant canoniquement, jamais silencieusement cross-tenant)', async () => {
-    // Le comportement historique préservé par `assertResourceTenantOrUnattributed`
-    // reste : un contrat sans `bien` (donc sans attribution tenant traçable)
-    // est accessible par n'importe quel membre canonique — il n'y a aucune
-    // frontière tenant à faire respecter. Aucune fuite tenant possible car
-    // aucun tenant n'est propriétaire.
+  test('LEASE-ISO-05 (C2.10A — unattributed historical contract — bien:null — n’est plus administrable par aucun staff tenant)', async () => {
+    // C2.10A (D2) — Property.tenant = T est NÉCESSAIRE pour qu'une ressource
+    // locative appartienne à T. L'ancien fail-open « non attribué = accessible à
+    // tout membre canonique » (assertResourceTenantOrUnattributed) est retiré :
+    // un bail sans bien relève du centre de régularisation, pas du cycle de vie.
     const fA = await buildTenant('A');
     const adminA = await makeTenantStaff(fA, 'Admin', 'Admin');
     const proprietaire = await Proprietaire.create({ nom: 'Legacy', prenom: 'X', telephone: `+2420600${seq++}0003` });
@@ -345,7 +344,7 @@ describe('LEASE-ISO — cross-tenant lease isolation', () => {
     const res = await request(app)
       .get(`/api/rental-lease-lifecycle/${legacyContrat._id}/available-transitions`)
       .set(bearer(adminA, fA.tenant));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
   });
 
   test('LEASE-ISO-08 (denied cross-tenant request creates NO state change / no ActionLog entry on target)', async () => {

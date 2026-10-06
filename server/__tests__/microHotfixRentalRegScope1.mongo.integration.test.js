@@ -56,12 +56,14 @@ const bearer = (user, tenantId) => ({
   ...(tenantId ? { 'X-Platform-Tenant-Id': String(tenantId) } : {}),
 });
 
-async function createUnaffiliatedProprietaireWithContract(overrides = {}) {
+// C2.10A — `proprietaireTenant` = provenance explicite de la fiche (seul
+// rattachement d'un bail sans bien) ; l'extension « tenant unique » est retirée.
+async function createUnaffiliatedProprietaireWithContract(overrides = {}, proprietaireTenant = null) {
   const ownerUser = await User.create({
     name: 'Unaffiliated Owner', email: `unaffiliated-owner-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`,
     password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true,
   });
-  const proprietaire = await Proprietaire.create({ nom: 'Owner', prenom: 'Unaffiliated', telephone: '060000000', user: ownerUser._id });
+  const proprietaire = await Proprietaire.create({ nom: 'Owner', prenom: 'Unaffiliated', telephone: '060000000', user: ownerUser._id, tenant: proprietaireTenant });
   const locataire = await Locataire.create({ nom: 'Tenant', prenom: 'One', telephone: '070000000' });
   const contract = await Contrat.create({
     type: 'location', statut: 'actif', proprietaire: proprietaire._id, locataire: locataire._id,
@@ -80,10 +82,22 @@ describe('MICRO-HOTFIX-RENTAL-REG-SCOPE-1 — scénario réel : contrat lié à 
   beforeAll(async () => {
     fixture = await createTenantFixture({ label: 'RentalRegScope1 Solo' });
     await promoteBootstrapToAdmin(fixture.tenant, fixture.bootstrap);
-    ({ contract } = await createUnaffiliatedProprietaireWithContract());
+    ({ contract } = await createUnaffiliatedProprietaireWithContract({}, fixture.tenant._id));
   });
 
-  test('GET / (liste) inclut le dossier dont le propriétaire est un compte non affilié au tenant unique', async () => {
+  // C2.10A (D3, §9) — un dossier dont la fiche n'a AUCUNE provenance n'est plus
+  // rattaché au tenant unique : invisible et non actionnable.
+  test('C2.10A — sans provenance, le dossier d’un owner non affilié n’est plus inclus même sur tenant unique', async () => {
+    const { contract: orphan } = await createUnaffiliatedProprietaireWithContract();
+    const res = await request(app).get('/api/rental-contract-regularization').set(bearer(fixture.bootstrap, fixture.tenant._id));
+    expect(res.status).toBe(200);
+    expect(res.body.data.cases.map((c) => String(c.contract._id))).not.toContain(String(orphan._id));
+    const decision = await request(app).post(`/api/rental-contract-regularization/${orphan._id}/decision`)
+      .set(bearer(fixture.bootstrap, fixture.tenant._id)).send({ action: 'flag_anomaly', reason: 'Tentative sans provenance' });
+    expect(decision.status).toBe(409);
+  });
+
+  test('GET / (liste) inclut le dossier d’un owner non affilié dont la fiche a la provenance du tenant', async () => {
     const res = await request(app).get('/api/rental-contract-regularization').set(bearer(fixture.bootstrap, fixture.tenant._id));
     expect(res.status).toBe(200);
     const ids = res.body.data.cases.map((c) => String(c.contract._id));
@@ -154,7 +168,8 @@ describe('MICRO-HOTFIX-RENTAL-REG-SCOPE-1 — non-régression : staff avec OrgMe
     await promoteMembershipTo(manager, fixture.tenant, 'GestionnaireImmobilier');
     const ownerUser = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Proprietaire' } })).user;
     await promoteMembershipTo(ownerUser, fixture.tenant, 'Collaborateur');
-    const proprietaire = await Proprietaire.create({ nom: 'Owner', prenom: 'Affiliated', telephone: '060000001', user: ownerUser._id });
+    // C2.10A — rattachement par provenance explicite de la fiche (plus via la membership de l'owner).
+    const proprietaire = await Proprietaire.create({ nom: 'Owner', prenom: 'Affiliated', telephone: '060000001', user: ownerUser._id, tenant: fixture.tenant._id });
     const locataire = await Locataire.create({ nom: 'Tenant', prenom: 'Two', telephone: '070000001' });
     contract = await Contrat.create({
       type: 'location', statut: 'actif', proprietaire: proprietaire._id, locataire: locataire._id,

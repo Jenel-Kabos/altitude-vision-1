@@ -62,12 +62,17 @@ const setRole = (userId, tenant, businessRole) => OrgMembership.updateOne(
 // Contrat fixture — insertMany bypasse la validation stricte (le contrôleur
 // gestionDocumentController.getDocuments lit seulement contrat.documents[]
 // et contrat.tenant, aucun autre champ n'est requis dans ce parcours READ).
+// C2.10A — le tenant d'un bail dérive EXCLUSIVEMENT de Contrat.bien →
+// Property.tenant (le schéma Contrat n'a pas de champ `tenant`) : la fixture
+// rattache donc chaque contrat à un bien du tenant voulu.
 const insertContrat = async ({ tenant, docs = [] }) => {
   const _id = new mongoose.Types.ObjectId();
+  const bien = new mongoose.Types.ObjectId();
+  await mongoose.connection.collection('properties').insertOne({ _id: bien, title: 'PDOC bien', tenant: tenant._id, owner: new mongoose.Types.ObjectId(), status: 'location' });
   await Contrat.collection.insertOne({
     _id,
     type: 'location',
-    tenant: tenant._id,
+    bien,
     documents: docs.map((d) => ({ _id: new mongoose.Types.ObjectId(), nom: d.nom || 'doc', type: d.type || 'bail', dateGeneration: new Date() })),
     createdAt: new Date(), updatedAt: new Date(),
   });
@@ -375,19 +380,96 @@ test('P-DOC-G04 GestionnaireImmobilier tenant member is denied (businessRole exc
   expect(res.status).toBe(403);
 });
 
-test('P-DOC-G05 PATH B operator + documents.read + Tenant A + Contrat A → 200', async () => {
-  const res = await request(app).get(`/api/gestion-docs/contrat/${contratA._id}`).set(bearer(operatorRead, tenantA._id));
+// BACKEND-TENANT-ISOLATION-CLOSURE-01 — OPTION A STRICTE (décision humaine).
+// Le schéma Contrat n'a pas de champ `tenant` (strict : un `tenant` passé à
+// Contrat.create est écarté — vérifié ci-dessous). Pour le PATH B, l'autorité
+// tenant d'un Contrat est dérivée UNIQUEMENT de Contrat.bien → Property.tenant
+// non null, sans repli owner. Fixtures créées par le schéma Contrat (jamais
+// d'insertion brute d'un `tenant`).
+async function createSchemaContrat({ propertyTenant, withProperty = true, withBien = true, label }) {
+  const Property = require('../models/Property');
+  const propertyId = new mongoose.Types.ObjectId();
+  if (withBien && withProperty) {
+    await Property.collection.insertOne({
+      _id: propertyId, title: `P-DOC bien ${label}`, tenant: propertyTenant, owner: tenantAdminA._id,
+      pole: 'Altimmo', type: 'Villa', status: 'location', createdAt: new Date(), updatedAt: new Date(),
+    });
+  }
+  const contrat = await Contrat.create({
+    type: 'location', ...(withBien ? { bien: propertyId } : {}), tenant: tenantA._id,
+    documents: [{ nom: `bail-${label}`, type: 'bail', dateGeneration: new Date() }],
+  });
+  const stored = await Contrat.collection.findOne({ _id: contrat._id });
+  expect(stored.tenant).toBeUndefined(); // le schéma écarte `tenant`
+  return contrat;
+}
+const gestionGet = (contrat, user, tenantId) => request(app).get(`/api/gestion-docs/contrat/${contrat._id}`).set(bearer(user, tenantId));
+
+test('P-DOC-G05 PATH B operator + documents.read + Tenant A + Contrat.bien → Property.tenant=A → 200 (Option A stricte)', async () => {
+  const contrat = await createSchemaContrat({ propertyTenant: tenantA._id, label: 'a-read' });
+  const res = await gestionGet(contrat, operatorRead, tenantA._id);
   expect(res.status).toBe(200);
+  expect(res.body.data.documents.map((d) => d.nom)).toContain('bail-a-read');
 });
 
-test('P-DOC-G06 PATH B operator + documents.manage + Tenant A + Contrat A → 200 (manage as read superset)', async () => {
-  const res = await request(app).get(`/api/gestion-docs/contrat/${contratA._id}`).set(bearer(operatorManage, tenantA._id));
+test('P-DOC-G06 PATH B operator + documents.manage + Tenant A + Contrat.bien → Property.tenant=A → 200 (manage as read superset)', async () => {
+  const contrat = await createSchemaContrat({ propertyTenant: tenantA._id, label: 'a-manage' });
+  const res = await gestionGet(contrat, operatorManage, tenantA._id);
   expect(res.status).toBe(200);
+  expect(res.body.data.documents.map((d) => d.nom)).toContain('bail-a-manage');
+});
+
+test('P-DOC-G05b Option A stricte — Property.tenant=B, target A → 404, aucun document', async () => {
+  const contrat = await createSchemaContrat({ propertyTenant: tenantB._id, label: 'b' });
+  const res = await gestionGet(contrat, operatorRead, tenantA._id);
+  expect(res.status).toBe(404);
+  expect(JSON.stringify(res.body)).not.toContain('bail-b');
+});
+
+test('P-DOC-G05c Option A stricte — Property.tenant=null (owner membre de A) → 404, aucun repli owner', async () => {
+  const contrat = await createSchemaContrat({ propertyTenant: null, label: 'null' });
+  const res = await gestionGet(contrat, operatorRead, tenantA._id);
+  expect(res.status).toBe(404);
+  expect(JSON.stringify(res.body)).not.toContain('bail-null');
+});
+
+test('P-DOC-G05d Option A stricte — Contrat sans bien → 404', async () => {
+  const contrat = await createSchemaContrat({ withBien: false, label: 'no-bien' });
+  const res = await gestionGet(contrat, operatorRead, tenantA._id);
+  expect(res.status).toBe(404);
+  expect(JSON.stringify(res.body)).not.toContain('bail-no-bien');
+});
+
+test('P-DOC-G05e Option A stricte — Property introuvable → 404', async () => {
+  const contrat = await createSchemaContrat({ withProperty: false, label: 'missing-prop' });
+  const res = await gestionGet(contrat, operatorRead, tenantA._id);
+  expect(res.status).toBe(404);
+  expect(JSON.stringify(res.body)).not.toContain('bail-missing-prop');
+});
+
+test('P-DOC-G05f Option A stricte — capability absente / opérateur suspendu / cible invalide → refusés même sur Property.tenant=A', async () => {
+  const contrat = await createSchemaContrat({ propertyTenant: tenantA._id, label: 'neg' });
+  expect((await gestionGet(contrat, operatorWrongCap, tenantA._id)).status).toBe(403);
+  // Opérateur suspendu : router.param('contratId') refuse avant le gate
+  // (tenant non résoluble pour cet acteur) → 404 ; fail-closed 404|403
+  // (INVARIANTS §12 cross-cutting). Jamais de document.
+  const suspended = await gestionGet(contrat, operatorSuspended, tenantA._id);
+  expect([403, 404]).toContain(suspended.status);
+  expect(JSON.stringify(suspended.body)).not.toContain('bail-neg');
+  expect([403, 404]).toContain((await gestionGet(contrat, operatorRead, new mongoose.Types.ObjectId())).status);
+});
+
+test('P-DOC-G05g Option A stricte — les 6 POST générateurs restent tenant-only (opérateur refusé)', async () => {
+  const contrat = await createSchemaContrat({ propertyTenant: tenantA._id, label: 'post' });
+  const res = await request(app).post(`/api/gestion-docs/bail/${contrat._id}`).set(bearer(operatorManage, tenantA._id)).send({});
+  expect([403, 404]).toContain(res.status);
 });
 
 test('P-DOC-G07 PATH B operator documents.read WITHOUT selected tenant → denied', async () => {
   const res = await request(app).get(`/api/gestion-docs/contrat/${contratA._id}`).set(bearer(operatorRead));
-  expect(res.status).toBe(403);
+  // C2.10A — sans contexte tenant valide, l'acteur est arrêté dès la frontière
+  // de scope du bail (404) ou par l'autorité (403) ; jamais de contenu.
+  expect([403, 404]).toContain(res.status);
 });
 
 test('P-DOC-G08 CRITICAL cross-tenant — operator + Tenant A + Contrat B → 404 fail-closed', async () => {
@@ -409,17 +491,23 @@ test('P-DOC-G10 PATH B operator with wrong capabilities (finance/rentals/crm onl
 
 test('P-DOC-G11 suspended operator → 403 even with documents.read', async () => {
   const res = await request(app).get(`/api/gestion-docs/contrat/${contratA._id}`).set(bearer(operatorSuspended, tenantA._id));
-  expect(res.status).toBe(403);
+  // C2.10A — sans contexte tenant valide, l'acteur est arrêté dès la frontière
+  // de scope du bail (404) ou par l'autorité (403) ; jamais de contenu.
+  expect([403, 404]).toContain(res.status);
 });
 
 test('P-DOC-G12 revoked operator → 403', async () => {
   const res = await request(app).get(`/api/gestion-docs/contrat/${contratA._id}`).set(bearer(operatorRevoked, tenantA._id));
-  expect(res.status).toBe(403);
+  // C2.10A — sans contexte tenant valide, l'acteur est arrêté dès la frontière
+  // de scope du bail (404) ou par l'autorité (403) ; jamais de contenu.
+  expect([403, 404]).toContain(res.status);
 });
 
 test('P-DOC-G13 naked User.role=Admin without OrgMembership and without PlatformOperator → denied by new PATH B', async () => {
   const res = await request(app).get(`/api/gestion-docs/contrat/${contratA._id}`).set(bearer(bareGlobalAdmin, tenantA._id));
-  expect(res.status).toBe(403);
+  // C2.10A — sans contexte tenant valide, l'acteur est arrêté dès la frontière
+  // de scope du bail (404) ou par l'autorité (403) ; jamais de contenu.
+  expect([403, 404]).toContain(res.status);
 });
 
 test('P-DOC-G14 operator documents.read cannot POST /api/gestion-docs/bail/:contratId (write NOT opened by Phase 2A.1)', async () => {
