@@ -87,8 +87,6 @@ module.exports = {
       permissions: [
         'android.permission.ACCESS_COARSE_LOCATION',
         'android.permission.ACCESS_FINE_LOCATION',
-        'android.permission.CAMERA',
-        'android.permission.READ_MEDIA_IMAGES',
         'android.permission.READ_EXTERNAL_STORAGE',
       ],
 
@@ -102,6 +100,11 @@ module.exports = {
       blockedPermissions: [
         'android.permission.RECORD_AUDIO',
         'android.permission.SYSTEM_ALERT_WINDOW',
+        // GOOGLE-PLAY-R2.1 — déclarée par le manifest de la bibliothèque
+        // expo-image-picker mais jamais utilisée (aucune prise de vue : les
+        // images viennent du sélecteur système). READ_MEDIA_IMAGES est retirée
+        // des permissions : le sélecteur système n'en a pas besoin.
+        'android.permission.CAMERA',
       ],
     },
 
@@ -112,7 +115,11 @@ module.exports = {
       'expo-status-bar',
       'expo-web-browser',
       'expo-video',
-      'expo-audio',
+      // GOOGLE-PLAY-R2 — l'audio n'est lu qu'en premier plan (messages vocaux du
+      // chat). Le défaut du plugin (enableBackgroundPlayback: true) déclarait un
+      // service de premier plan « mediaPlayback » et ses permissions, soumis à
+      // déclaration FGS justifiée sur Google Play pour targetSdk ≥ 34.
+      ['expo-audio', { enableBackgroundPlayback: false }],
       'expo-updates',
       'expo-notifications',
       'expo-location',
@@ -133,6 +140,10 @@ module.exports = {
 
     extra: {
       googleMapsConfigured: Boolean(googleMapsAndroidApiKey),
+      // GOOGLE-PLAY-R2.1 — EAS fournit le DSN sous `SENTRY_DSN` (secret, jamais
+      // inliné par Metro faute de préfixe EXPO_PUBLIC_) : exposé ici au build
+      // pour que l'app l'initialise en release. Le DSN est public par nature.
+      sentryDsn: process.env.SENTRY_DSN?.trim() || undefined,
       eas: {
         projectId: '20e7342e-6723-404c-bd44-66ef60758a19',
       },

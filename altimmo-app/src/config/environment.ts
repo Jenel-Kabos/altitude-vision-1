@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+
 type AppEnvironment = 'development' | 'preview' | 'production';
 
 const DEFAULT_API_URL = 'https://altitude-vision.onrender.com/api';
@@ -25,6 +27,13 @@ function parseEnvironment(value: string | undefined): AppEnvironment {
   return 'development';
 }
 
+// GOOGLE-PLAY-R2.1 — en build EAS, le DSN arrive via `SENTRY_DSN` exposé par
+// app.config.js dans `extra.sentryDsn` ; EXPO_PUBLIC_SENTRY_DSN reste prioritaire.
+function readExtraString(key: string): string {
+  const value = (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export const environment = Object.freeze({
   name: parseEnvironment(process.env.EXPO_PUBLIC_APP_ENV),
   apiUrl: parseUrl('EXPO_PUBLIC_API_URL', process.env.EXPO_PUBLIC_API_URL, DEFAULT_API_URL),
@@ -33,7 +42,7 @@ export const environment = Object.freeze({
     process.env.EXPO_PUBLIC_SOCKET_URL,
     DEFAULT_SOCKET_URL,
   ),
-  sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN?.trim() || '',
+  sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN?.trim() || readExtraString('sentryDsn'),
   googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || '',
 });
 

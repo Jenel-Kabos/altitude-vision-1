@@ -212,11 +212,8 @@ export default function PublierBienScreen({ navigation, route }) {
   // ─── Photos ─────────────────────────────────────────────────
   const ajouterPhotos = async () => {
     if (photos.length >= 10) return;
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (perm.status !== 'granted') {
-      Alert.alert('Permission refusée', 'Accès à la galerie requis.');
-      return;
-    }
+    // GOOGLE-PLAY-R2.1 — sélecteur système (Android PickVisualMedia / iOS PHPicker) :
+    // aucune permission galerie requise, seuls les éléments choisis sont reçus.
     const res = await ImagePicker.launchImageLibraryAsync({
       quality: 0.8,
       allowsMultipleSelection: true,

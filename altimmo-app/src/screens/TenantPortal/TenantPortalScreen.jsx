@@ -101,8 +101,8 @@ export default function TenantPortalScreen({ navigation, route }) {
   }, [state]);
 
   const pickPhotos = useCallback(async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return Alert.alert('Permission requise', 'Autorisez l’accès aux photos pour joindre des images.');
+    // GOOGLE-PLAY-R2.1 — sélecteur système (Android PickVisualMedia / iOS PHPicker) :
+    // aucune permission galerie requise, seuls les éléments choisis sont reçus.
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsMultipleSelection: true, selectionLimit: 5, quality: 0.8 });
     if (!result.canceled) setForm((current) => ({ ...current, photos: result.assets.slice(0, 5) }));
   }, []);

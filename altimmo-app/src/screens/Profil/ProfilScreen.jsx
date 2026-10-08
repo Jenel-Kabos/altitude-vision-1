@@ -117,11 +117,8 @@ export default function ProfilScreen({ navigation, route }) {
   }, [isProprietaire]);
 
   const pickAndUploadAvatar = useCallback(async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (perm.status !== 'granted') {
-      Alert.alert('Permission requise', 'Autorisez l\'accès à la galerie pour changer votre photo.');
-      return;
-    }
+    // GOOGLE-PLAY-R2.1 — sélecteur système (Android PickVisualMedia / iOS PHPicker) :
+    // aucune permission galerie requise, seuls les éléments choisis sont reçus.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,

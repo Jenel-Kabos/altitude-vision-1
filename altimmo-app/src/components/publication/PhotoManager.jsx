@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,11 +18,8 @@ export default function PhotoManager({ photos, onChange, error, max = MAX_PHOTOS
 
   const ajouterPhotos = useCallback(async () => {
     if (photos.length >= max) return;
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (perm.status !== 'granted') {
-      Alert.alert('Permission refusée', 'Accès à la galerie requis pour ajouter des photos.');
-      return;
-    }
+    // GOOGLE-PLAY-R2.1 — sélecteur système (Android PickVisualMedia / iOS PHPicker) :
+    // aucune permission galerie requise, seuls les éléments choisis sont reçus.
     const res = await ImagePicker.launchImageLibraryAsync({
       quality: 0.8,
       allowsMultipleSelection: true,
