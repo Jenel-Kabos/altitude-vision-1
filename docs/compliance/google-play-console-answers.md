@@ -189,7 +189,7 @@ Détail des types de données collectées / partagées : voir
 | 1 | ~~Suppression de compte self-service~~ ✅ CODE_CLOSED — endpoint + UI + tests livrés | — | Non |
 | 2 | Rotation Google Maps configurée (`HUMAN_CONFIRMED`) ; rebuild AAB et validation Maps signée restent requis avant suppression de l'ancienne clé | P0 sécurité | **OUI** |
 | 3 | Confirmer prestataire de paiement effectif et adapter Data Safety | P1 | Recommandé |
-| 4 | ~~RECORD_AUDIO / SYSTEM_ALERT_WINDOW~~ ✅ CODE_CLOSED — bloquées via `android.blockedPermissions` dans `app.config.js`. FOREGROUND_SERVICE_MEDIA_PLAYBACK reste (héritée d'`expo-audio`) | P1 | Non bloquant |
+| 4 | ~~RECORD_AUDIO / SYSTEM_ALERT_WINDOW~~ ✅ CODE_CLOSED — bloquées via `android.blockedPermissions` dans `app.config.js`. ✅ GOOGLE-PLAY-R2 — FOREGROUND_SERVICE / FOREGROUND_SERVICE_MEDIA_PLAYBACK et le service `mediaPlayback` retirés (`expo-audio` `enableBackgroundPlayback: false` : l'audio n'est lu qu'en premier plan) — aucune déclaration FGS à fournir | — | Non |
 | 5 | Politiques web/mobile et procédure publique alignées ; durées chiffrées soumises à `HUMAN_LEGAL_REVIEW_REQUIRED` | P1 | Revue juridique |
 | 6 | Fournir un compte de test Google Review (Client + Proprietaire) | P0 | **OUI** pour review |
 | 7 | Répondre au questionnaire IARC (content rating) | P0 | **OUI** |

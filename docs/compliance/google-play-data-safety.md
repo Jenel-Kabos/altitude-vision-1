@@ -160,7 +160,7 @@ LOW (nécessite validation humaine).
    wrapper d'auth). Si oui : Sentry reçoit un `userId` — à déclarer.
 2. Upload vidéo confirmé dans le flux `PublierBienScreen` vers Cloudinary ; aligner la réponse Console
    est branché en lecture).
-3. Vérifier sur le prochain AAB signé que RECORD_AUDIO / SYSTEM_ALERT_WINDOW sont absentes ; FOREGROUND_SERVICE_MEDIA_PLAYBACK reste justifiée par la lecture `expo-audio`
+3. Vérifier sur le prochain AAB signé que RECORD_AUDIO / SYSTEM_ALERT_WINDOW sont absentes ; FOREGROUND_SERVICE_MEDIA_PLAYBACK est désormais absente (GOOGLE-PLAY-R2 : `expo-audio` `enableBackgroundPlayback: false`, aucune lecture en arrière-plan)
    sont réellement nécessaires (héritages Expo) — voir la section permissions
    du rapport d'audit.
 4. Confirmer le moyen de paiement effectif (hors application ? redirection
