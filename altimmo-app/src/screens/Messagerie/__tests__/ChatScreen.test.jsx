@@ -147,3 +147,23 @@ describe('ChatScreen — repli deep link générique (route.params.id sans conve
     expect(api.get).not.toHaveBeenCalledWith('/conversations/conv-1');
   });
 });
+
+describe('ChatScreen — conversation commerciale en lecture seule', () => {
+  beforeEach(() => {
+    mockActiveTheme = colors;
+    jest.clearAllMocks();
+    api.get.mockResolvedValue({ data: { data: { messages: [] } } });
+  });
+
+  test('désactive le composeur et explique que l’autorisation Altitude Vision est requise', async () => {
+    render(<ChatScreen
+      route={{ params: { conversation: { ...conversation, writeState: { writable: false, code: 'CONTACT_AUTHORIZATION_REQUIRED' } }, contact } }}
+      navigation={navigation}
+    />);
+
+    await waitFor(() => expect(api.get).toHaveBeenCalled());
+    expect(screen.getByLabelText('Écrire un message').props.editable).toBe(false);
+    expect(screen.getByLabelText('Envoyer le message').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByText(/lecture seule.*Altitude Vision/i)).toBeTruthy();
+  });
+});

@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../services/api';
+import { getMyOperatorStatus } from '../../services/platformTenantService';
 import { connectSocket, getSocket } from '../../services/socketService';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -170,7 +171,20 @@ export default function ConversationsScreen({ navigation }) {
   const { user }           = useAuth();
   const { themeColors: c } = useTheme();
   const styles  = useMemo(() => makeStyles(c), [c]);
-  const isStaff = STAFF_ROLES.includes(user?.role);
+  const isStaffRole = STAFF_ROLES.includes(user?.role);
+  // P0 SUPPORT-INBOX — la boîte de support appartient à Altitude Vision :
+  // seul un PlatformOperator actif détenant `platform.support.read` la charge.
+  // Aucun rôle d'organisation n'y donne accès ; fail closed en cas d'erreur.
+  const [isStaff, setIsStaff] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getMyOperatorStatus()
+      .then((operator) => {
+        if (active) setIsStaff(operator?.status === 'active' && (operator.capabilities || []).includes('platform.support.read'));
+      })
+      .catch(() => { if (active) setIsStaff(false); });
+    return () => { active = false; };
+  }, [user?._id]);
 
   const [conversations, setConversations] = useState([]);
   const [loading,       setLoading]       = useState(true);
@@ -364,7 +378,7 @@ export default function ConversationsScreen({ navigation }) {
                 ? 'Aucune demande client pour le moment.'
                 : 'Posez une question à notre équipe directement.'}
             </Text>
-            {!isStaff && (
+            {!isStaff && !isStaffRole && (
               <TouchableOpacity
                 style={styles.emptyBtn}
                 onPress={() => navigation.navigate('Chatbot')}
@@ -379,7 +393,7 @@ export default function ConversationsScreen({ navigation }) {
       />
 
       {/* ─── FAB contacter l'agence ─── */}
-      {!isStaff && (
+      {!isStaff && !isStaffRole && (
         <TouchableOpacity
           style={styles.fab}
           onPress={() => navigation.navigate('Chatbot')}

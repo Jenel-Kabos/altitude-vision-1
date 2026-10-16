@@ -16,6 +16,7 @@ import PaiementScreen       from '../../screens/Paiements/PaiementScreen';
 import VirementScreen                  from '../../screens/Paiements/VirementScreen';
 import PolitiqueConfidentialiteScreen  from '../../screens/Profil/PolitiqueConfidentialiteScreen';
 import CacheManagementScreen          from '../../screens/Profil/CacheManagementScreen';
+import MarketingPreferencesScreen     from '../../screens/Profil/MarketingPreferencesScreen';
 import MyHotelReservationsScreen from '../../screens/Hotels/MyHotelReservationsScreen';
 import HotelReservationDetailScreen from '../../screens/Hotels/HotelReservationDetailScreen';
 import HotelDetailScreen from '../../screens/Hotels/HotelDetailScreen';
@@ -49,6 +50,7 @@ export default function ProfilStack() {
       <Stack.Screen name="ProfilHome"      component={ProfilScreen} />
       <Stack.Screen name="EditProfile"     component={EditProfileScreen} />
       <Stack.Screen name="ChangePassword"  component={ChangePasswordScreen} />
+      <Stack.Screen name="MarketingPreferences" component={MarketingPreferencesScreen} />
       <Stack.Screen name="MesAnnonces"     component={MesAnnoncesScreen} />
       <Stack.Screen name="PublierBien"     component={PublierBienScreen} />
       <Stack.Screen name="ChoixTypeAnnonce"   component={ChoixTypeAnnonceScreen} />

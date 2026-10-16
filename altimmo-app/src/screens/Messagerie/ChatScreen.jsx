@@ -150,6 +150,7 @@ export default function ChatScreen({ route, navigation }) {
 
   const conversation = routeConversation || resolvedConversation;
   const contact = routeContact || resolvedContact;
+  const isReadOnly = conversation?.writeState?.writable === false;
 
   const [messages, setMessages] = useState([]);
   const [text,     setText]     = useState('');
@@ -265,6 +266,7 @@ export default function ChatScreen({ route, navigation }) {
 
   // ─── Envoi optimiste (texte et/ou pièce jointe) ───
   const sendMessage = useCallback(async () => {
+    if (isReadOnly) return;
     const content = text.trim();
     if (!content && !selectedFile) return;
 
@@ -312,12 +314,13 @@ export default function ChatScreen({ route, navigation }) {
         prev.map(m => m._id === tempMsg._id ? { ...m, error: true } : m)
       );
     }
-  }, [text, selectedFile, user, conversation?._id, contact]);
+  }, [text, selectedFile, user, conversation?._id, contact, isReadOnly]);
 
   const onTyping = useCallback((val) => {
+    if (isReadOnly) return;
     setText(val);
     getSocket()?.emit('typing', { conversationId: conversation._id, userId: user._id });
-  }, [conversation?._id, user._id]);
+  }, [conversation?._id, user._id, isReadOnly]);
 
   // ─── Sélection de pièces jointes ───
   const pickImage = useCallback(async () => {
@@ -499,6 +502,11 @@ export default function ChatScreen({ route, navigation }) {
           </View>
         )}
 
+        {isReadOnly && (
+          <Text style={{ color: '#92400E', backgroundColor: '#FFFBEB', padding: 10, textAlign: 'center' }}>
+            Conversation en lecture seule — Altitude Vision doit autoriser la reprise des échanges.
+          </Text>
+        )}
         <View style={styles.inputBar}>
           <TouchableOpacity
             style={styles.plusBtn}
@@ -506,6 +514,7 @@ export default function ChatScreen({ route, navigation }) {
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Joindre un fichier"
+            disabled={isReadOnly}
           >
             <Ionicons name="add" size={22} color={c.gold} />
           </TouchableOpacity>
@@ -521,6 +530,7 @@ export default function ChatScreen({ route, navigation }) {
             multiline
             maxLength={1000}
             accessibilityLabel="Écrire un message"
+            editable={!isReadOnly}
           />
 
           <TouchableOpacity
@@ -536,7 +546,7 @@ export default function ChatScreen({ route, navigation }) {
           <TouchableOpacity
             style={[styles.sendBtn, (!text.trim() && !selectedFile) && styles.sendBtnDisabled]}
             onPress={sendMessage}
-            disabled={!text.trim() && !selectedFile}
+            disabled={isReadOnly || (!text.trim() && !selectedFile)}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Envoyer le message"

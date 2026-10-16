@@ -11,6 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Button, Card, Checkbox } from '../../components';
+import MarketingConsentFields from '../../components/MarketingConsentFields';
+import { EMPTY_MARKETING_CONSENT } from '../../constants/marketingConsent';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 import {
   configureGoogleSignIn,
@@ -218,6 +220,8 @@ export default function RegisterScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [erreur, setErreur]   = useState('');
   const [contratOpen, setContratOpen] = useState(false);
+  // MARKETING-CONSENT-1 — cases facultatives, jamais précochées.
+  const [marketingConsent, setMarketingConsent] = useState(EMPTY_MARKETING_CONSENT);
 
   const emailRef    = useRef(null);
   const passRef     = useRef(null);
@@ -260,11 +264,6 @@ export default function RegisterScreen({ navigation }) {
     setStep(s => Math.max(1, s - 1));
   }, []);
 
-  const handleStep2Next = useCallback(() => {
-    setErreur('');
-    if (isProprietaire) { setStep(3); } else { handleRegister(); }
-  }, [isProprietaire]);
-
   const handleRegister = useCallback(async () => {
     if (isProprietaire && !allCertsChecked) {
       setErreur('Cochez tous les engagements pour continuer');
@@ -273,7 +272,7 @@ export default function RegisterScreen({ navigation }) {
     setLoading(true);
     setErreur('');
     try {
-      const base = { name: name.trim(), email: email.trim().toLowerCase(), password, passwordConfirm, role };
+      const base = { name: name.trim(), email: email.trim().toLowerCase(), password, passwordConfirm, role, marketingConsent };
       await register(isProprietaire ? { ...base, ...certs } : base);
       setStep(4); // écran de confirmation
     } catch (err) {
@@ -281,7 +280,16 @@ export default function RegisterScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [isProprietaire, allCertsChecked, name, email, password, passwordConfirm, role, certs, register]);
+  }, [isProprietaire, allCertsChecked, name, email, password, passwordConfirm, role, certs, marketingConsent, register]);
+
+  // Déclaré APRÈS handleRegister et dépendant de lui : auparavant mémorisé
+  // avec [isProprietaire] seul, il appelait le handleRegister du premier
+  // rendu (nom/e-mail/mot de passe vides) — l'inscription e-mail d'un
+  // Client échouait côté serveur avec « Champs manquants ».
+  const handleStep2Next = useCallback(() => {
+    setErreur('');
+    if (isProprietaire) { setStep(3); } else { handleRegister(); }
+  }, [isProprietaire, handleRegister]);
 
   // ─── Stepper ─────────────────────────────────────────────────────
   const renderStepper = () => {
@@ -515,6 +523,8 @@ export default function RegisterScreen({ navigation }) {
                     );
                   })}
                 </View>
+
+                <MarketingConsentFields value={marketingConsent} onChange={setMarketingConsent} disabled={loading} />
 
                 {erreur ? (
                   <Animated.View entering={FadeInDown.duration(250)} style={styles.errorWrap}>

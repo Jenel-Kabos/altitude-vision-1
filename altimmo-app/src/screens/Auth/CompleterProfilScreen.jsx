@@ -9,6 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Button, Checkbox } from '../../components';
+import MarketingConsentFields from '../../components/MarketingConsentFields';
+import { EMPTY_MARKETING_CONSENT } from '../../constants/marketingConsent';
 import PageHeader from '../../components/PageHeader';
 import { fonts, fontSize, spacing, radius } from '../../theme';
 import api from '../../services/api';
@@ -82,6 +84,9 @@ export default function CompleterProfilScreen() {
   });
   const [loading, setLoading] = useState(false);
   const [erreur, setErreur]   = useState('');
+  // MARKETING-CONSENT-1 — l'inscription Google n'emporte aucun consentement :
+  // il n'est donné que par ces cases facultatives, jamais précochées.
+  const [marketingConsent, setMarketingConsent] = useState(EMPTY_MARKETING_CONSENT);
 
   const nomRef = useRef(null);
   const telRef = useRef(null);
@@ -125,6 +130,7 @@ export default function CompleterProfilScreen() {
         telephone: telClean,
         role,
         ...(isProprietaire && { certifications: certs }),
+        marketingConsent,
       });
 
       const updatedUser = res.data?.data?.user;
@@ -136,7 +142,7 @@ export default function CompleterProfilScreen() {
     } finally {
       setLoading(false);
     }
-  }, [isProprietaire, allCertsChecked, prenom, nom, telClean, role, certs, markProfileCompleted]);
+  }, [isProprietaire, allCertsChecked, prenom, nom, telClean, role, certs, marketingConsent, markProfileCompleted]);
 
   const goNext = useCallback(() => {
     if (!validateStep1()) return;
@@ -215,6 +221,8 @@ export default function CompleterProfilScreen() {
                     );
                   })}
                 </View>
+
+                <MarketingConsentFields value={marketingConsent} onChange={setMarketingConsent} disabled={loading} />
 
                 {erreur ? (
                   <Animated.View entering={FadeInDown.duration(250)} style={styles.errorWrap}>

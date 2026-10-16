@@ -437,10 +437,6 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       Alert.alert('Créneau invalide', 'Choisissez une date et une heure dans le futur.');
       return;
     }
-    if (!rdvTelephone.trim() || !rdvConsent) {
-      Alert.alert('Champs requis', "Renseignez le téléphone et confirmez votre accord de contact.");
-      return;
-    }
     try {
       rdvSubmittingRef.current = true;
       setRdvLoading(true);
@@ -448,7 +444,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
       const heureLabel = formatTimeHHmm(rdvHeure);
       const convRes = await api.post('/conversations/start', {
         propertyId: annonce?._id,
-        message: `Demande de visite le ${dateLabel} à ${heureLabel}. Tél: ${rdvTelephone}${rdvMessage ? '. ' + rdvMessage : ''}`,
+        message: `Demande de visite le ${dateLabel} à ${heureLabel}${rdvMessage ? `. ${rdvMessage}` : ''}`,
       });
       const conversation = extractConversation(convRes);
       await api.post('/visites', buildVisitPayload({
@@ -1293,7 +1289,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                 </View>
                 <Text style={styles.rdvSuccessTitle}>Demande envoyée !</Text>
                 <Text style={styles.rdvSuccessDesc}>
-                  Notre équipe vous contactera au {rdvTelephone} pour confirmer votre rendez-vous.
+                  Notre équipe coordonnera avec vous la confirmation du rendez-vous dans Altimmo.
                 </Text>
 
                 <View style={styles.rdvRecap}>
@@ -1430,7 +1426,7 @@ export default function DetailAnnonceScreen({ route, navigation }) {
                   )}
 
                   <Text style={styles.rdvFieldLabel}>
-                    Téléphone <Text style={{ color: c.gold }}>*</Text>
+                    Téléphone (optionnel, réservé à Altitude Vision)
                   </Text>
                   <TextInput
                     style={styles.rdvInput}

@@ -402,6 +402,13 @@ export default function ProfilScreen({ navigation, route }) {
               onPress={() => navigation.navigate('ChangePassword')}
               styles={styles} c={c}
             />
+            <View style={styles.menuSep} />
+            <MenuRow
+              icon="megaphone-outline"
+              label="Communications et offres"
+              onPress={() => navigation.navigate('MarketingPreferences')}
+              styles={styles} c={c}
+            />
           </View>
         </Animated.View>
 
