@@ -160,6 +160,35 @@ them; sprint reports are historical, this file is current.
   must commit atomically with its ledger entries. No transaction spans user
   interactions. Hotel invoices are payable only when issued, in XAF; surplus
   confirmed funds may remain unallocated, but allocation cannot exceed balance.
+- F-U2.11 — narrow exception: a rental *tracking obligation* (draft
+  `FinancialDocument`, `metadata.trackingObligation = true`, owner without
+  organization or mandate, no legal issuer) may receive allocations of payments
+  confirmed by the owner. It can never be issued, cancelled once allocated, or
+  have its lines replaced. Every other document must be issued before allocation.
+- F-U2.11 — exactly one rental penalty engine is active (`RENT_PENALTY_ENGINE`:
+  LEGACY default, CANONICAL, anything else = none); per-due-date guards forbid
+  a second penalty from the other engine.
+- F-U2.12 — rent payment imputation has a single source
+  (`rentImputationService`): explicit payment instruction > lease clause
+  (`ordreImputation`) > rent before charges, in confirmation order. Late
+  penalty, autonomous 1 % and delegated 10 % commission bases all use it and
+  never include charges or penalties.
+- F-U2.12 — an owner-declared direct receipt (`DirectRentReceipt`) counts for
+  rent tracking immediately but enters the 1 % base only after independent
+  confirmation (tenant, or PLATFORM review); the owner never confirms their own.
+- F-U2.13 — every rent period is governed by the lease's own versioned
+  contractual policy (`LeaseContractualPolicy`), resolved from the management
+  mode covering the period start (never from account type, role, organization,
+  `tenant:null`, a global default or the active engine). Altitude Vision
+  recovery terms (`ALTITUDE_DELEGATED`) apply only to leases delegated to
+  Altitude Vision (PLATFORM mandatary) and only after the tenant's explicit,
+  prior, authenticated acceptance (`LeasePolicyConsent`, immutable). Autonomous
+  terms (`OWNER_AUTONOMOUS`) are never pre-filled. No resolved policy →
+  `POLICY_UNRESOLVED`: rent tracking only — no due date, penalty, formal notice
+  or prorata is presumed, by either penalty engine. Policies are never
+  retroactive. Owner-declared direct receipts are `pending` payments that
+  settle nothing until independently confirmed. The 1 % / 10 % regime follows
+  the rent period (`delegatedCoverageAt`), never the current mode.
 
 ## 12. Canonical authorization architecture patterns (ARCH-AUTH-03)
 

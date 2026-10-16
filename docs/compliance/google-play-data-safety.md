@@ -7,6 +7,13 @@ Version auditée : `1.0.1` (`versionCode: 2`), Expo `~57.0.25`, React Native `0.
 
 Date de l'audit : 2026-09-28. Commit HEAD : `1f5c74f`.
 
+> **Mise à jour 2026-10-10 (MARKETING-CONSENT-1)** — le CRM Altitude Vision
+> envoie des campagnes marketing aux utilisateurs d'Altimmo, désormais
+> uniquement avec consentement explicite par canal. Les finalités
+> « Publicité ou marketing », l'« Adresse » (adresse professionnelle du
+> dossier d'activation) et les règles de suppression décrites ici sont
+> **remplacées** par `docs/compliance/marketing-consent-and-retention.md` §7.
+
 Ce document décrit **ce que fait le code** aujourd'hui. Il ne remplace pas la
 saisie humaine dans Play Console mais fournit la classification recommandée,
 la preuve dans le code, et le niveau de confiance.
