@@ -18,7 +18,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Contrat = require('../models/Contrat');
@@ -59,7 +59,7 @@ const makeProperty = (owner, tenant) => Property.create({
 async function operatorWith(capabilities) {
   const op = await makeUser({ role: 'Admin' });
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: op._id, actor: granter, reason: 'MRCB fixture', capabilities });
+  await provisionPrivilegedOperator({ userId: op._id, actor: granter, reason: 'MRCB fixture', capabilities });
   return op;
 }
 

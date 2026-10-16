@@ -178,3 +178,45 @@ exports.requestLink = async (req, res) => {
     fail(res, error.statusCode || 500, error.message);
   }
 };
+
+// F-U2.10 — Échéances de loyer (noyau financier) et signalement d'une
+// difficulté de paiement. Date de déclaration fixée par le serveur : aucun
+// champ de date de déclaration n'est lu du client.
+const rentCollection = require('../services/finance/billing/rentCollectionService');
+
+exports.getRentDues = async (req, res, next) => {
+  try { res.json({ status: 'success', data: await rentCollection.tenantRentDues({ userId: req.user.id }) }); } catch (error) { next(error); }
+};
+
+exports.reportPaymentDifficulty = async (req, res, next) => {
+  try {
+    const report = await rentCollection.reportPaymentDifficulty({ userId: req.user.id, documentId: req.params.documentId, reason: req.body?.reason, proposedPaymentDate: req.body?.proposedPaymentDate });
+    res.status(201).json({ status: 'success', data: { report } });
+  } catch (error) { next(error); }
+};
+
+// F-U2.12 — le locataire confirme ou conteste un loyer déclaré reçu par son bailleur.
+const directReceipts = require('../services/finance/billing/directRentReceiptService');
+exports.respondToDirectReceipt = async (req, res, next) => {
+  try {
+    const receipt = await directReceipts.tenantRespond({ userId: req.user.id, receiptId: req.params.receiptId, decision: req.body?.decision, reason: req.body?.reason });
+    res.json({ status: 'success', data: { receipt: directReceipts.publicReceipt(receipt) } });
+  } catch (error) { next(error); }
+};
+
+// F-U2.13 — conditions du bail : consultation (présentation horodatée,
+// empreinte, jeton à usage unique) puis acceptation explicite. Aucune date ni
+// identité de signataire n'est lue du client.
+const leasePolicies = require('../services/finance/billing/leasePolicyService');
+exports.getLeasePolicies = async (req, res, next) => {
+  try { res.json({ status: 'success', data: { policies: await leasePolicies.tenantPolicies({ userId: req.user.id }) } }); } catch (error) { next(error); }
+};
+exports.presentLeasePolicy = async (req, res, next) => {
+  try { res.json({ status: 'success', data: await leasePolicies.presentPolicy({ userId: req.user.id, policyId: req.params.policyId }) }); } catch (error) { next(error); }
+};
+exports.acceptLeasePolicy = async (req, res, next) => {
+  try {
+    const consent = await leasePolicies.acceptPolicy({ userId: req.user.id, policyId: req.params.policyId, presentationToken: req.body?.presentationToken, documentHash: req.body?.documentHash, accept: req.body?.accept });
+    res.status(201).json({ status: 'success', data: { consent: { status: consent.status, acceptedAt: consent.acceptedAt, signatureStatus: consent.signatureStatus, policyVersion: consent.policyVersion } } });
+  } catch (error) { next(error); }
+};

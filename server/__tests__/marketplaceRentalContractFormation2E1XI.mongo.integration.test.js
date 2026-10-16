@@ -10,7 +10,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const RealEstateApplication = require('../models/RealEstateApplication');
@@ -64,7 +64,7 @@ async function scenario() {
 async function operatorWith(capabilities) {
   const op = await makeUser({ role: 'Admin' });
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: op._id, actor: granter, reason: 'MRCF fixture', capabilities });
+  await provisionPrivilegedOperator({ userId: op._id, actor: granter, reason: 'MRCF fixture', capabilities });
   return op;
 }
 
