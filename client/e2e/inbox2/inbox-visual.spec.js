@@ -12,11 +12,21 @@
 // non-régression par diff de pixels (aucune image de référence n'existe,
 // volontairement : la validation de ce sprint EST la première preuve).
 import { test, expect } from '@playwright/test';
+import { buildAppCss } from '../support/appCss';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 import esbuild from 'esbuild';
 import { FIXTURE_MESSAGES, HEIGHT_FIXTURE_MESSAGES } from './fixtures.js';
+
+// F-U2.15 — banc visuel monté par setContent (sans <meta viewport>) : le rendu
+// ne doit pas dépendre du projet Playwright. Sous l'émulation Pixel 5
+// (mobile-chromium : isMobile, DPR 2,75), Chromium appliquait un viewport de
+// mise en page de 980 px et écrasait les captures de référence par une vue
+// desktop réduite. Contexte fixé ici (DPR 1, sans émulation mobile/tactile),
+// identique à celui des références ; les formats desktop/mobile restent fixés
+// par setViewportSize dans chaque test, exécuté dans les deux projets.
+test.use({ isMobile: false, hasTouch: false, deviceScaleFactor: 1 });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_ROOT = path.join(__dirname, '..', '..');
@@ -94,11 +104,10 @@ test.beforeAll(async () => {
   });
   BUNDLE = result.outputFiles[0].text;
 
-  const cssDir = path.join(CLIENT_ROOT, '.next/static/css');
-  PROD_CSS = fs.readdirSync(cssDir)
-    .filter((f) => f.endsWith('.css'))
-    .map((f) => fs.readFileSync(path.join(cssDir, f), 'utf8'))
-    .join('\n');
+  // F-U2.14 — CSS applicatif compilé avec la configuration réelle du projet
+  // (mêmes sources et règles que le build de production), indépendamment du
+  // dossier `.next` que le serveur E2E (`next dev`) réécrit.
+  PROD_CSS = await buildAppCss(CLIENT_ROOT);
 });
 
 async function mountInbox(page, { heightFixtures = false } = {}) {

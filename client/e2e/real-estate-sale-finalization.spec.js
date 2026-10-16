@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import { expect, test } from './external-network.fixture';
+import { selectAdministeredTenant } from './support/platformContext';
+import { E2E_TENANT_ID, loginThroughUi } from './support/auth';
 
 const API = 'http://localhost:5000/api';
 const client = { email: 'client-e2e@example.test', password: 'E2eClient!2026' };
@@ -7,18 +9,13 @@ const admin = { email: 'owner-e2e@example.test', password: 'E2eOwner!2026' };
 
 test.setTimeout(240000);
 
-async function login(page, credentials) {
-  await page.goto('/login');
-  await page.locator('#email').fill(credentials.email);
-  await page.locator('#password').fill(credentials.password);
-  await page.getByRole('button', { name: /se connecter/i }).click();
-  await expect(page).not.toHaveURL(/\/login/);
-  const consent = page.getByRole('button', { name: 'Tout accepter', exact: true });
-  if (await consent.isVisible().catch(() => false)) await consent.click();
-  return page.evaluate(() => localStorage.getItem('token'));
-}
+// F-U2.14 : connexion robuste partagée (attend l'hydratation et la réponse de l'API).
+const login = loginThroughUi;
 
 const authHeaders = (token) => ({ Authorization: `Bearer ${token}` });
+// F-U2.14 : l'opérateur agit dans l'organisation sélectionnée dans l'interface
+// (dossiers, transaction, paiement, finalisation) — mêmes en-têtes que le client web.
+const operatorHeaders = (token) => ({ ...authHeaders(token), 'X-Platform-Tenant-Id': E2E_TENANT_ID });
 
 test('vente : offre, paiement signé, finalisation et rejeux idempotents', async ({ page, request }, testInfo) => {
   const mobile = testInfo.project.name === 'mobile-chromium';
@@ -37,6 +34,9 @@ test('vente : offre, paiement signé, finalisation et rejeux idempotents', async
   await page.evaluate(() => { localStorage.clear(); });
   const adminToken = await login(page, admin);
   await page.goto('/dashboard/dossiers-immobiliers');
+  // F-U2.14 : l'administrateur est un opérateur plateforme ; il traite les
+  // dossiers dans le contexte de l'organisation, comme en production.
+  await selectAdministeredTenant(page, 'Tenant E2E');
   const row = page.getByRole('row').filter({ hasText: title });
   await row.getByRole('button', { name: 'Consulter' }).click();
   page.once('dialog', (dialog) => dialog.accept());
@@ -50,7 +50,7 @@ test('vente : offre, paiement signé, finalisation et rejeux idempotents', async
   const reservationId = acceptedJson.data.reservation._id;
 
   const transactionResponse = await request.post(`${API}/transactions`, {
-    headers: authHeaders(adminToken),
+    headers: operatorHeaders(adminToken),
     data: { propertyId, clientId: '66e200000000000000000002', reservationId, finalAmount: 120000000, transactionType: 'vente' },
   });
   expect(transactionResponse.status()).toBe(201);
@@ -65,11 +65,20 @@ test('vente : offre, paiement signé, finalisation et rejeux idempotents', async
   // findOne applicatif voit déjà le paiement "En attente" de l'autre
   // requête, 409 si les deux passent ce contrôle et se percutent sur
   // l'index unique en base — jamais un deuxième succès (200).
-  const paymentStatuses = [paymentA.status(), paymentB.status()].sort((a, b) => a - b);
-  expect(paymentStatuses[0]).toBe(200);
-  expect([400, 409]).toContain(paymentStatuses[1]);
+  // F-U2.14 : troisième issue légitime depuis la clé métier idempotente
+  // (`yabetooBusinessKey`) : 202 PAYMENT_ALREADY_INITIATED / RECONCILIATION_REQUIRED
+  // quand le perdant retrouve l'initiation du gagnant — aucun nouvel intent.
+  expect([paymentA.status(), paymentB.status()].filter((status) => status === 200)).toHaveLength(1);
   const successfulPayment = paymentA.status() === 200 ? paymentA : paymentB;
+  const losingPayment = successfulPayment === paymentA ? paymentB : paymentA;
+  expect([400, 409, 202]).toContain(losingPayment.status());
   const intentId = (await successfulPayment.json()).data.intentId;
+  if (losingPayment.status() === 202) {
+    const replay = await losingPayment.json();
+    expect(['PAYMENT_ALREADY_INITIATED', 'PAYMENT_RECONCILIATION_REQUIRED']).toContain(replay.code);
+    // Jamais un second intent : au plus l'intent du gagnant (null s'il n'est pas encore enregistré).
+    expect([null, intentId]).toContain(replay.data.intentId);
+  }
 
   // `id` doit être unique par intent : desktop et mobile-chromium partagent
   // le même serveur E2E dans une seule exécution Playwright, donc une
@@ -96,23 +105,23 @@ test('vente : offre, paiement signé, finalisation et rejeux idempotents', async
   expect(finalizedJson.data.idempotent).toBe(false);
   const invoiceId = finalizedJson.data.invoice._id;
 
-  const replayFinalization = await request.post(`${API}/transactions/${transactionId}/finalize`, { headers: authHeaders(adminToken), data: {} });
+  const replayFinalization = await request.post(`${API}/transactions/${transactionId}/finalize`, { headers: operatorHeaders(adminToken), data: {} });
   expect(replayFinalization.status()).toBe(200);
   const replayFinalizationJson = await replayFinalization.json();
   expect(replayFinalizationJson.data.idempotent).toBe(true);
   expect(replayFinalizationJson.data.invoice._id).toBe(invoiceId);
 
-  const transactionCheck = await request.get(`${API}/transactions/${transactionId}`, { headers: authHeaders(adminToken) });
+  const transactionCheck = await request.get(`${API}/transactions/${transactionId}`, { headers: operatorHeaders(adminToken) });
   const transaction = (await transactionCheck.json()).data.transaction;
   expect(transaction.status).toBe('Réussie');
   expect(transaction.paymentStatus).toBe('confirmé');
   expect(transaction.linkedInvoice).toBe(invoiceId);
   expect(transaction.finalization.attemptCount).toBe(1);
 
-  const reservationCheck = await request.get(`${API}/real-estate-applications/reservations/${reservationId}`, { headers: authHeaders(adminToken) });
+  const reservationCheck = await request.get(`${API}/real-estate-applications/reservations/${reservationId}`, { headers: operatorHeaders(adminToken) });
   expect((await reservationCheck.json()).data.reservation.status).toBe('converted');
 
-  const propertyCheck = await request.get(`${API}/properties/${propertyId}`, { headers: authHeaders(adminToken) });
+  const propertyCheck = await request.get(`${API}/properties/${propertyId}`, { headers: operatorHeaders(adminToken) });
   const propertyPayload = await propertyCheck.json();
   const property = propertyPayload.data?.property || propertyPayload.property;
   expect(property.availability).toBe('Vendu');

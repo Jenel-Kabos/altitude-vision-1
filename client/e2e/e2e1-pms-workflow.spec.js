@@ -1,4 +1,5 @@
 import { test, expect } from './external-network.fixture';
+import { selectAdministeredTenant } from './support/platformContext';
 
 // E2E-1 — certification navigateur du workflow PMS hôtelier complet.
 // Réutilise strictement les fixtures DASH-4 (Owner A = rentalOnboardingOwner,
@@ -17,6 +18,11 @@ const HOUSE_C = '66e200000000000000000055';
 const FOREIGN_HOTEL = '66e200000000000000000011'; // géré par ADMIN, jamais par Owner A — cross-owner réel
 const ROOM_CATEGORY_A = '66e200000000000000000060';
 const RATE_PLAN_A = '66e200000000000000000064';
+
+// F-U2.14 — desktop et mobile partagent le même serveur E2E : chaque projet
+// dispose de ses propres chambres (A1–A5 desktop, M1–M5 mobile, seed E2E),
+// sinon la passe mobile retrouve les chambres occupées par la passe desktop.
+const room = (label) => (test.info().project.name === 'mobile-chromium' ? label.replace(/^A/, 'M') : label);
 
 function isoDate(daysFromNow) {
   const d = new Date();
@@ -163,7 +169,7 @@ test.describe('E2E-1 — PMS nominal (bout en bout navigateur)', () => {
     });
 
     await confirmReservation(page);
-    await checkInReservation(page, 'A1');
+    await checkInReservation(page, room('A1'));
 
     const financialPanel = page.getByTestId('hotel-financial-document');
     await expect(financialPanel).toBeVisible();
@@ -178,7 +184,7 @@ test.describe('E2E-1 — PMS nominal (bout en bout navigateur)', () => {
       guestFirstName: 'Grace', guestLastName: 'NominalA2', guestEmail: `grace-nominal-a2-${Date.now()}@example.test`,
     });
     await confirmReservation(page);
-    await checkInReservation(page, 'A2');
+    await checkInReservation(page, room('A2'));
     await expect(page.getByTestId('hotel-financial-document')).toBeVisible();
   });
 });
@@ -192,7 +198,7 @@ test.describe('E2E-1 — cycle financier complet et check-out nominal (deux acte
       guestFirstName: 'Marie', guestLastName: 'CycleComplet', guestEmail: `marie-cycle-${Date.now()}@example.test`,
     });
     await confirmReservation(page);
-    await checkInReservation(page, 'A3');
+    await checkInReservation(page, room('A3'));
 
     // Le propriétaire ne peut PAS finaliser/émettre/encaisser (canManage=false
     // par conception, DASH-3) : la suite du cycle financier passe réellement
@@ -201,7 +207,10 @@ test.describe('E2E-1 — cycle financier complet et check-out nominal (deux acte
     const adminContext = await browser.newContext();
     const adminPage = await adminContext.newPage();
     await loginAdmin(adminPage);
+    // F-U2.14 : l'Admin E2E est un opérateur plateforme ; l'autorité financière
+    // tenant s'exerce dans l'organisation sélectionnée (INVARIANTS, PATH B).
     await adminPage.goto('/dashboard/hotel-reservations');
+    await selectAdministeredTenant(adminPage, 'Tenant E2E');
     await fillSearchAndSettle(adminPage, reference);
     await expandAdminReservationRow(adminPage, reference);
 
@@ -259,7 +268,7 @@ test.describe('E2E-1 — cycle financier complet et check-out nominal (deux acte
     // Housekeeping/inspection restent accessibles au Owner (DASH-3) : retour
     // sur le contexte propriétaire pour la fin du cycle.
     await page.goto(`/mes-hotels/${HOTEL_A}/housekeeping`);
-    const taskRow = page.locator('tr', { hasText: 'A3' });
+    const taskRow = page.locator('tr', { hasText: room('A3') });
     await expect(taskRow).toBeVisible();
     await taskRow.getByRole('button', { name: 'Démarrer' }).click();
     await expect(taskRow.getByRole('button', { name: 'Terminer' })).toBeVisible();
@@ -282,7 +291,7 @@ test.describe('E2E-1 — cycle financier complet et check-out nominal (deux acte
     });
     await confirmReservation(page);
     const verifySelect = await openRoomAssignmentPanel(page);
-    await expect(verifySelect).toContainText('A3');
+    await expect(verifySelect).toContainText(room('A3'));
   });
 });
 
@@ -295,7 +304,7 @@ test.describe('E2E-1 — checkout bloqué (financier)', () => {
       guestFirstName: 'Paul', guestLastName: 'Bloque', guestEmail: `paul-bloque-${Date.now()}@example.test`,
     });
     await confirmReservation(page);
-    await checkInReservation(page, 'A4');
+    await checkInReservation(page, room('A4'));
 
     const readiness = page.getByTestId('checkout-financial-readiness');
     await expect(readiness).toContainText('Check-out bloqué');
@@ -314,7 +323,7 @@ test.describe('E2E-1 — inspection échouée', () => {
       guestFirstName: 'Chloe', guestLastName: 'InspectionFail', guestEmail: `chloe-inspection-fail-${Date.now()}@example.test`,
     });
     await confirmReservation(page);
-    await checkInReservation(page, 'A5');
+    await checkInReservation(page, room('A5'));
 
     // Check-out via l'Admin (dérogation) pour atteindre l'étape housekeeping
     // sans re-décrire tout le cycle financier déjà prouvé ci-dessus (mission
@@ -323,7 +332,10 @@ test.describe('E2E-1 — inspection échouée', () => {
     const adminContext = await browser.newContext();
     const adminPage = await adminContext.newPage();
     await loginAdmin(adminPage);
+    // F-U2.14 : l'Admin E2E est un opérateur plateforme ; l'autorité financière
+    // tenant s'exerce dans l'organisation sélectionnée (INVARIANTS, PATH B).
     await adminPage.goto('/dashboard/hotel-reservations');
+    await selectAdministeredTenant(adminPage, 'Tenant E2E');
     await fillSearchAndSettle(adminPage, reference);
     await expandAdminReservationRow(adminPage, reference);
     // La dérogation admin déclenche DEUX dialogues natifs séquentiels
@@ -337,7 +349,7 @@ test.describe('E2E-1 — inspection échouée', () => {
     await adminContext.close();
 
     await page.goto(`/mes-hotels/${HOTEL_A}/housekeeping`);
-    const taskRow = page.locator('tr', { hasText: 'A5' });
+    const taskRow = page.locator('tr', { hasText: room('A5') });
     await taskRow.getByRole('button', { name: 'Démarrer' }).click();
     await taskRow.getByRole('button', { name: 'Terminer' }).click();
     await taskRow.getByRole('button', { name: 'Inspecter' }).click();
@@ -358,7 +370,7 @@ test.describe('E2E-1 — inspection échouée', () => {
     });
     await confirmReservation(page);
     const verifySelect = await openRoomAssignmentPanel(page);
-    await expect(verifySelect).not.toContainText('A5');
+    await expect(verifySelect).not.toContainText(room('A5'));
   });
 });
 
@@ -381,12 +393,23 @@ test.describe('E2E-1 — switch établissement propre', () => {
 test.describe('E2E-1 — cross-owner réel', () => {
   test('Owner A force l’URL d’un hôtel appartenant à un autre propriétaire → 403 réseau, aucune donnée visible', async ({ page }) => {
     await loginOwner(page);
-    const foreignResponse = page.waitForResponse((res) => res.url().includes(`/hotels/${FOREIGN_HOTEL}`) || res.url().includes(`/hotel-analytics/${FOREIGN_HOTEL}`) || res.url().includes(`hotelId=${FOREIGN_HOTEL}`));
+    // F-U2.15 : seules les réponses de l'API (port 5000) portent des données ; en
+    // build de production, Next précharge aussi des routes de page (RSC, 200,
+    // sans données) dont l'URL contient l'identifiant — exclues du contrôle.
+    const isForeignApiResponse = (res) => res.url().startsWith('http://localhost:5000/api/')
+      && (res.url().includes(`/hotels/${FOREIGN_HOTEL}`) || res.url().includes(`/hotel-analytics/${FOREIGN_HOTEL}`) || res.url().includes(`hotelId=${FOREIGN_HOTEL}`));
+    const foreignResponse = page.waitForResponse(isForeignApiResponse);
+    const leakedForeignResponses = [];
+    page.on('response', (res) => { if (isForeignApiResponse(res) && res.status() < 400) leakedForeignResponses.push(`${res.status()} ${res.url()}`); });
     await page.goto(`/mes-hotels/${FOREIGN_HOTEL}`);
     const response = await foreignResponse;
-    expect(response.status()).toBe(403);
+    // F-U2.14 : INVARIANTS « fail-closed » — ressource hors périmètre = 404 ou 403 ;
+    // 404 quand l'hôtel est attribué à une organisation (pas de révélation d'existence).
+    expect([403, 404]).toContain(response.status());
     await expect(page.getByText(/Établissement introuvable|n’est pas disponible/i).first()).toBeVisible();
     await expect(page.getByText('Hôtel Portefeuille E2E', { exact: true })).toHaveCount(0);
+    // Aucune réponse d'API réussie pour l'hôtel étranger pendant toute la visite.
+    expect(leakedForeignResponses).toEqual([]);
   });
 });
 
@@ -406,6 +429,9 @@ test.describe('E2E-1 — deep-link direct', () => {
 test.describe('E2E-1 — notification contextualisée', () => {
   test('notification housekeeping ouvre directement le bon hôtel', async ({ page }) => {
     await loginOwner(page);
+    // F-U2.14 : compte multi-activité → sas /mon-espace-proprietaire sans chrome
+    // (3ca61dc) ; la cloche vit dans l'espace Exploitation (OwnerDashboard).
+    await page.goto('/mes-hotels');
     await page.getByRole('button', { name: /Notifications/ }).click();
     const scopedRequest = page.waitForRequest((request) => request.url().includes(`hotelId=${HOTEL_A}`));
     await page.getByText('Maintenance Hôtel Owner A', { exact: true }).click();

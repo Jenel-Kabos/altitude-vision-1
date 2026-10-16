@@ -11,6 +11,7 @@ client/node_modules/
 client/build/
 client/dist/
 client/.next/
+client/.next-e2e/
 client/.env
 client/.env.local
 client/playwright-report/

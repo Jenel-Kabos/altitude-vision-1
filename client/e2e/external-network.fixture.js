@@ -11,6 +11,11 @@ const isLocalUrl = (rawUrl) => {
 
 const test = base.extend({
   externalNetworkIsolation: [async ({ context }, use) => {
+    // F-U2.14 — visiteur ayant déjà exprimé son choix de cookies (refus des
+    // cookies analytiques, clé réelle de useCookieConsent) : la bannière
+    // compacte (refondue en 3ca61dc) ne recouvre plus les actions testées.
+    // Même convention que les specs hôtelières, généralisée.
+    await context.addInitScript(() => { try { localStorage.setItem('cookie_consent', 'refused'); } catch { /* stockage indisponible */ } });
     const blocked = [];
     await context.route('**/*', async (route) => {
       const url = route.request().url();

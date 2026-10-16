@@ -1,4 +1,6 @@
 import { expect, test } from './external-network.fixture';
+import { loginThroughUi } from './support/auth';
+import { selectAdministeredTenant } from './support/platformContext';
 
 // REG-GL-1.1 — Deux incompatibilités frontend/backend empêchaient toute
 // création de contrat manuelle depuis GestionLocativePage.jsx :
@@ -12,14 +14,10 @@ import { expect, test } from './external-network.fixture';
 const admin = { email: 'owner-e2e@example.test', password: 'E2eOwner!2026' };
 test.setTimeout(120000);
 
+// F-U2.14 : connexion partagée robuste ; l'administrateur E2E est un opérateur
+// plateforme qui administre la gestion locative DANS l'organisation sélectionnée.
 async function login(page) {
-  await page.goto('/login');
-  await page.locator('#email').fill(admin.email);
-  await page.locator('#password').fill(admin.password);
-  await page.getByRole('button', { name: /se connecter/i }).click();
-  await expect(page).not.toHaveURL(/\/login/);
-  const consent = page.getByRole('button', { name: 'Tout accepter', exact: true });
-  if (await consent.isVisible().catch(() => false)) await consent.click();
+  await loginThroughUi(page, admin);
 }
 
 // GL-ARCH-1.1/1.2 — flux complet Phase 12/13 : un bien propre n'apparaît
@@ -58,6 +56,7 @@ test('un bien propre historique ne peut plus être importé depuis un contrat', 
   // l'option/la cellule de contrat de l'autre projet qui n'ont pas de tiret).
   await login(page);
   await page.goto('/dashboard/gestion-locative');
+  await selectAdministeredTenant(page, 'Tenant E2E');
   await page.getByRole('button', { name: /nouveau contrat/i }).click();
 
   const proprietaireSelect = page.locator('label:text("Propriétaire")').locator('xpath=following-sibling::select');
@@ -77,6 +76,7 @@ test('création de contrat avec un bien du portefeuille Altimmo réussit et le c
 
   await login(page);
   await page.goto('/dashboard/gestion-locative');
+  await selectAdministeredTenant(page, 'Tenant E2E');
   await page.getByRole('button', { name: /nouveau contrat/i }).click();
 
   // GL-ARCH-1.2 — deux fiches "BienPropre*" existent désormais (desktop et

@@ -1,6 +1,10 @@
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
+const https = require("https");
+const fs = require("fs");
+const os = require("os");
+const { execFileSync } = require("child_process");
 const mongoose = require("mongoose");
 const { MongoMemoryReplSet } = require("mongodb-memory-server");
 const { safeTestEnv } = require("../test-utils/safeTestEnv");
@@ -59,11 +63,21 @@ const ids = {
   e2e1RoomA6: "66e200000000000000000070",
   e2e1RoomA7: "66e200000000000000000071",
   e2e1RoomA8: "66e200000000000000000072",
+  e2e1RoomM1: "66e2000000000000000000d0",
+  e2e1RoomM2: "66e2000000000000000000d1",
+  e2e1RoomM3: "66e2000000000000000000d2",
+  e2e1RoomM4: "66e2000000000000000000d3",
+  e2e1RoomM5: "66e2000000000000000000d4",
 };
 let mongo;
 let fakePaymentProvider;
+let fakePaymentProviderTls;
+let fakeProviderTlsDir;
 let shuttingDown = false;
 const children = [];
+// F-U2.15 — `production` (défaut : next build + next start) ou `dev` (next dev).
+const E2E_NEXT_MODE = process.env.E2E_NEXT_MODE === "dev" ? "dev" : "production";
+const E2E_API_URL = "http://localhost:5000/api";
 const E2E_IMAGE = 'http://127.0.0.1:5051/fixture.svg';
 const waitFor = (url, timeout = 120000) =>
   new Promise((resolve, reject) => {
@@ -141,9 +155,33 @@ async function seed(uri) {
     status: "active",
     createdBy: ids.owner,
   });
+  // F-U2.14 — modules d'organisation désormais conditionnés par l'abonnement
+  // (tenantModuleGate) : l'organisation E2E dispose d'un abonnement actif
+  // couvrant les modules qu'exercent les parcours (comme une organisation réelle).
+  const PlatformTenantSubscription = require("../models/PlatformTenantSubscription");
+  const { TENANT_FEATURE_MODULES } = require("../constants/platformTenantConstants");
+  await PlatformTenantSubscription.create({ tenant: ids.platformTenant, plan: "professionnel", status: "active", modulesIncluded: [...TENANT_FEATURE_MODULES], startDate: new Date("2026-01-01T00:00:00Z"), createdBy: ids.owner });
+  // F-U2.14 — depuis le découpage des domaines de contrat (59d5c26), les
+  // mutations commerciales plateforme (contrats, transactions…) exigent un
+  // PlatformOperator actif : un rôle global « Admin » ne confère plus aucun
+  // privilège plateforme (INVARIANTS : no global-role fallback). L'administrateur
+  // E2E reçoit donc, comme en production, le jeu de capacités de la Vue
+  // plateforme (sans impersonation ni réponse support, accordées à part).
+  const PlatformOperator = require("../models/PlatformOperator");
+  const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require("../constants/platformOperatorConstants");
+  await PlatformOperator.create({
+    user: ids.owner, status: "active", capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES],
+    grantedBy: ids.owner, grantReason: "Administrateur plateforme E2E (données fictives de recette)",
+  });
   await OrgMembership.create([
-    { user: ids.owner, orgUnit: ids.orgRoot, roleInUnit: "owner", status: "active", grantedBy: ids.owner },
-    { user: ids.rentalOnboardingOwner, orgUnit: ids.orgRoot, roleInUnit: "member", status: "active", grantedBy: ids.owner },
+    // F-U2.14 — rôle métier explicite (introduit après ce seed) : le propriétaire
+    // de l'organisation en est l'administrateur, comme en production.
+    { user: ids.owner, orgUnit: ids.orgRoot, roleInUnit: "owner", businessRole: "Admin", status: "active", grantedBy: ids.owner },
+    // F-U2.14 — capacités financières tenant dérivées du rôle métier (e7c8e6c :
+    // Hotel.manager n'est qu'une relation). Gestionnaire d'établissement en
+    // LECTURE financière seule (payment.status) : il consulte document et état
+    // de check-out ; facturation/encaissement restent à l'Admin (scénario E2E-1).
+    { user: ids.rentalOnboardingOwner, orgUnit: ids.orgRoot, roleInUnit: "member", businessRole: "GestionnaireImmobilier", status: "active", grantedBy: ids.owner },
   ]);
   await Property.create([
     {
@@ -166,6 +204,8 @@ async function seed(uri) {
       isPublished: true,
       availability: "Disponible",
       owner: ids.owner,
+      // F-U2.14 — bien support de l’hébergement de l’organisation E2E (C2.10A).
+      tenant: ids.platformTenant,
     },
     {
       _id: ids.hotelProperty,
@@ -240,6 +280,8 @@ async function seed(uri) {
       isPublished: true,
       availability: "Disponible",
       owner: ids.owner,
+      // F-U2.14 — bien du portefeuille de l'organisation E2E (C2.10A).
+      tenant: ids.platformTenant,
     },
     {
       _id: ids.contratFormPropertyMobile,
@@ -260,6 +302,8 @@ async function seed(uri) {
       isPublished: true,
       availability: "Disponible",
       owner: ids.owner,
+      // F-U2.14 — bien du portefeuille de l'organisation E2E (C2.10A).
+      tenant: ids.platformTenant,
     },
     {
       _id: ids.finalizationSaleProperty,
@@ -320,6 +364,9 @@ async function seed(uri) {
       isPublished: true,
       availability: "Disponible",
       owner: ids.owner,
+      // F-U2.14 — C2.10A : un bail ne se conclut que sur un bien DIRECTEMENT
+      // rattaché à l'organisation qui le gère (Property.tenant).
+      tenant: ids.platformTenant,
     },
     {
       _id: ids.rentalActivationPropertyMobile,
@@ -340,6 +387,9 @@ async function seed(uri) {
       isPublished: true,
       availability: "Disponible",
       owner: ids.owner,
+      // F-U2.14 — C2.10A : un bail ne se conclut que sur un bien DIRECTEMENT
+      // rattaché à l'organisation qui le gère (Property.tenant).
+      tenant: ids.platformTenant,
     },
     ...[
       [ids.rentalOnboardingProperty, "Bien privé Gestion E2E"],
@@ -351,11 +401,17 @@ async function seed(uri) {
       latitude: -4.27, longitude: 15.28, images: [E2E_IMAGE], surface: 65, bedrooms: 2, bathrooms: 1,
       statusAdmin: "En attente", isPublished: false, recommande: false, availability: "Disponible",
       owner: ids.rentalOnboardingOwner,
+      // F-U2.14 — bien géré par l'organisation E2E : rattachement direct (C2.10A).
+      tenant: ids.platformTenant,
     })),
   ]);
   await Accommodation.create({
     _id: ids.accommodation,
     property: ids.property,
+    // F-U2.14 — hébergement exploité par l'organisation E2E (C2.10A) : son
+    // pilotage (liste, réservations) relève du tenant sélectionné ; une
+    // ressource tenant:null n'est jamais visible d'un opérateur en contexte tenant.
+    tenant: ids.platformTenant,
     accommodationType: "villa_meublee",
     publicationStatus: "publie",
     active: true,
@@ -445,6 +501,13 @@ async function seed(uri) {
     { _id: ids.e2e1RoomA6, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A6", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
     { _id: ids.e2e1RoomA7, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A7", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
     { _id: ids.e2e1RoomA8, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "A8", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    // F-U2.14 — chambres dédiées au projet mobile-chromium : desktop et mobile
+    // partagent le même serveur E2E ; A1–A5 restent occupées après la passe desktop.
+    { _id: ids.e2e1RoomM1, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "M1", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomM2, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "M2", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomM3, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "M3", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomM4, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "M4", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
+    { _id: ids.e2e1RoomM5, hotel: ids.dash4HotelA, roomCategory: ids.e2e1RoomCategoryA, roomNumber: "M5", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
     { _id: ids.e2e1RoomB1, hotel: ids.dash4HotelB, roomCategory: ids.e2e1RoomCategoryB, roomNumber: "B1", status: "available", active: true, createdBy: ids.rentalOnboardingOwner },
   ]);
   await PaiementTransaction.syncIndexes();
@@ -477,10 +540,14 @@ async function seed(uri) {
   await Proprietaire.create({
     nom: "GestionE2E", prenom: "Propriétaire", telephone: "+242060000097",
     user: ids.rentalOnboardingOwner, biensPropres: [],
+    // F-U2.14 — fiches propriétaires saisies par l'organisation E2E : provenance
+    // explicite (tenantRentalPartyIds), comme toute fiche créée dans un tenant.
+    tenant: ids.platformTenant,
   });
   await Proprietaire.create({
     _id: ids.proprietaireBienPropre,
     nom: "PropriétaireE2E", prenom: "BienPropre", telephone: "+242060000099",
+    tenant: ids.platformTenant,
     biensPropres: [{
       typeBien: "location", titre: "Bien propre E2E", type: "Maison",
       adresse: "12 rue du bien propre", ville: "Brazzaville",
@@ -492,6 +559,7 @@ async function seed(uri) {
   await Proprietaire.create({
     _id: ids.proprietaireBienPropreMobile,
     nom: "PropriétaireE2E", prenom: "BienPropreMobile", telephone: "+242060000098",
+    tenant: ids.platformTenant,
     biensPropres: [{
       typeBien: "location", titre: "Bien propre E2E Mobile", type: "Maison",
       adresse: "13 rue du bien propre mobile", ville: "Brazzaville",
@@ -500,7 +568,23 @@ async function seed(uri) {
       photos: [E2E_IMAGE],
     }],
   });
+  await buildAllIndexes();
   await mongoose.disconnect();
+}
+// F-U2.15 — au démarrage, le serveur construit en arrière-plan (autoIndex) les
+// index de tous ses modèles : pendant ~10 à 27 s, toutes ses requêtes (même un
+// 404) sont ralenties, ce qui faisait expirer les premiers scénarios une fois
+// le front-end servi en production (instantané). Les index sont donc construits
+// ICI, avant le démarrage du serveur (dont les createIndex deviennent sans
+// effet) — base éphémère de test uniquement.
+async function buildAllIndexes() {
+  const modelsDir = path.join(serverDir, "models");
+  for (const file of fs.readdirSync(modelsDir)) {
+    if (file.endsWith(".js")) require(path.join(modelsDir, file));
+  }
+  const startedAt = Date.now();
+  for (const name of mongoose.modelNames()) await mongoose.model(name).init();
+  console.log(`E2E_INDEXES_READY models=${mongoose.modelNames().length} durationMs=${Date.now() - startedAt}`);
 }
 function start(command, args, cwd, env) {
   const guardPath = path.resolve(serverDir, 'test-utils/externalNetworkGuard.js');
@@ -514,9 +598,9 @@ function start(command, args, cwd, env) {
   children.push(child);
   return child;
 }
-function startFakePaymentProvider() {
+async function startFakePaymentProvider() {
   let sequence = 0;
-  fakePaymentProvider = http.createServer((req, res) => {
+  const handler = (req, res) => {
     const chunks = [];
     req.on('data', (chunk) => chunks.push(chunk));
     req.on('end', () => {
@@ -528,7 +612,9 @@ function startFakePaymentProvider() {
       res.setHeader('Content-Type', 'application/json');
       if (req.method === 'POST' && req.url === '/v1/payment-intents') {
         sequence += 1;
-        res.end(JSON.stringify({ id: `e2e-intent-${sequence}` }));
+        // F-U2.14 — contrat Yabetoo réel : l'intent renvoie `id` ET `client_secret`
+        // (exigés depuis 1a1eea5 pour confirmer le paiement Mobile Money).
+        res.end(JSON.stringify({ id: `e2e-intent-${sequence}`, client_secret: `e2e-secret-${sequence}` }));
         return;
       }
       if (req.method === 'POST' && /^\/v1\/payment-intents\/[^/]+\/confirm$/.test(req.url)) {
@@ -542,8 +628,21 @@ function startFakePaymentProvider() {
       res.statusCode = 404;
       res.end(JSON.stringify({ error: 'not_found' }));
     });
-  });
-  return new Promise((resolve) => fakePaymentProvider.listen(5051, '127.0.0.1', resolve));
+  };
+  // Images de fixture (navigateur) : HTTP 5051, inchangé.
+  fakePaymentProvider = http.createServer(handler);
+  // F-U2.14 — API de paiement factice servie en HTTPS (5052) : le service
+  // Yabetoo exige une URL https (contrôle de sécurité conservé). Certificat
+  // autosigné éphémère (SAN 127.0.0.1/localhost), approuvé UNIQUEMENT par le
+  // backend E2E via NODE_EXTRA_CA_CERTS.
+  fakeProviderTlsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'altitude-e2e-tls-'));
+  const keyPath = path.join(fakeProviderTlsDir, 'key.pem');
+  const certPath = path.join(fakeProviderTlsDir, 'cert.pem');
+  execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', keyPath, '-out', certPath, '-days', '1', '-subj', '/CN=127.0.0.1', '-addext', 'subjectAltName=IP:127.0.0.1,DNS:localhost'], { stdio: 'ignore' });
+  fakePaymentProviderTls = https.createServer({ key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }, handler);
+  await new Promise((resolve) => fakePaymentProvider.listen(5051, '127.0.0.1', resolve));
+  await new Promise((resolve) => fakePaymentProviderTls.listen(5052, '127.0.0.1', resolve));
+  return { certPath };
 }
 async function shutdown() {
   if (shuttingDown) return;
@@ -555,6 +654,8 @@ async function shutdown() {
   });
   await new Promise((resolve) => setTimeout(resolve, 300));
   if (fakePaymentProvider) await new Promise((resolve) => fakePaymentProvider.close(resolve));
+  if (fakePaymentProviderTls) await new Promise((resolve) => fakePaymentProviderTls.close(resolve));
+  if (fakeProviderTlsDir) fs.rmSync(fakeProviderTlsDir, { recursive: true, force: true });
   if (mongo) {
     try {
       await mongo.stop();
@@ -564,8 +665,28 @@ async function shutdown() {
   }
   process.exit();
 }
+// F-U2.15 — build de production isolé pour les E2E : NEXT_E2E_BUILD=1 impose la
+// sortie `.next-e2e` (jamais publiée par Netlify) et n'autorise le backend local
+// dans la CSP que pour ce build ; NEXT_PUBLIC_API_URL (inliné au build) pointe
+// sur l'API E2E locale. Le build n'exécute aucune logique applicative : il
+// tourne sans le garde réseau (téléchargement des polices next/font), avec les
+// identifiants externes neutralisés (safeTestEnv). `next start` reste gardé.
+function buildNextForE2E() {
+  const nextBin = path.join(clientDir, "node_modules/next/dist/bin/next");
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [nextBin, "build"], {
+      cwd: clientDir,
+      env: safeTestEnv(process.env, { NODE_ENV: "production", NEXT_E2E_BUILD: "1", NEXT_PUBLIC_API_URL: E2E_API_URL, TEST_EXTERNAL_NETWORK: "" }),
+      stdio: "inherit",
+      detached: true,
+    });
+    children.push(child);
+    child.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`next build (E2E) a échoué : code ${code}`))));
+  });
+}
 async function main() {
-  await startFakePaymentProvider();
+  if (E2E_NEXT_MODE !== "dev") await buildNextForE2E();
+  const { certPath: fakeProviderCertPath } = await startFakePaymentProvider();
   mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
   const uri = mongo.getUri("altitude_e2e");
   // UX-OWNER-4 — journalisé pour permettre à un script de fixture ponctuel
@@ -583,17 +704,22 @@ async function main() {
     JWT_SECRET: "e2e-jwt-secret-not-for-production",
     JWT_EXPIRES_IN: "1h",
     DISABLE_SCHEDULED_JOBS: "1",
-    YABETOO_API_URL: "http://127.0.0.1:5051/v1",
+    YABETOO_API_URL: "https://127.0.0.1:5052/v1",
+    NODE_EXTRA_CA_CERTS: fakeProviderCertPath,
     YABETOO_SECRET_KEY: "e2e-provider-secret",
     YABETOO_WEBHOOK_SECRET: "e2e-webhook-secret",
   });
-  await waitFor("http://localhost:5000/api/health");
-  start(
-    process.execPath,
-    [path.join(clientDir, "node_modules/next/dist/bin/next"), "dev", "--hostname", "localhost", "--port", "3000"],
-    clientDir,
-    { NEXT_PUBLIC_API_URL: "http://localhost:5000/api" },
-  );
+  // F-U2.15 — readiness (Mongo connecté), pas seulement liveness.
+  await waitFor("http://localhost:5000/api/ready");
+  const nextBin = path.join(clientDir, "node_modules/next/dist/bin/next");
+  if (E2E_NEXT_MODE === "dev") {
+    // Mode historique (débogage local) : compilation à la demande par `next dev`.
+    start(process.execPath, [nextBin, "dev", "--hostname", "localhost", "--port", "3000"], clientDir, { NEXT_PUBLIC_API_URL: E2E_API_URL });
+  } else {
+    // F-U2.15 — mode par défaut : build Next.js de PRODUCTION (fait en tête de
+    // main(), voir buildNextForE2E) servi par `next start`, sous le garde réseau.
+    start(process.execPath, [nextBin, "start", "--hostname", "localhost", "--port", "3000"], clientDir, { NODE_ENV: "production", NEXT_E2E_BUILD: "1", NEXT_PUBLIC_API_URL: E2E_API_URL });
+  }
   await waitFor("http://localhost:3000");
   console.log(`E2E_READY property=${ids.property}`);
   // Le processus lancé par Playwright est le propriétaire explicite de

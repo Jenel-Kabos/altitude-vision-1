@@ -32,6 +32,9 @@ test.describe('DASH-4 E2E — propriétaire multi-établissements et deep-links'
 
   test('notification synthétique ouvre directement la maintenance du bon hôtel', async ({ page }) => {
     await login(page);
+    // F-U2.14 : compte multi-activité → sas /mon-espace-proprietaire sans chrome
+    // (3ca61dc) ; la cloche vit dans l'espace Exploitation (OwnerDashboard).
+    await page.goto('/mes-hotels');
     await page.getByRole('button', { name: /Notifications/ }).click();
     const scopedRequest = page.waitForRequest((request) => request.url().includes(`/api/maintenance?hotelId=${HOTEL_A}`));
     await page.getByText('Maintenance Hôtel Owner A', { exact: true }).click();

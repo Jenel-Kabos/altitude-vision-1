@@ -9,7 +9,8 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # F-U2.15 : marge pour le `next build` de production intégré au webServer.
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -20,8 +21,11 @@ jobs:
           node-version: 20
 
       # webServer (voir client/playwright.config.js) spawn le back-end
-      # (MongoMemoryReplSet + Express) et le front-end (next dev) l'un depuis
-      # l'autre : les deux jeux de dépendances doivent être installés.
+      # (MongoMemoryReplSet + Express) et le front-end l'un depuis l'autre :
+      # les deux jeux de dépendances doivent être installés. F-U2.15 : le
+      # front-end est un build Next.js de PRODUCTION isolé (`next build` dans
+      # client/.next-e2e puis `next start`, voir server/scripts/
+      # start-accommodation-e2e.js) ; E2E_NEXT_MODE=dev rétablit `next dev`.
       - name: Install server dependencies
         working-directory: server
         run: npm ci

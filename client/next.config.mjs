@@ -3,6 +3,12 @@ import path from 'path';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 const isDev = process.env.NODE_ENV !== 'production';
+// F-U2.15 — build de production dédié aux E2E (banc Playwright local/CI) :
+// seul ce drapeau autorise le backend local dans la CSP, et il impose un
+// dossier de sortie distinct (`.next-e2e`) que Netlify (publish = ".next") ne
+// publie jamais. Sans le drapeau, la configuration est strictement inchangée.
+const isE2EBuild = process.env.NEXT_E2E_BUILD === '1';
+const allowLocalBackend = isDev || isE2EBuild;
 
 const CSP = [
   "default-src 'self'",
@@ -19,7 +25,7 @@ const CSP = [
   // API calls + Facebook feed data; blob: for fetch() responses; GA endpoints; Leaflet tile/geocoding requests; NextAuth Google OAuth
   // wss:// is required for the Socket.IO real-time connection (notifications, chat)
   // http://localhost:5000 / ws://localhost:5000 are added only outside production, to allow the local backend dev server
-  `connect-src 'self' blob: https://altitude-vision.onrender.com wss://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org https://accounts.google.com https://oauth2.googleapis.com https://api.cloudinary.com https://res.cloudinary.com${isDev ? ' http://localhost:5000 ws://localhost:5000' : ''}`,
+  `connect-src 'self' blob: https://altitude-vision.onrender.com wss://altitude-vision.onrender.com https://graph.facebook.com https://www.facebook.com https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://region1.google-analytics.com https://*.tile.openstreetmap.org https://nominatim.openstreetmap.org https://accounts.google.com https://oauth2.googleapis.com https://api.cloudinary.com https://res.cloudinary.com${allowLocalBackend ? ' http://localhost:5000 ws://localhost:5000' : ''}`,
   // Web Workers (e.g. PDF.js, comlink) require blob: worker source
   "worker-src 'self' blob:",
   // child-src covers blob: workers in older browsers that don't support worker-src
@@ -47,6 +53,7 @@ const SECURITY_HEADERS = [
 
 const nextConfig = {
   reactStrictMode: true,
+  ...(isE2EBuild ? { distDir: '.next-e2e' } : {}),
   outputFileTracingRoot: __dirname,
   images: {
     unoptimized: false,

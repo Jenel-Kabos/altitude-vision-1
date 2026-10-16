@@ -1,4 +1,6 @@
 import { expect, test } from './external-network.fixture';
+import { loginThroughUi } from './support/auth';
+import { selectAdministeredTenant } from './support/platformContext';
 
 // DOC-ARCH-1 — un seul Centre documentaire pour toute la plateforme.
 // Vérifie en conditions réelles de navigateur : (1) l'ancien lien
@@ -11,14 +13,15 @@ import { expect, test } from './external-network.fixture';
 const admin = { email: 'owner-e2e@example.test', password: 'E2eOwner!2026' };
 test.setTimeout(120000);
 
+// F-U2.14 : l'administrateur E2E est un opérateur plateforme ; le Centre
+// documentaire d'organisation s'administre dans le tenant sélectionné
+// (sélection persistée), sinon l'écran « Sélectionnez un tenant » s'affiche.
 async function login(page) {
-  await page.goto('/login');
-  await page.locator('#email').fill(admin.email);
-  await page.locator('#password').fill(admin.password);
-  await page.getByRole('button', { name: /se connecter/i }).click();
-  await expect(page).not.toHaveURL(/\/login/);
-  const consent = page.getByRole('button', { name: 'Tout accepter', exact: true });
-  if (await consent.isVisible().catch(() => false)) await consent.click();
+  await loginThroughUi(page, admin);
+  // Sélection depuis le module (comme les autres parcours opérateur) : sur
+  // mobile, l'accueil /dashboard superpose son propre panneau à l'en-tête.
+  await page.goto('/dashboard/documents');
+  await selectAdministeredTenant(page, 'Tenant E2E');
 }
 
 test('l’ancien lien Gestion locative → Documents redirige vers le Centre documentaire déjà filtré, en conservant contratId', async ({ page }) => {
