@@ -2,6 +2,11 @@ jest.mock('../models/Notification', () => ({
   findOneAndUpdate: jest.fn(),
   findOneAndDelete: jest.fn(),
 }));
+// LOT N — filtre de visibilité (notifications de la boîte de support masquées
+// hors agent support) ; ici l'utilisateur n'est pas agent.
+jest.mock('../services/notificationService', () => ({
+  notificationVisibilityFilter: jest.fn().mockResolvedValue({ type: { $nin: ['new_staff_message'] } }),
+}));
 
 const Notification = require('../models/Notification');
 const controller = require('../controllers/notificationController');
@@ -27,7 +32,7 @@ describe('notificationController ownership and invalid IDs', () => {
     await controller[method]({ params: { id: otherNotificationId }, user: { _id: ownerId } }, res, next);
 
     expect(Notification[modelMethod].mock.calls[0][0]).toEqual(
-      expect.objectContaining({ _id: otherNotificationId, recipient: ownerId }),
+      expect.objectContaining({ _id: otherNotificationId, recipient: ownerId, type: { $nin: ['new_staff_message'] } }),
     );
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Notification introuvable.' }));
   });

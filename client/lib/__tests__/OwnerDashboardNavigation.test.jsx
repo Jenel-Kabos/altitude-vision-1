@@ -17,6 +17,11 @@ vi.mock('../context/AuthContext', () => ({
 }));
 
 vi.mock('../services/visiteService', () => ({ getOwnerVisitesUnreadCount: vi.fn() }));
+// F-U2.14 — la cloche réelle (hook réseau/socket) est remplacée par une sonde :
+// on vérifie ici son montage dans le shell, pas son comportement interne.
+vi.mock('../components/notifications/NotificationBell', () => ({
+  default: ({ isAuthenticated }) => <button type="button" data-authenticated={String(isAuthenticated)}>Notifications</button>,
+}));
 
 const baseUser = { _id: 'TEST-OWNER', name: 'OWNER TEST', role: 'Proprietaire' };
 
@@ -137,5 +142,21 @@ describe('Navigation propriétaire', () => {
 
     expect(countAfterResolution).toBeGreaterThan(countWhileLoading);
     expect(screen.getByRole('link', { name: 'Vue du patrimoine' })).toBeInTheDocument();
+  });
+
+  // F-U2.14 — régression 3ca61dc : le header global (seul porteur de la cloche)
+  // est masqué dans les espaces propriétaire ; le shell doit exposer la cloche.
+  test.each([[false, 'desktop'], [true, 'mobile']])('expose une seule cloche de notifications (%s → %s)', async (mobile) => {
+    getOwnerVisitesUnreadCount.mockResolvedValue(0);
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query) => ({ matches: mobile, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    try {
+      render(<OwnerDashboard><p>CONTENU PROPRIETAIRE</p></OwnerDashboard>);
+      const bells = await screen.findAllByRole('button', { name: 'Notifications' });
+      expect(bells).toHaveLength(1);
+      expect(bells[0]).toHaveAttribute('data-authenticated', 'true');
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });

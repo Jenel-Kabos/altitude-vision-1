@@ -1,13 +1,11 @@
 // server/routes/conversationRoutes.js
 const express = require('express');
-const { ALL_STAFF } = require('../utils/roles');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
 const { attachTenantContext, requireTenantScopeForStaffOrPlatformOperator, isPlatformWideRequest, isPlatformViewForbiddenRequest } = require('../middleware/tenantContext');
 const { requirePlatformNativeCapability } = require('../middleware/platformAuthority');
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
-const { restrictTo } = require('../middleware/authMiddleware');
 const {
   getConversationById,
   getConversations,
@@ -30,8 +28,8 @@ const {
 // appliquée dans chaque contrôleur UNIQUEMENT quand `req.platformTenant`
 // existe (staff), jamais retirée pour cet acteur — voir
 // conversationController.js/messageController.js pour le détail.
-// `GET /staff-inbox` reste gardée séparément par `restrictTo(...ALL_STAFF)`
-// ci-dessous, inchangé.
+// `GET /staff-inbox` (boîte de support Altitude Vision) est réservée aux
+// agents `platform.support.read` (P0 SUPPORT-INBOX, voir ci-dessous).
 router.use(authController.protect, attachTenantContext);
 
 // Global support is a platform operation. A PlatformOperator may omit the
@@ -91,7 +89,10 @@ router.get('/count/unread', requireStaffConversationScope, getUnreadCount);
 // affectées par HF-FINAL-01 — voir ENDPOINT_MATRIX.md).
 
 // Boîte partagée staff (Admin + tous sous-rôles collaborateurs)
-router.get('/staff-inbox', restrictTo(...ALL_STAFF), requireStaffConversationScope, getStaffInbox);
+// P0 SUPPORT-INBOX — boîte de support Altitude Vision : l'autorité est la
+// capacité `platform.support.read` d'un PlatformOperator actif, vérifiée
+// fraîchement par le contrôleur ; aucun filtre par rôle User ni par tenant.
+router.get('/staff-inbox', getStaffInbox);
 
 // Ma propre conversation staff-inbox (côté client/propriétaire)
 router.get('/my-inbox', getMyInbox);

@@ -6,7 +6,11 @@ const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const { ALL_STAFF } = require('../utils/roles');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
-const { assertConversationAccess } = require('../services/messagingAuthorizationService');
+const { assertConversationAccess, assertConversationWritable, evaluateConversationWriteState, hasSupportCapability, SUPPORT_READ, SUPPORT_REPLY } = require('../services/messagingAuthorizationService');
+const { serializeConversation } = require('../services/conversationSerializer');
+const HotelReservation = require('../models/HotelReservation');
+const Hotel = require('../models/Hotel');
+const HotelStaffAssignment = require('../models/HotelStaffAssignment');
 
 const activeTenantId = (req) => req.platformTenant?._id;
 // POST-E2E-1 — un client sans tenant propre voit UNIQUEMENT ses propres
@@ -93,6 +97,11 @@ async function keepAttributedConversations(req, conversations) {
   return allowed;
 }
 
+async function serializeForActor(req, conversation, extra = {}) {
+  const writeState = await evaluateConversationWriteState({ actor: req.user, conversation });
+  return { ...serializeConversation(conversation, writeState), ...extra };
+}
+
 /**
  * @description Récupérer une conversation par son ID (objet complet peuplé)
  * @route GET /api/conversations/:conversationId
@@ -102,7 +111,7 @@ exports.getConversationById = asyncHandler(async (req, res) => {
   const { conversationId } = req.params;
 
   const conversation = await Conversation.findById(conversationId)
-    .populate('participants', 'name email photo role')
+    .populate('participants', 'name photo role')
     .populate('relatedProperty', 'title images address')
     .lean();
 
@@ -117,7 +126,7 @@ exports.getConversationById = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     status: 'success',
-    data: { conversation },
+    data: { conversation: await serializeForActor(req, conversation) },
   });
 });
 
@@ -132,15 +141,13 @@ exports.getConversations = asyncHandler(async (req, res) => {
     isArchived: { $ne: true },
     isStaffInbox: false, // les convs staff-inbox sont via GET /staff-inbox
   }] })
-    .populate('participants', 'name email photo role')
+    .populate('participants', 'name photo role')
     .sort({ updatedAt: -1 });
   const conversations = await keepAttributedConversations(req, candidates);
 
-  const withUnread = conversations.map((conv) => {
-    const obj = conv.toObject();
-    obj.unreadCount = conv.unreadCount?.get(req.user.id) || 0;
-    return obj;
-  });
+  const withUnread = await Promise.all(conversations.map((conv) => serializeForActor(req, conv, {
+    unreadCount: conv.unreadCount?.get(req.user.id) || 0,
+  })));
 
   res.status(200).json({
     status: 'success',
@@ -209,8 +216,8 @@ exports.getConversationMessages = asyncHandler(async (req, res) => {
       };
 
   const messages = await Message.find(msgQuery)
-    .populate('sender', 'name email photo')
-    .populate('receiver', 'name email photo')
+    .populate('sender', 'name photo')
+    .populate('receiver', 'name photo')
     .sort({ createdAt: 1 })
     .limit(parseInt(limit))
     .skip(skip);
@@ -309,23 +316,37 @@ exports.createOrGetConversation = asyncHandler(async (req, res) => {
   if (Conversation) {
     let conversation = await Conversation.findOne({
       participants: { $all: [req.user.id, targetUserId] },
-    }).populate('participants', 'name email photo');
+      tenant: activeTenantId(req) || null,
+      relatedProperty: req.body.relatedProperty || null,
+      relatedDossierType: req.body.dossierType || null,
+      relatedDossier: req.body.dossierId || null,
+      channelType: 'commercial_direct',
+    }).populate('participants', 'name photo role');
 
     if (!conversation) {
-      conversation = await Conversation.create({
+      const candidate = {
         participants: [req.user.id, targetUserId],
         relatedProperty: req.body.relatedProperty || null,
+        relatedDossierType: req.body.dossierType || null,
+        relatedDossier: req.body.dossierId || null,
         tenant: activeTenantId(req),
+        isStaffInbox: false,
+      };
+      await assertConversationWritable({ actor: req.user, conversation: candidate });
+      conversation = await Conversation.create({
+        ...candidate,
+        channelType: 'commercial_direct',
       });
-      await conversation.populate('participants', 'name email photo');
-    } else if (!conversation.relatedProperty && req.body.relatedProperty) {
-      conversation.relatedProperty = req.body.relatedProperty;
-      await conversation.save();
+      await conversation.populate('participants', 'name photo role');
+    } else {
+      await assertConversationWritable({ actor: req.user, conversation });
     }
+
+    const writeState = await evaluateConversationWriteState({ actor: req.user, conversation });
 
     return res.status(200).json({
       status: 'success',
-      data: { conversation },
+      data: { conversation: serializeConversation(conversation, writeState) },
     });
   }
 
@@ -336,8 +357,8 @@ exports.createOrGetConversation = asyncHandler(async (req, res) => {
       conversation: {
         _id: targetUserId,
         participants: [
-          { _id: req.user.id, name: req.user.name, email: req.user.email, photo: req.user.photo },
-          { _id: participant._id, name: participant.name, email: participant.email, photo: participant.photo },
+          { _id: req.user.id, name: req.user.name, photo: req.user.photo },
+          { _id: participant._id, name: participant.name, photo: participant.photo },
         ],
       },
     },
@@ -359,6 +380,13 @@ exports.deleteConversation = asyncHandler(async (req, res) => {
     const conversation = await Conversation.findById(conversationId);
     if (conversation) {
       await assertConversationAccess(req, conversation);
+      // P0 SUPPORT-INBOX — supprimer la conversation d'un prospect est une
+      // écriture : réservée au prospect lui-même ou à un agent habilité à
+      // répondre.
+      const isParticipantActor = conversation.participants.some((p) => p.toString() === req.user.id.toString());
+      if (conversation.isStaffInbox && !isParticipantActor && !(await hasSupportCapability(req.user, SUPPORT_REPLY))) {
+        return res.status(403).json({ status: 'fail', code: 'SUPPORT_REPLY_CAPABILITY_REQUIRED', message: 'Accès refusé' });
+      }
       const otherParticipant = conversation.participants.find(
         (p) => p.toString() !== req.user.id.toString()
       );
@@ -413,12 +441,15 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
   // Staff : ajoute les conversations de la boîte partagée où un message
   // client attend une réponse (clé Map 'staff') — ces messages ont
   // receiver: null et ne sont donc jamais comptés ci-dessus.
-  if (ALL_STAFF.includes(req.user.role)) {
-    const staffInboxUnread = await Conversation.countDocuments({ $and: [tenantConversationFilter(req), {
+  // P0 SUPPORT-INBOX — la boîte de support n'est comptée que pour un agent
+  // Altitude Vision actif (`platform.support.read`), jamais pour le staff
+  // d'une organisation.
+  if (await hasSupportCapability(req.user, SUPPORT_READ)) {
+    const staffInboxUnread = await Conversation.countDocuments({
       isStaffInbox: true,
       isArchived: { $ne: true },
       'unreadCount.staff': { $gt: 0 },
-    }] });
+    });
     unreadCount += staffInboxUnread;
   }
 
@@ -457,30 +488,41 @@ async function resolveConversationTenantId(req, propertyId) {
   return attribution.status === 'resolved' ? attribution.tenantId : null;
 }
 
+async function resolveHotelOperationalContext({ actorId, recipientId, dossierType, dossierId }) {
+  if (dossierType !== 'HotelReservation') return null;
+  const reservation = await HotelReservation.findOne({ _id: dossierId, status: { $in: ['confirmed', 'checked_in'] } })
+    .select('hotel guestUser tenant').lean();
+  if (!reservation) return null;
+  const parties = new Set([String(actorId), String(recipientId)]);
+  if (!reservation.guestUser || !parties.has(String(reservation.guestUser))) return null;
+  const staffId = String(actorId) === String(reservation.guestUser) ? recipientId : actorId;
+  const hotel = await Hotel.findById(reservation.hotel).select('manager tenant').lean();
+  const assigned = await HotelStaffAssignment.exists({ user: staffId, hotel: reservation.hotel, status: 'active', $or: [{ validUntil: null }, { validUntil: { $gt: new Date() } }] });
+  if (String(hotel?.manager || '') !== String(staffId) && !assigned) return null;
+  return { tenantId: reservation.tenant || hotel?.tenant || null };
+}
+
 exports.startConversation = async (req, res) => {
   try {
-    const { recipientId, propertyId, message } = req.body;
+    const { recipientId, propertyId, dossierType, dossierId, message } = req.body;
     const isSenderStaff = ALL_STAFF.includes(req.user.role);
     const conversationTenantId = await resolveConversationTenantId(req, propertyId);
+    let recipient = null;
+    if (recipientId) recipient = await User.findById(recipientId).select('role');
+    if (recipientId && !recipient) return res.status(404).json({ status: 'fail', message: 'Destinataire introuvable.' });
+    const directAuthorizedFlow = Boolean(recipientId && !ALL_STAFF.includes(recipient?.role));
+    const hotelOperational = recipientId
+      ? await resolveHotelOperationalContext({ actorId: req.user.id, recipientId, dossierType, dossierId })
+      : null;
 
-    // ── Blocage client → client ──────────────────────────────────
-    if (!isSenderStaff && recipientId) {
-      const recipient = await User.findById(recipientId).select('role');
-      if (!recipient) {
-        return res.status(404).json({ status: 'fail', message: 'Destinataire introuvable.' });
-      }
-      if (!ALL_STAFF.includes(recipient.role)) {
-        return res.status(403).json({
-          status: 'fail',
-          message: 'Vous ne pouvez contacter que notre équipe.',
-        });
-      }
+    if (!hotelOperational && !isSenderStaff && directAuthorizedFlow) {
+      await assertConversationWritable({ actor: req.user, conversation: { participants: [req.user.id, recipientId], tenant: conversationTenantId, relatedProperty: propertyId, relatedDossierType: dossierType, relatedDossier: dossierId, isStaffInbox: false } });
     }
 
     // ── Trouver ou créer la conversation ─────────────────────────
     let conversation;
 
-    if (isSenderStaff) {
+    if (isSenderStaff || directAuthorizedFlow || hotelOperational) {
       // Staff → destinataire précis : conversation 1-à-1
       if (!recipientId) {
         return res.status(400).json({ status: 'fail', message: 'recipientId requis pour le staff.' });
@@ -488,17 +530,24 @@ exports.startConversation = async (req, res) => {
       conversation = await Conversation.findOne({
         participants: { $all: [req.user.id, recipientId] },
         isStaffInbox: false,
+        tenant: hotelOperational?.tenantId || conversationTenantId || null,
+        relatedProperty: propertyId || null,
+        relatedDossierType: dossierType || null,
+        relatedDossier: dossierId || null,
+        channelType: hotelOperational ? 'hotel_operational' : (directAuthorizedFlow ? 'commercial_direct' : null),
       });
       if (!conversation) {
-        conversation = await Conversation.create({
+        const candidate = {
           participants: [req.user.id, recipientId],
           relatedProperty: propertyId || null,
+          relatedDossierType: dossierType || null,
+          relatedDossier: dossierId || null,
+          channelType: hotelOperational ? 'hotel_operational' : (directAuthorizedFlow ? 'commercial_direct' : null),
           isStaffInbox: false,
-          tenant: conversationTenantId,
-        });
-      } else if (propertyId && !conversation.relatedProperty) {
-        conversation.relatedProperty = propertyId;
-        await conversation.save();
+          tenant: hotelOperational?.tenantId || conversationTenantId,
+        };
+        await assertConversationWritable({ actor: req.user, conversation: candidate });
+        conversation = await Conversation.create(candidate);
       }
     } else {
       // Client/Proprietaire → boîte staff partagée
@@ -523,14 +572,15 @@ exports.startConversation = async (req, res) => {
     // ── Premier message optionnel ─────────────────────────────────
     if (message?.trim()) {
       const { getIO } = require('../socket');
-      const { notify, notifyStaff } = require('../services/notificationService');
+      const { notify, notifySupportAgents } = require('../services/notificationService');
 
+      await assertConversationWritable({ actor: req.user, conversation });
       const newMsg = await Message.create({
         sender: req.user.id,
-        receiver: isSenderStaff ? recipientId : null,
+        receiver: (isSenderStaff || directAuthorizedFlow || hotelOperational) ? recipientId : null,
         conversation: conversation._id,
         content: message.trim(),
-        tenant: conversationTenantId,
+        tenant: conversation.tenant || null,
       });
 
       conversation.lastMessage = message.trim();
@@ -538,9 +588,9 @@ exports.startConversation = async (req, res) => {
 
       const preview = message.trim().slice(0, 100);
 
-      if (isSenderStaff) {
+      if (isSenderStaff || directAuthorizedFlow || hotelOperational) {
         // Notifier le destinataire direct (chat UI + cloche/liste + push)
-        try { getIO().to(recipientId.toString()).emit('new-message', { conversationId: conversation._id, message: newMsg }); } catch {}
+        try { getIO().to(recipientId.toString()).emit('new-message', { conversationId: conversation._id, message: serializeMessage(newMsg) }); } catch {}
         notify({ recipient: recipientId,
           type: 'message_staff',
           title: req.user.name || 'Message',
@@ -548,12 +598,12 @@ exports.startConversation = async (req, res) => {
           data: { conversationId: conversation._id.toString(), screen: 'Chat' },
         }).catch(() => {});
       } else {
-        // Notifier tout le staff en temps réel (chat UI + cloche/liste + push)
-        const staff = await User.find({ role: { $in: ALL_STAFF } }).select('_id');
-        for (const s of staff) {
-          try { getIO().to(s._id.toString()).emit('new-staff-message', { conversationId: conversation._id, message: newMsg }); } catch {}
-        }
-        notifyStaff({
+        // P0 SUPPORT-INBOX — seuls les agents de support Altitude Vision
+        // actifs sont prévenus (temps réel réautorisé + notification), jamais
+        // le staff du tenant propriétaire du bien.
+        const { emitSupportInboxEvent } = require('../socket');
+        try { emitSupportInboxEvent('new-staff-message', { conversationId: conversation._id, message: serializeMessage(newMsg) }).catch(() => {}); } catch {}
+        notifySupportAgents({
           type: 'new_staff_message',
           title: req.user.name || 'Nouveau message client',
           body: preview,
@@ -562,15 +612,16 @@ exports.startConversation = async (req, res) => {
       }
     }
 
-    await conversation.populate('participants', 'name email photo role');
+    await conversation.populate('participants', 'name photo role');
     if (conversation.relatedProperty) {
       await conversation.populate('relatedProperty', 'title images');
     }
 
-    res.status(200).json({ status: 'success', data: { conversation } });
+    const writeState = await evaluateConversationWriteState({ actor: req.user, conversation });
+    res.status(200).json({ status: 'success', data: { conversation: serializeConversation(conversation, writeState) } });
   } catch (error) {
     console.error('❌ [startConversation]', error.message);
-    res.status(500).json({ status: 'error', message: error.message });
+    res.status(error.statusCode || 500).json({ status: error.statusCode ? 'fail' : 'error', code: error.code, message: error.message });
   }
 };
 
@@ -591,11 +642,9 @@ exports.getMyInbox = asyncHandler(async (req, res) => {
     .sort('-updatedAt');
   const conversations = await keepAttributedConversations(req, candidates);
 
-  const withUnread = conversations.map((conv) => {
-    const obj = conv.toObject();
-    obj.unreadCount = conv.unreadCount?.get(req.user.id) || 0;
-    return obj;
-  });
+  const withUnread = await Promise.all(conversations.map((conv) => serializeForActor(req, conv, {
+    unreadCount: conv.unreadCount?.get(req.user.id) || 0,
+  })));
 
   res.status(200).json({
     status: 'success',
@@ -611,21 +660,21 @@ exports.getMyInbox = asyncHandler(async (req, res) => {
  */
 exports.getStaffInbox = async (req, res) => {
   try {
-    if (!ALL_STAFF.includes(req.user.role)) {
-      return res.status(403).json({ status: 'fail', message: 'Accès réservé au staff.' });
+    // P0 SUPPORT-INBOX — boîte de support Altitude Vision : agents actifs
+    // `platform.support.read` uniquement (relus maintenant), tous prospects
+    // confondus (provenance tenant ou `tenant: null`). Aucun rôle tenant.
+    if (!(await hasSupportCapability(req.user, SUPPORT_READ))) {
+      return res.status(403).json({ status: 'fail', code: 'SUPPORT_CAPABILITY_REQUIRED', message: 'Boîte de support réservée aux agents Altitude Vision habilités.' });
     }
 
-    const candidates = await Conversation.find({ $and: [tenantConversationFilter(req), { isStaffInbox: true, isArchived: { $ne: true } }] })
-      .populate('participants', 'name email photo role')
+    const conversations = await Conversation.find({ isStaffInbox: true, isArchived: { $ne: true } })
+      .populate('participants', 'name photo role')
       .populate('relatedProperty', 'title images')
       .sort('-updatedAt');
-    const conversations = await keepAttributedConversations(req, candidates);
 
-    const withUnread = conversations.map((conv) => {
-      const obj = conv.toObject();
-      obj.unreadCount = conv.unreadCount?.get('staff') || 0;
-      return obj;
-    });
+    const withUnread = await Promise.all(conversations.map((conv) => serializeForActor(req, conv, {
+      unreadCount: conv.unreadCount?.get('staff') || 0,
+    })));
 
     res.status(200).json({
       status: 'success',

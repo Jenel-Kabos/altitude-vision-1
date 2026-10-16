@@ -10,6 +10,7 @@ import {
 import { useNotifications } from '../../hooks/useNotifications';
 import { clearRead } from '../../services/notificationService';
 import { useAuth } from '../../context/AuthContext';
+import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
 import api from '../../services/api';
 import { resolveNotificationWebRoute } from '../../navigation/navigationSdk';
 
@@ -104,6 +105,7 @@ function fmtTime(dateStr) {
 export default function NotificationBell({ isAuthenticated }) {
   const router  = useRouter();
   const { user } = useAuth();
+  const { can: canPlatform } = usePlatformTenantRuntime();
   const [open, setOpen] = useState(false);
   const panelRef = useRef(null);
 
@@ -135,7 +137,9 @@ export default function NotificationBell({ isAuthenticated }) {
         const res  = await api.get(`/conversations/${notif.data.conversationId}`);
         const conv = res.data?.data?.conversation;
         if (conv) {
-          if (STAFF_ROLES.includes(user?.role)) {
+          // P0 SUPPORT-INBOX — la boîte de support n'est ouverte qu'aux agents
+          // `platform.support.read` ; tout autre utilisateur ouvre /messages.
+          if (conv.isStaffInbox && canPlatform('platform.support.read')) {
             router.push('/dashboard/conversations');
           } else {
             router.push(`/messages?conversationId=${conv._id}`);
@@ -147,12 +151,15 @@ export default function NotificationBell({ isAuthenticated }) {
 
     const cfg = TYPE_CONFIG[notif.type] || DEFAULT_CONFIG;
     const isStaff = STAFF_ROLES.includes(user?.role);
-    const fallbackRoute = isStaff
+    const messageWithoutSupport = MESSAGE_TYPES.includes(notif.type) && !canPlatform('platform.support.read');
+    const fallbackRoute = messageWithoutSupport
+      ? '/messages'
+      : isStaff
       ? cfg.route
       : CLIENT_ROUTES[notif.type] || (cfg.route.startsWith('/dashboard') ? '/profile' : cfg.route);
     const destination = resolveNotificationWebRoute(notif, fallbackRoute);
     router.push(destination.startsWith('/') ? destination : fallbackRoute);
-  }, [markRead, router, user]);
+  }, [markRead, router, user, canPlatform]);
 
   const handleClearRead = useCallback(async () => {
     try {

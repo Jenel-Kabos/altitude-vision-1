@@ -11,6 +11,7 @@ import { toast } from "react-hot-toast";
 import { useAuth } from '../../context/AuthContext';
 import { getOwnerVisitesUnreadCount } from '../../services/visiteService';
 import { DashboardContextSwitcher } from '../../components/dashboard/DashboardUI';
+import NotificationBell from '../../components/notifications/NotificationBell';
 
 const BLUE  = '#2E7BB5';
 const GOLD  = '#C8960C';
@@ -287,8 +288,19 @@ const OwnerDashboard = ({ children }) => {
             style={{ fontFamily: "'DM Sans', sans-serif" }}>
             {activeTitle}
           </span>
-          <div className="w-11" aria-hidden="true" />
+          {/* F-U2.14 — le header global est masqué dans les espaces propriétaire
+              (ClientLayout, 3ca61dc) : la cloche y est réintégrée. Une seule
+              instance rendue selon le viewport (un seul abonnement aux notifications). */}
+          <div className="flex min-h-11 min-w-11 items-center justify-center text-gray-600">
+            {isMobileViewport && <NotificationBell isAuthenticated={!!user} />}
+          </div>
         </div>
+
+        {!isMobileViewport && (
+          <div className="hidden md:flex justify-end px-6 pt-4 text-gray-600">
+            <NotificationBell isAuthenticated={!!user} />
+          </div>
+        )}
 
         <div className="dashboard-content-inner flex-1 p-4 md:p-6 overflow-y-auto">
           {children}

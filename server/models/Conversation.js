@@ -33,6 +33,9 @@ const conversationSchema = new mongoose.Schema({
         ref: 'Event',
         default: null,
     },
+    relatedDossierType: { type: String, enum: ['RealEstateApplication', 'Visite', 'HotelReservation', 'AccommodationReservation', 'Other'], default: null },
+    relatedDossier: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
+    channelType: { type: String, enum: ['commercial_direct', 'staff_inbox', 'hotel_operational'], default: null },
     // true = conversation initiée par un non-staff vers le staff (boîte partagée)
     // visible par tout Admin/Collaborateur, sans destinataire unique fixe
     isStaffInbox: {
@@ -89,7 +92,7 @@ conversationSchema.statics.getUserConversations = function (userId, page, limit,
         // Peupler les autres participants (tous sauf l'utilisateur actuel)
         .populate({
             path: 'participants',
-            select: 'name avatar email',
+            select: 'name avatar role',
             match: { _id: { $ne: userId } } // Exclure l'utilisateur lui-même
         });
 

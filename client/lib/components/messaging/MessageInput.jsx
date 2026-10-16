@@ -4,13 +4,13 @@
 import React, { useState, useRef } from 'react';
 import { Send, Paperclip } from 'lucide-react';
 
-const MessageInput = ({ onSendMessage, isLoading = false }) => {
+const MessageInput = ({ onSendMessage, isLoading = false, writeState = { writable: true } }) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef(null);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!message.trim() || isLoading) return;
+    if (!message.trim() || isLoading || writeState?.writable === false) return;
     onSendMessage(message.trim());
     setMessage('');
     if (textareaRef.current) {
@@ -55,7 +55,7 @@ const MessageInput = ({ onSendMessage, isLoading = false }) => {
           placeholder="Écrivez votre message... (Shift+Entrée pour nouvelle ligne)"
           className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder-gray-400 bg-white"
           rows="1"
-          disabled={isLoading}
+          disabled={isLoading || writeState?.writable === false}
           maxLength={2000}
           style={{ color: '#111827' }} // forcer le texte visible même si Tailwind est purgé
         />
@@ -63,13 +63,19 @@ const MessageInput = ({ onSendMessage, isLoading = false }) => {
         {/* Bouton envoyer */}
         <button
           type="submit"
-          disabled={!message.trim() || isLoading}
+          disabled={!message.trim() || isLoading || writeState?.writable === false}
           className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed flex-shrink-0"
           title="Envoyer (Entrée)"
         >
           <Send size={20} />
         </button>
       </div>
+
+      {writeState?.writable === false && (
+        <p className="mt-2 text-sm text-amber-700" role="status">
+          Cette conversation est en lecture seule. Une autorisation d’Altitude Vision est requise pour reprendre les échanges.
+        </p>
+      )}
 
       {/* Compteur de caractères */}
       <div className="flex justify-between items-center mt-2 text-xs text-gray-500">

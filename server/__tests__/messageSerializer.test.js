@@ -43,7 +43,8 @@ describe('serializeMessage — contrat historique avant extraction', () => {
     });
     const output = serializeMessage(input);
 
-    expect(output.sender).toEqual(input.sender);
+    expect(output.sender).toEqual({ _id: SENDER_ID, name: 'Alice', avatar: '/alice.png' });
+    expect(output.sender).not.toHaveProperty('email');
     expect(output.conversation).toEqual(input.conversation);
     expect(output.sender).not.toHaveProperty('password');
     expect(output.sender).not.toHaveProperty('token');

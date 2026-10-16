@@ -16,6 +16,7 @@ import {
   openConversationAttachment,
 } from "../services/conversationService";
 import { useAuth } from "../context/AuthContext";
+import { usePlatformTenantRuntime } from "../context/PlatformTenantRuntimeContext";
 import BackButton from "../components/navigation/BackButton";
 
 const GOLD = "#C8960C";
@@ -48,7 +49,6 @@ const formatTime = (d) => {
     : date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 };
 
-const STAFF_ROLES = ["Admin", "Collaborateur"];
 
 const MessagesPage = () => {
   const { user, isInitialized } = useAuth();
@@ -70,12 +70,16 @@ const MessagesPage = () => {
   const listScrollRef = useRef(null);
   const requestedConversationId = searchParams.get('conversationId') || searchParams.get('conversation');
 
-  // Le staff a sa propre boîte partagée (/dashboard/conversations) — pas cette page.
+  // P0 SUPPORT-INBOX — seuls les agents Altitude Vision (`platform.support.read`)
+  // ont la boîte de support (/dashboard/conversations). Le staff d'organisation
+  // reste ici pour ses conversations directes : aucun rôle n'y redirige.
+  const { can: canPlatform } = usePlatformTenantRuntime();
+  const isSupportAgent = canPlatform('platform.support.read');
   useEffect(() => {
-    if (isInitialized && user && STAFF_ROLES.includes(user.role)) {
+    if (isInitialized && user && isSupportAgent && !requestedConversationId) {
       router.replace('/dashboard/conversations');
     }
-  }, [isInitialized, user, router]);
+  }, [isInitialized, user, router, isSupportAgent, requestedConversationId]);
 
   const fetchConversations = async () => {
     try {
@@ -181,7 +185,7 @@ const MessagesPage = () => {
 
   const handleSend = async (e) => {
     e.preventDefault();
-    if ((!input.trim() && pendingFiles.length === 0) || !selected || sending) return;
+    if ((!input.trim() && pendingFiles.length === 0) || !selected || sending || selected.writeState?.writable === false) return;
     setSending(true);
     try {
       const msg = pendingFiles.length > 0
@@ -415,6 +419,11 @@ const MessagesPage = () => {
                 onSubmit={handleSend}
                 className="relative px-2 sm:px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white border-t border-gray-200 flex items-end gap-1 sm:gap-2 flex-shrink-0"
               >
+                {selected.writeState?.writable === false && (
+                  <p className="absolute bottom-full inset-x-0 px-4 py-2 bg-amber-50 text-amber-800 text-sm border-t border-amber-200" role="status">
+                    Conversation en lecture seule — Altitude Vision doit autoriser la reprise des échanges.
+                  </p>
+                )}
                 {showEmoji && (
                   <div className="absolute bottom-full left-4 mb-2 bg-white border border-gray-200 rounded-xl shadow-xl p-3 grid grid-cols-6 gap-1 z-20">
                     {EMOJIS.map(e => (
@@ -441,6 +450,7 @@ const MessagesPage = () => {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={selected.writeState?.writable === false}
                   className="flex-shrink-0 p-2.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
                   aria-label="Joindre un fichier"
                 >
@@ -458,6 +468,7 @@ const MessagesPage = () => {
 
                 <textarea
                   value={input}
+                  disabled={selected.writeState?.writable === false}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e); }
@@ -468,7 +479,7 @@ const MessagesPage = () => {
                 />
                 <button
                   type="submit"
-                  disabled={(!input.trim() && pendingFiles.length === 0) || sending}
+                  disabled={(!input.trim() && pendingFiles.length === 0) || sending || selected.writeState?.writable === false}
                   className="flex-shrink-0 p-2.5 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
                   style={{ background: `linear-gradient(135deg, #1A5A8A, ${BLUE})` }}
                 >

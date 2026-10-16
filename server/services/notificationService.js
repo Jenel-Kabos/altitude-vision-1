@@ -322,8 +322,35 @@ async function notifyStaff(payload) {
 /**
  * Notifie plusieurs utilisateurs avec le même payload.
  */
+// P0 SUPPORT-INBOX — notification d'un message de la boîte de support
+// Altitude Vision : destinataires = PlatformOperators ACTIFS détenant
+// `platform.support.read` (lus maintenant), jamais le staff d'un tenant —
+// même si le prospect s'intéresse à un bien de cette organisation.
+async function notifySupportAgents(payload) {
+  const PlatformOperator = require('../models/PlatformOperator');
+  const agentIds = await PlatformOperator.find({ status: 'active', capabilities: 'platform.support.read' }).distinct('user');
+  if (!agentIds.length) return;
+  const agents = await User.find({ _id: { $in: agentIds }, isActive: true, status: { $nin: ['Suspendu', 'Banni', 'Supprimé'] } }).select('_id').lean();
+  await Promise.allSettled(agents.map((agent) => notify({ ...payload, platformTenantId: null, audience: 'staff', link: payload.link ?? null, recipient: agent._id })));
+}
+
+// LOT N — visibilité des notifications de la boîte de support. Les
+// notifications `new_staff_message` portent l'aperçu du message d'un prospect ;
+// avant le correctif P0 SUPPORT-INBOX, `notifyStaff` en adressait aussi au
+// staff des organisations. Elles ne sont plus exposées qu'à un agent
+// Altitude Vision actif (`platform.support.read`, relu à chaque requête).
+// Filtre appliqué à la LECTURE et aux mutations par le destinataire : aucune
+// purge, aucune migration, aucun document masqué n'est modifié ni supprimé.
+const SUPPORT_INBOX_NOTIFICATION_TYPES = Object.freeze(['new_staff_message']);
+
+async function notificationVisibilityFilter(user) {
+  const { hasSupportCapability, SUPPORT_READ } = require('./messagingAuthorizationService');
+  if (await hasSupportCapability(user, SUPPORT_READ)) return {};
+  return { type: { $nin: [...SUPPORT_INBOX_NOTIFICATION_TYPES] } };
+}
+
 async function notifyMany(recipientIds, payload) {
   await Promise.allSettled(recipientIds.map((id) => notify({ ...payload, recipient: id })));
 }
 
-module.exports = { notify, notifyStaff, notifyMany, visitSocketEventFor, hospitalityLinkFor };
+module.exports = { notify, notifyStaff, notifyMany, notifySupportAgents, notificationVisibilityFilter, SUPPORT_INBOX_NOTIFICATION_TYPES, visitSocketEventFor, hospitalityLinkFor };

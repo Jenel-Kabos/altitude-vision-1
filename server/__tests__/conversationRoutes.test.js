@@ -35,6 +35,13 @@ const { app }      = require('../server');
 const User         = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Message      = require('../models/Message');
+const PlatformOperator = require('../models/PlatformOperator');
+
+// P0 SUPPORT-INBOX — la boîte de support exige une capacité PlatformOperator
+// revalidée à chaque accès ; aucun utilisateur de ces tests n'en détient.
+beforeEach(() => {
+  jest.spyOn(PlatformOperator, 'exists').mockResolvedValue(null);
+});
 
 const makeToken = (role = 'Client') =>
   jwt.sign({ id: '507f1f77bcf86cd799439011', tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });

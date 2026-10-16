@@ -6,13 +6,13 @@ const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
-const { uploadPrivateAsset, readPrivateAsset } = require('../services/storage/secureStorageService');
-const { getIO, emitConversationEvent } = require('../socket');
-const { notify, notifyStaff } = require('../services/notificationService');
+const { uploadPrivateAsset, readPrivateAsset, deletePrivateAsset } = require('../services/storage/secureStorageService');
+const { getIO, emitSupportInboxEvent } = require('../socket');
+const { notify, notifySupportAgents } = require('../services/notificationService');
 const { ALL_STAFF } = require('../utils/roles');
 const logger = require('../utils/logger');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
-const { assertConversationAccess } = require('../services/messagingAuthorizationService');
+const { assertConversationAccess, assertConversationWritable, hasSupportCapability, SUPPORT_READ } = require('../services/messagingAuthorizationService');
 const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
 const { serializeMessage } = require('../services/messageSerializer');
 
@@ -38,6 +38,19 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         throw new Error('Le contenu ou une pièce jointe, et soit conversationId ou receiverId sont requis.');
     }
 
+    // Fail before private uploads. A bare receiverId never establishes a
+    // commercial relationship; existing conversations are checked against
+    // their current server-side write state.
+    let preflightConversation = null;
+    if (conversationId) {
+        preflightConversation = await Conversation.findById(conversationId);
+        if (!preflightConversation) { res.status(404); throw new Error('Conversation non trouvée.'); }
+        await assertConversationAccess(req, preflightConversation);
+        await assertConversationWritable({ actor: req.user, conversation: preflightConversation });
+    } else {
+        await assertConversationWritable({ actor: req.user, receiverId });
+    }
+
     // --- 1bis. Upload des pièces jointes vers Cloudinary ---
     // Extraction de durée : pas de ffprobe côté serveur (dépendance binaire lourde,
     // hors scope pour un simple message). Le client peut mesurer la durée lui-même
@@ -50,6 +63,11 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     // datés sont envoyés dans le même message.
     let durationApplied = false;
     const attachmentsData = [];
+    let targetUserId = null;
+    let convDoc = null;
+    let isStaffInbox = false;
+    let message;
+    try {
     if (uploadedFiles.length) {
         for (const file of uploadedFiles) {
             const isVideo = file.mimetype.startsWith('video/');
@@ -76,15 +94,11 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         }
     }
 
-    let targetUserId = null;
-    let convDoc = null;
-    let isStaffInbox = false;
-
     if (receiverId) {
         // CAS 1 : receiverId fourni directement (conv 1-à-1)
         targetUserId = receiverId;
     } else if (conversationId) {
-        convDoc = await Conversation.findById(conversationId);
+        convDoc = preflightConversation || await Conversation.findById(conversationId);
         if (!convDoc) {
             res.status(404);
             throw new Error('Conversation non trouvée.');
@@ -154,6 +168,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     }
 
     // --- 3. Créer le message ---
+    await assertConversationWritable({ actor: req.user, conversation: convDoc });
     // MESSAGING-PLATFORM-INBOX-AGGREGATION-1A — INVARIANT DE PRÉSERVATION DE TENANT :
     // Une réponse dans une conversation existante hérite TOUJOURS de
     // `convDoc.tenant`. Le contexte dashboard `req.platformTenant` sert à
@@ -165,7 +180,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     // Ne consulter `req.platformTenant` qu'en dernier recours, uniquement
     // quand aucune conversation existante n'ancre le message.
     const messageTenant = convDoc?.tenant ?? req.platformTenant?._id ?? null;
-    const message = await Message.create({
+    message = await Message.create({
         sender: req.user.id,
         receiver: targetUserId || null,
         conversation: convDoc?._id || null,
@@ -173,11 +188,16 @@ exports.sendMessage = asyncHandler(async (req, res) => {
         attachments: attachmentsData,
         tenant: messageTenant,
     });
-
-    await message.populate('sender', 'name email avatar');
-    if (targetUserId) {
-        await message.populate('receiver', 'name email avatar');
+    } catch (error) {
+        await Promise.allSettled(attachmentsData.map(({ asset }) => deletePrivateAsset(asset)));
+        throw error;
     }
+
+    await message.populate('sender', 'name avatar');
+    if (targetUserId) {
+        await message.populate('receiver', 'name avatar');
+    }
+    const safeMessage = serializeMessage(message);
 
     // --- 4. Mettre à jour la Conversation (lastMessage + unreadCount) ---
     if (!convDoc) {
@@ -224,23 +244,24 @@ exports.sendMessage = asyncHandler(async (req, res) => {
             // room globale `platform:support` pour les opérateurs porteurs
             // de `platform.support.read`. Un staff tenant B ne peut plus
             // recevoir accidentellement une conversation Mila.
-            emitConversationEvent(
-                'new-staff-message',
-                { conversationId: convDoc._id, message },
-                { conversationTenantId: convDoc.tenant }
-            );
-            notifyStaff({
+            // P0 SUPPORT-INBOX — la boîte de support appartient à Altitude
+            // Vision : diffusion et notification aux seuls agents actifs
+            // `platform.support.read`, jamais au staff du tenant du bien.
+            emitSupportInboxEvent('new-staff-message', { conversationId: convDoc._id, message: safeMessage }).catch(() => {});
+            notifySupportAgents({
                 type: 'new_staff_message',
                 title: senderName,
                 body: preview,
                 data: { conversationId: convDoc._id.toString(), screen: 'Conversations' },
-                platformTenantId: convDoc.tenant || null,
             }).catch(() => {});
         } else if (targetUserId) {
             // Conv 1-à-1 ou staff → client : notifier le destinataire
             const recipientIdStr = targetUserId.toString();
-            getIO().to(recipientIdStr).emit('new-message', { conversationId: convDoc._id, message });
-            console.log('[NOTIF DEBUG] notify appelé pour:', recipientIdStr);
+            // LOT N — fiabilité : l'émission temps réel est best-effort et ne
+            // doit jamais empêcher la notification persistante (cloche + push).
+            // Auparavant, `getIO()` levait (Socket.IO indisponible) AVANT
+            // `notify()` dans le même bloc : la notification était perdue.
+            try { getIO().to(recipientIdStr).emit('new-message', { conversationId: convDoc._id, message: safeMessage }); } catch { /* temps réel indisponible */ }
             notify({ recipient: recipientIdStr,
                 type: isStaffInbox ? 'message_staff' : 'new_message',
                 title: senderName,
@@ -254,7 +275,7 @@ exports.sendMessage = asyncHandler(async (req, res) => {
 
     res.status(201).json({
         status: 'success',
-        data: { message: serializeMessage(message) },
+        data: { message: safeMessage },
     });
 });
 
@@ -272,8 +293,13 @@ exports.downloadAttachment = asyncHandler(async (req, res) => {
     const userId = String(req.user.id);
     const participant = conversation?.participants?.some((id) => String(id) === userId)
         || String(message.sender) === userId || String(message.receiver || '') === userId;
-    const staffAllowed = ALL_STAFF.includes(req.user.role) && conversation?.tenant && req.platformTenant
-        && String(conversation.tenant) === String(req.platformTenant._id);
+    // P0 SUPPORT-INBOX — pièce jointe de la boîte de support : prospect
+    // participant ou agent actif `platform.support.read`, jamais le staff du
+    // tenant (ni par rôle, ni par provenance de la conversation).
+    const staffAllowed = conversation?.isStaffInbox
+        ? await hasSupportCapability(req.user, SUPPORT_READ)
+        : ALL_STAFF.includes(req.user.role) && conversation?.tenant && req.platformTenant
+            && String(conversation.tenant) === String(req.platformTenant._id);
     if (!participant && !staffAllowed) { res.status(403); throw new Error('Accès refusé à cette pièce jointe.'); }
     const attachment = message.attachments.id(req.params.attachmentId);
     if (!attachment) { res.status(404); throw new Error('Pièce jointe introuvable.'); }
@@ -359,8 +385,8 @@ exports.getMessages = asyncHandler(async (req, res) => {
       };
 
   const messages = await Message.find(msgQuery)
-    .populate('sender', 'name email avatar')
-    .populate('receiver', 'name email avatar')
+    .populate('sender', 'name avatar')
+    .populate('receiver', 'name avatar')
     .sort({ createdAt: 1 })
     .limit(parseInt(limit))
     .skip(skip);
@@ -481,8 +507,8 @@ exports.getConversations = asyncHandler(async (req, res) => {
       ...(req.platformTenant ? [{ $or: [{ tenant: req.platformTenant._id }, { tenant: null }] }] : []),
     ],
   })
-    .populate('sender', 'name email avatar')
-    .populate('receiver', 'name email avatar')
+    .populate('sender', 'name avatar')
+    .populate('receiver', 'name avatar')
     .sort({ createdAt: -1 });
   const messages = [];
   for (const message of candidates) {

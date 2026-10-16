@@ -70,7 +70,7 @@ function stopAllChildren() {
 const connect = (port, user, tenant) => new Promise((resolve, reject) => {
   const token = jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });
   const client = clientIo(`http://127.0.0.1:${port}`, {
-    transports: ['websocket'], auth: { token, platformTenantId: String(tenant._id) }, forceNew: true,
+    transports: ['websocket'], auth: { token, ...(tenant ? { platformTenantId: String(tenant._id) } : {}) }, forceNew: true,
   });
   clients.push(client);
   client.once('connect', () => resolve(client));
@@ -283,27 +283,40 @@ test('sécurité — conversation cross-tenant toujours bloquée avec adaptateur
   const { user: staffB } = await createTenantUser({ tenant: tenantB, bootstrap, overrides: { role: 'Collaborateur', email: `sec-sb-${Date.now()}@example.test` } });
   const { user: userB } = await createTenantUser({ tenant: tenantB, bootstrap, overrides: { role: 'Client', email: `sec-b-${Date.now()}@example.test` } });
   const conversationB = await Conversation.create({ tenant: tenantB._id, participants: [userB._id], isStaffInbox: true });
+  // P0 SUPPORT-INBOX — le destinataire légitime d'une conversation de la boîte
+  // de support est un agent Altitude Vision (`platform.support.read`), jamais
+  // le staff du tenant de provenance.
+  const supportAgent = await require('../models/User').create({
+    name: 'Sec Support Agent', email: `sec-agent-${Date.now()}@example.test`,
+    password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client',
+  });
+  await require('../services/platformOperator/platformOperatorService').provisionPrivilegedOperator({
+    userId: supportAgent._id, actor: bootstrap, reason: 'P0 SUPPORT-INBOX test', capabilities: ['platform.support.read'],
+  });
 
   const { port: portA } = await startChild({ withRedis: true });
   const { port: portB } = await startChild({ withRedis: true });
-  // staffB (tenant B, autorisé via boîte partagée) connecté sur A : prouve la
-  // livraison cross-instance à un destinataire LÉGITIME dans le même passage
-  // que le refus d'un destinataire illégitime (staffA, tenant A) sur B.
-  const staffBOnA = await connect(portA, staffB, tenantB);
+  // L'agent support connecté sur A prouve la livraison cross-instance à un
+  // destinataire LÉGITIME dans le même passage que le refus des destinataires
+  // illégitimes : staffA (autre tenant) et staffB (tenant de provenance) sur B.
+  const agentOnA = await connect(portA, supportAgent, null);
   const staffAOnB = await connect(portB, staffA, tenantA);
+  const staffBOnB = await connect(portB, staffB, tenantB);
   const userBOnB = await connect(portB, userB, tenantB);
 
-  expect(await join(staffBOnA, conversationB._id)).toEqual({ ok: true });
+  expect(await join(agentOnA, conversationB._id)).toEqual({ ok: true });
   expect(await join(staffAOnB, conversationB._id)).toEqual({ ok: false, error: 'Accès refusé' });
+  expect(await join(staffBOnB, conversationB._id)).toEqual({ ok: false, error: 'Accès refusé' });
   expect(await join(userBOnB, conversationB._id)).toEqual({ ok: true });
 
   let leaked = false;
   staffAOnB.on('typing', () => { leaked = true; });
-  const receivedByStaffBOnA = waitForEvent(staffBOnA, 'typing');
+  staffBOnB.on('typing', () => { leaked = true; });
+  const receivedByAgentOnA = waitForEvent(agentOnA, 'typing');
   userBOnB.emit('typing', { conversationId: String(conversationB._id) });
-  expect(await receivedByStaffBOnA).toMatchObject({ userId: String(userB._id) }); // livraison cross-instance à un destinataire autorisé
+  expect(await receivedByAgentOnA).toMatchObject({ userId: String(userB._id) }); // livraison cross-instance à un destinataire autorisé
   await new Promise((resolve) => setTimeout(resolve, 200));
-  expect(leaked).toBe(false); // staff A (tenant A, refusé) ne reçoit jamais l'événement de la conversation B, même avec Redis
+  expect(leaked).toBe(false); // aucun staff d'organisation ne reçoit l'événement, même avec Redis
 });
 
 test('sécurité — hôtel cross-tenant toujours bloqué avec adaptateur distribué actif', async () => {

@@ -1,6 +1,7 @@
 const asyncHandler  = require('express-async-handler');
 const mongoose      = require('mongoose');
 const Notification  = require('../models/Notification');
+const { notificationVisibilityFilter } = require('../services/notificationService');
 
 const PAGE_SIZE = 20;
 
@@ -10,7 +11,9 @@ exports.getMyNotifications = asyncHandler(async (req, res) => {
   const page      = Math.max(parseInt(req.query.page, 10) || 1, 1);
   const unreadOnly = req.query.filter === 'unread';
 
-  const match = { recipient: req.user._id };
+  // LOT N — notifications de la boîte de support masquées hors agent support.
+  const visibility = await notificationVisibilityFilter(req.user);
+  const match = { recipient: req.user._id, ...visibility };
   if (unreadOnly) match.read = false;
 
   const [notifications, total, unreadCount] = await Promise.all([
@@ -20,7 +23,7 @@ exports.getMyNotifications = asyncHandler(async (req, res) => {
       .limit(PAGE_SIZE)
       .lean(),
     Notification.countDocuments(match),
-    Notification.countDocuments({ recipient: req.user._id, read: false }),
+    Notification.countDocuments({ recipient: req.user._id, read: false, ...visibility }),
   ]);
 
   res.status(200).json({
@@ -42,6 +45,7 @@ exports.getUnreadCount = asyncHandler(async (req, res) => {
   const count = await Notification.countDocuments({
     recipient: req.user._id,
     read: false,
+    ...(await notificationVisibilityFilter(req.user)),
   });
   res.status(200).json({ status: 'success', data: { count } });
 });
@@ -54,7 +58,7 @@ exports.markRead = asyncHandler(async (req, res) => {
   }
 
   const notif = await Notification.findOneAndUpdate(
-    { _id: req.params.id, recipient: req.user._id },
+    { _id: req.params.id, recipient: req.user._id, ...(await notificationVisibilityFilter(req.user)) },
     { read: true },
     { new: true },
   );
@@ -68,7 +72,7 @@ exports.markRead = asyncHandler(async (req, res) => {
 // PATCH /api/notifications/read-all
 exports.markAllRead = asyncHandler(async (req, res) => {
   const result = await Notification.updateMany(
-    { recipient: req.user._id, read: false },
+    { recipient: req.user._id, read: false, ...(await notificationVisibilityFilter(req.user)) },
     { read: true },
   );
   res.status(200).json({
@@ -87,6 +91,7 @@ exports.deleteNotification = asyncHandler(async (req, res) => {
   const notif = await Notification.findOneAndDelete({
     _id: req.params.id,
     recipient: req.user._id,
+    ...(await notificationVisibilityFilter(req.user)),
   });
   if (!notif) {
     res.status(404);
@@ -100,6 +105,7 @@ exports.clearRead = asyncHandler(async (req, res) => {
   const result = await Notification.deleteMany({
     recipient: req.user._id,
     read: true,
+    ...(await notificationVisibilityFilter(req.user)),
   });
   res.status(200).json({
     status: 'success',

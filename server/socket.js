@@ -14,6 +14,7 @@ const {
   PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE,
 } = require('./constants/platformOperatorConstants');
 const logger = require('./utils/logger');
+const { evaluateConversationWriteState, hasSupportCapability, SUPPORT_READ } = require('./services/messagingAuthorizationService');
 
 // MESSAGING-PLATFORM-INBOX-AGGREGATION-1C — room canonique pour les
 // PlatformOperator porteurs de `platform.support.read`. Réutilisée par
@@ -107,6 +108,15 @@ const canAccessConversation = async (user, conversationId, activeTenantId = null
     .lean();
   if (!conversation) return false;
 
+  // P0 SUPPORT-INBOX — boîte de support Altitude Vision : uniquement le
+  // prospect participant ou un PlatformOperator actif `platform.support.read`
+  // (relu maintenant). La provenance tenant et le rôle staff sont ignorés.
+  if (conversation.isStaffInbox) {
+    const userKey = user?._id?.toString();
+    if (conversation.participants?.some((participantId) => participantId.toString() === userKey)) return true;
+    return hasSupportCapability(user, SUPPORT_READ);
+  }
+
   // Une room est une frontière de données au même titre qu'une route HTTP.
   // Si la conversation est attribuée, le contexte socket actif doit être le
   // même avant de considérer participant ou rôle staff.
@@ -116,8 +126,20 @@ const canAccessConversation = async (user, conversationId, activeTenantId = null
   const isParticipant = conversation.participants?.some(
     (participantId) => participantId.toString() === userId,
   );
-  const isStaffInboxMember = conversation.isStaffInbox && STAFF_ROLES.has(user?.role);
-  return Boolean(isParticipant || isStaffInboxMember);
+  return Boolean(isParticipant);
+};
+
+const canWriteConversation = async (user, conversationId, activeTenantId = null) => {
+  if (!mongoose.isValidObjectId(conversationId)) return false;
+  const conversation = await Conversation.findById(conversationId)
+    .select('participants isStaffInbox tenant relatedProperty relatedDossierType relatedDossier channelType')
+    .lean();
+  if (!conversation) return false;
+  // P0 SUPPORT-INBOX — l'écriture dans la boîte de support ne dépend que de
+  // la politique centrale (participant ou `platform.support.reply`).
+  if (!conversation.isStaffInbox && conversation.tenant && (!activeTenantId || String(conversation.tenant) !== String(activeTenantId))) return false;
+  const state = await evaluateConversationWriteState({ actor: user, conversation });
+  return state.writable === true;
 };
 
 /**
@@ -313,9 +335,10 @@ const initSocket = (httpServer, corsOptions) => {
     });
 
     // Relayer l'indicateur "en train d'écrire" aux autres membres de la conv
-    socket.on('typing', ({ conversationId } = {}) => {
+    socket.on('typing', async ({ conversationId } = {}) => {
       const room = `conv:${conversationId}`;
       if (!socket.rooms.has(room)) return;
+      if (!(await canWriteConversation(socket.user, conversationId, socket.platformTenantId).catch(() => false))) return;
       socket.to(room).emit('typing', { userId: socket.userId });
     });
 
@@ -455,6 +478,31 @@ const getRealtimeReadyPromise = () => _adapterReadyPromise;
  *   - optionnellement une room additionnelle (participant client).
  * Aucune diffusion à tous les ALL_STAFF via user-room.
  */
+// P0 SUPPORT-INBOX — diffusion d'un événement de la boîte de support aux
+// seuls agents Altitude Vision : chaque socket du salon `platform:support`
+// est réautorisé au moment de l'émission (opérateur actif détenant
+// `platform.support.read`, session valide) ; un agent suspendu ou révoqué
+// quitte le salon et ne reçoit plus rien. Jamais de salon staff tenant.
+async function emitSupportInboxEvent(eventName, payload) {
+  if (!_io) return { delivered: 0 };
+  const sockets = await _io.in(PLATFORM_SUPPORT_ROOM).fetchSockets();
+  let delivered = 0;
+  for (const socket of sockets) {
+    const userId = socket.data.userId;
+    const freshUser = userId ? await User.findById(userId).select('isActive status tokenVersion').lean() : null;
+    const sessionValid = freshUser && freshUser.isActive && !['Suspendu', 'Banni'].includes(freshUser.status)
+      && (socket.data.authTokenVersion === undefined || socket.data.authTokenVersion >= freshUser.tokenVersion);
+    const allowed = sessionValid && await hasSupportCapability(userId, SUPPORT_READ).catch(() => false);
+    if (!allowed) {
+      await socket.leave(PLATFORM_SUPPORT_ROOM);
+      continue;
+    }
+    socket.emit(eventName, payload);
+    delivered += 1;
+  }
+  return { delivered };
+}
+
 function emitConversationEvent(eventName, payload, { conversationTenantId, extraRooms = [] } = {}) {
   if (!_io) return;
   const rooms = new Set(extraRooms.filter(Boolean).map(String));
@@ -468,7 +516,7 @@ function emitConversationEvent(eventName, payload, { conversationTenantId, extra
 }
 
 module.exports = {
-  initSocket, getIO, isUserOnline, canAccessConversation, canAccessHotel, hotelRoom, emitHotelEvent,
-  PLATFORM_SUPPORT_ROOM, tenantStaffRoom, emitConversationEvent,
+  initSocket, getIO, isUserOnline, canAccessConversation, canWriteConversation, canAccessHotel, hotelRoom, emitHotelEvent,
+  PLATFORM_SUPPORT_ROOM, tenantStaffRoom, emitConversationEvent, emitSupportInboxEvent,
   getRealtimeStatus, getRealtimeReadyPromise, INSTANCE_ID,
 };

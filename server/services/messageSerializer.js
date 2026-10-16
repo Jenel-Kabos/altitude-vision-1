@@ -8,6 +8,12 @@ const { safePrivateDescriptor } = require('./storage/secureStorageService');
  */
 function serializeMessage(value) {
   const data = value?.toObject ? value.toObject() : { ...value };
+  for (const party of ['sender', 'receiver']) {
+    if (data[party] && typeof data[party] === 'object' && !data[party]._bsontype && ('_id' in data[party] || 'email' in data[party] || 'name' in data[party])) {
+      const { email, phone, password, token, refreshToken, googleId, ...safeParty } = data[party];
+      data[party] = safeParty;
+    }
+  }
   data.attachments = (data.attachments || []).map((attachment) => {
     const { asset, url: legacyUrl, ...metadata } = attachment;
     if (asset) {
