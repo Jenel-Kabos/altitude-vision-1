@@ -9,6 +9,7 @@
 
 const mongoose = require('mongoose');
 const Hotel = require('../models/Hotel');
+const CommercialPublicationRevision = require('../models/CommercialPublicationRevision');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const RoomCategory = require('../models/RoomCategory');
@@ -47,6 +48,12 @@ const { resolveTenantMembership } = require('../services/tenantMembershipService
 const { buildExactCiRegexFilter } = require('../services/propertyFilterService');
 const { escapeRegex } = require('../utils/regexEscape');
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
+const {
+  publicSnapshot,
+  projectApprovedPublicResource,
+  createPendingRevision,
+  decideRevision,
+} = require('../services/commercialPublicationService');
 const {
   ADMINISTRATION_SCOPE_MODE,
   hotelScopeFilter,
@@ -231,7 +238,7 @@ exports.getOne = async (req, res) => {
 // descriptif à destination du client, jamais une donnée administrative ou
 // personnelle — voir HOTEL_DETAIL_H1_REPORT.md). `taxInformation`,
 // `legalName`, `administrativeDocuments` restent volontairement exclus.
-const PUBLIC_HOTEL_FIELDS = 'name brand description starRating hotelType phone email website contact services hotelServices hasRestaurant hasReception gallery property publicationStatus active totalRooms totalCapacity totalBeds minNightlyRate maxNightlyRate currency policies';
+const PUBLIC_HOTEL_FIELDS = 'name brand description starRating hotelType phone email website contact services hotelServices hasRestaurant hasReception gallery property publicationStatus active totalRooms totalCapacity totalBeds minNightlyRate maxNightlyRate currency policies approvedPublicSnapshot';
 
 exports.getPublic = async (req, res) => {
   try {
@@ -266,12 +273,13 @@ exports.getPublic = async (req, res) => {
     // PHASE-H1 — `detail` est additif : `hotel`/`categories` restent
     // inchangés (contrat consommé par HotelBookingScreen, jamais cassé),
     // `detail` est la nouvelle projection normalisée pour HotelDetailScreen.
+    const publicHotel = projectApprovedPublicResource(hotel);
     res.json({
       status: 'success',
       data: {
-        hotel,
+        hotel: publicHotel,
         categories: categoriesWithRates,
-        detail: buildPublicHotelDetail(hotel, categoriesWithRates, {
+        detail: buildPublicHotelDetail(publicHotel, categoriesWithRates, {
           accommodation, reviewSummary, faq, viewerId: req.user?._id || req.user?.id,
         }),
       },
@@ -331,7 +339,7 @@ exports.listPublic = async (req, res) => {
       })
       .sort({ publishedAt: -1 });
 
-    const visible = hotels.filter((h) => h.property);
+    const visible = hotels.filter((h) => h.property).map(projectApprovedPublicResource);
     const total = visible.length;
     const start = (Math.max(1, Number(page) || 1) - 1) * (Number(limit) || 12);
     const paged = visible.slice(start, start + (Number(limit) || 12));
@@ -709,11 +717,13 @@ exports.updateFull = async (req, res) => {
     }
 
     let proposed = false;
+    let canonicalProposedSnapshot = null;
     if (hotel.publicationStatus === 'publie') {
       if (hotel.proposedVersion?.status === 'pending') return fail(res, 409, 'Une modification sensible est déjà en attente de modération.', { code: 'HOTEL_PROPOSED_VERSION_PENDING' });
       const { sensitiveProperty, sensitiveHotel } = splitSensitiveUpdates(property, hotel, propertyUpdates, hotelUpdates);
       if (Object.keys(sensitiveProperty).length || Object.keys(sensitiveHotel).length) {
         proposed = true;
+        canonicalProposedSnapshot = { ...hotel.toObject(), ...sensitiveHotel };
         hotel.proposedVersion = {
           requestId: new mongoose.Types.ObjectId().toString(), status: 'pending',
           propertyChanges: sensitiveProperty, hotelChanges: sensitiveHotel,
@@ -723,6 +733,12 @@ exports.updateFull = async (req, res) => {
     }
 
     const result = await updateFullHotel({ property, hotel, propertyUpdates, hotelUpdates, actingUser: req.user });
+    if (canonicalProposedSnapshot) {
+      await createPendingRevision({
+        resourceType: 'Hotel', resource: result.hotel,
+        proposedSnapshot: canonicalProposedSnapshot, actor: req.user,
+      });
+    }
 
     logAction({
       action: 'Hôtel modifié',
@@ -761,7 +777,11 @@ exports.submit = async (req, res) => {
     hotel.submittedAt = new Date();
     hotel.rejectionReason = '';
     await hotel.save();
-    res.json({ status: 'success', data: { hotel } });
+    const revision = await createPendingRevision({
+      resourceType: 'Hotel', resource: hotel,
+      proposedSnapshot: publicSnapshot(hotel), actor: req.user,
+    });
+    res.json({ status: 'success', data: { hotel, publicationRevision: revision } });
   } catch (error) {
     fail(res, 500, error.message);
   }
@@ -772,7 +792,7 @@ exports.submit = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.pending = async (req, res) => {
   try {
-    try { await assertHotelRequestAdministrationAuthority(req, 'platform.hotels.read', HOTEL_TENANT_ROLES.moderate); }
+    try { await assertHotelRequestAdministrationAuthority(req, 'platform.commercial.manage', []); }
     catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.', error.code ? { code: error.code } : {}); }
     const query = { $or: [{ publicationStatus: 'soumis' }, { 'proposedVersion.status': 'pending' }] };
     Object.assign(query, hotelScopeFilter(req.adminScope));
@@ -810,7 +830,7 @@ exports.reviewDecision = async (req, res) => {
     // F2.6.2 : cette action n'avait auparavant AUCUN contrôle de portée au-delà du filtre de
     // rôle global au niveau route — n'importe quel membre du staff Altimmo pouvait valider,
     // rejeter, suspendre ou réactiver n'importe quel hôtel.
-    try { await assertHotelAdministrationAccess(req, hotel, 'platform.hotels.manage', HOTEL_TENANT_ROLES.moderate); }
+    try { await assertHotelAdministrationAccess(req, hotel, 'platform.commercial.manage', []); }
     catch (error) { return fail(res, error.statusCode || 403, 'Accès refusé.', error.code ? { code: error.code } : {}); }
 
     const proposed = hotel.proposedVersion?.status === 'pending' ? hotel.proposedVersion : null;
@@ -886,11 +906,48 @@ exports.reviewDecision = async (req, res) => {
     if (action === 'suspend') { changes.suspensionReason = String(req.body.reason).trim(); changes.suspendedAt = now; }
     if (action === 'unsuspend') changes.suspensionReason = '';
     if (action === 'validate') changes.publishedAt = now;
-    const transition = await Hotel.updateOne(
-      { _id: hotel._id, publicationStatus: oldStatus },
-      { $set: changes, $push: { moderationHistory: { from: oldStatus, to: newStatus, decision: action, reason: String(req.body.reason || '').trim(), comment: String(req.body.comment || '').trim(), moderator: req.user.id, decidedAt: now } } },
-    );
-    if (!transition?.modifiedCount) return fail(res, 409, 'Cette demande a déjà été traitée par un autre modérateur.', { code: 'HOTEL_MODERATION_CONFLICT' });
+    if (['validate', 'reject'].includes(action)) {
+      let revision = await CommercialPublicationRevision.findOne({ resourceType: 'Hotel', resource: hotel._id, status: 'pending' }).sort('-createdAt');
+      if (!revision && hotel.property?._id) {
+        revision = await CommercialPublicationRevision.findOne({ resourceType: 'Property', resource: hotel.property._id, status: 'pending' }).sort('-createdAt');
+      }
+      if (!revision) revision = await createPendingRevision({ resourceType: 'Hotel', resource: hotel, proposedSnapshot: publicSnapshot(hotel), actor: hotel.manager || hotel.createdBy });
+      const decidesPropertyRevision = revision.resourceType === 'Property';
+      await decideRevision({
+        revisionId: revision._id,
+        decision: action === 'validate' ? 'approve' : 'reject',
+        actor: req.user,
+        reason: String(req.body.reason || (action === 'validate' ? 'Approbation commerciale Altitude Vision' : '')).trim(),
+        adapter: {
+          model: decidesPropertyRevision ? Property : Hotel,
+          buildPromotionUpdate: (approved, decidedRevision) => ({
+            $set: {
+              approvedPublicSnapshot: approved,
+              currentPublicationRevision: decidedRevision._id,
+              ...(decidesPropertyRevision
+                ? { statusAdmin: 'Validée', isPublished: true, reviewedAt: now }
+                : {
+                  publicationStatus: 'publie', reviewedBy: req.user.id, publishedAt: now,
+                }),
+            },
+            $inc: { commercialPublicationVersion: 1 },
+            ...(!decidesPropertyRevision ? { $push: { moderationHistory: { from: oldStatus, to: newStatus, decision: action, reason: String(req.body.reason || '').trim(), comment: String(req.body.comment || '').trim(), moderator: req.user.id, decidedAt: now } } } : {}),
+          }),
+        },
+      });
+      if (action === 'reject' || decidesPropertyRevision) {
+        await Hotel.updateOne(
+          { _id: hotel._id, publicationStatus: oldStatus },
+          { $set: changes, $push: { moderationHistory: { from: oldStatus, to: newStatus, decision: action, reason: String(req.body.reason || '').trim(), comment: String(req.body.comment || '').trim(), moderator: req.user.id, decidedAt: now } } },
+        );
+      }
+    } else {
+      const transition = await Hotel.updateOne(
+        { _id: hotel._id, publicationStatus: oldStatus },
+        { $set: changes, $push: { moderationHistory: { from: oldStatus, to: newStatus, decision: action, reason: String(req.body.reason || '').trim(), comment: String(req.body.comment || '').trim(), moderator: req.user.id, decidedAt: now } } },
+      );
+      if (!transition?.modifiedCount) return fail(res, 409, 'Cette demande a déjà été traitée par un autre modérateur.', { code: 'HOTEL_MODERATION_CONFLICT' });
+    }
     Object.assign(hotel, changes);
     // La Property est l'ancre du listing immobilier public. La décision
     // hôtelière reste l'unique action de modération et aligne les deux gates

@@ -34,12 +34,19 @@ async function fixtureWithOneUnit() {
   return { actor, hotel, category, rate };
 }
 
+// Dates relatives : des dates codées en dur (2026-10-10) faisaient échouer ce
+// test dès qu'elles passaient dans le passé (arrivée refusée), sans rapport
+// avec l'anti-surbooking qu'il certifie.
+const isoDay = (offsetDays) => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + offsetDays)).toISOString().slice(0, 10);
+
 test('deux réservations concurrentes différentes sur la dernière unité : une seule réussit', async () => {
   const f = await fixtureWithOneUnit();
+  const checkIn = isoDay(30);
+  const checkOut = isoDay(32);
   const base = {
     hotelId: f.hotel._id, roomCategoryId: f.category._id, ratePlanId: f.rate._id,
     guest: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.test' },
-    checkInDate: '2026-10-10', checkOutDate: '2026-10-12', roomsCount: 1, adults: 1, children: 0,
+    checkInDate: checkIn, checkOutDate: checkOut, roomsCount: 1, adults: 1, children: 0,
     source: 'public_web', actingUser: {},
     notificationDependencies: { emailSender: jest.fn().mockResolvedValue({ success: true }) },
   };
@@ -53,7 +60,7 @@ test('deux réservations concurrentes différentes sur la dernière unité : une
   expect(fulfilled).toHaveLength(1);
   expect(results.find((r) => r.status === 'rejected')?.reason?.statusCode).toBe(409);
 
-  const inventory = await RoomInventory.findOne({ roomCategory: f.category._id, date: new Date('2026-10-10T00:00:00.000Z') });
+  const inventory = await RoomInventory.findOne({ roomCategory: f.category._id, date: new Date(`${checkIn}T00:00:00.000Z`) });
   expect(inventory.reservedUnits).toBe(1);
   expect(await HotelReservation.countDocuments({ hotel: f.hotel._id })).toBe(1);
 });

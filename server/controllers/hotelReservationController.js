@@ -90,6 +90,13 @@ async function assertReservationAccess(req, reservation) {
   if (isGuest) return { role: 'guest' };
   const hotel = await Hotel.findById(reservation.hotel);
   if (!hotel) return null;
+  // F-U2.14 — propagation du contexte tenant résolu AVANT toute branche de rôle :
+  // le gestionnaire (`hotel.manager`) sortait ici sans `req.user.platformTenant`,
+  // si bien que l'autorisation financière en aval (capacité dérivée de
+  // l'OrgMembership du tenant) échouait toujours (403 sur
+  // /checkout-financial-readiness) alors que la route financière équivalente
+  // (requireTenantScope) lui était accessible. Voir le commentaire ci-dessous.
+  if (!req.user.platformTenant && req.platformTenant) req.user.platformTenant = req.platformTenant;
   const isOwner = hotel.manager && String(hotel.manager) === String(req.user?.id);
   if (isOwner) return { role: 'owner', hotel };
   // Global admin routes/actions apply their read/manage PlatformOperator

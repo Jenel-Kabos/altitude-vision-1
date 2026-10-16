@@ -13,6 +13,7 @@ const { requireHotelCapability } = require('../middleware/hotelAccessMiddleware'
 const { HOTEL_OPERATIONAL_CAPABILITIES } = require('../constants/hotelAccessConstants');
 const { upload } = require('../config/cloudinary');
 const { attachTenantScopeIfResolvable, requireTenantScope, requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
+const { requirePlatformOperatorCapability, requirePlatformScope } = require('../middleware/platformAuthority');
 
 const router = express.Router();
 const markHotelAdministrationRequest = (req, res, next) => { req.hotelAdministrationRequest = true; next(); };
@@ -79,7 +80,7 @@ router.post('/:hotelId/staff-assignments/:assignmentId/revoke', staffManage, sta
 router.post('/admin', markHotelAdministrationRequest, requireTenantScope, upload.array('images', 10), ctrl.createFull);
 router.put('/admin/:hotelId', markHotelAdministrationRequest, upload.array('images', 10), ctrl.updateFull);
 router.get('/admin/list', requireTenantScopeForStaffAllowPlatformWide, ctrl.listAdmin);
-router.get('/status/pending', requireTenantScopeForStaffAllowPlatformWide, ctrl.pending);
+router.get('/status/pending', requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, ctrl.pending);
 // Contrôle final (audit Sprint B2) — réconciliation manuelle en cas de
 // désynchronisation Hotel↔Accommodation constatée (voir hotelService.
 // resyncLinkedAccommodations). Réservé au staff : action de récupération
@@ -147,7 +148,7 @@ router.patch('/room-assignments/change', roomAssignmentCtrl.change);
 router.patch('/room-assignments/release', roomAssignmentCtrl.release);
 
 // Staff — validate|reject|suspend|unsuspend (même convention qu'Accommodation)
-router.patch('/:id/:action', ctrl.reviewDecision);
+router.patch('/:id/:action', requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, ctrl.reviewDecision);
 
 // Sélecteur admin (Sprint Hôtel, inchangé) — routes génériques en dernier
 router.get('/', requireTenantScopeForStaffAllowPlatformWide, ctrl.list);

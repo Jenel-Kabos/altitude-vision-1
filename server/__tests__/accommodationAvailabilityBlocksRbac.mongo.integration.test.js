@@ -23,7 +23,7 @@ const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
 const Block = require('../models/AccommodationAvailabilityBlock');
 const NightLock = require('../models/AccommodationNightLock');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const routes = require('../routes/accommodationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
@@ -88,7 +88,7 @@ beforeAll(async () => {
   client = await User.create({ name: 'RBAC Client', email: `rbac-client-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   operatorGlobal = await User.create({ name: 'RBAC Operator', email: `rbac-operator-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   // PLATFORM-ADMIN-04A — la portée globale exige un opérateur éligible à la Vue plateforme.
-  await grantOperator({ userId: operatorGlobal._id, actor: adminA, reason: 'RBAC-FINAL-01 test', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: operatorGlobal._id, actor: adminA, reason: 'RBAC-FINAL-01 test', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
 
   accommodationA = await makeAccommodation(tenantA, ownerA, 'A');
   blockA = await makeBlock(accommodationA, ownerA);

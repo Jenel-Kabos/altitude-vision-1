@@ -17,7 +17,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser, createTenantHotel } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const User = require('../models/User');
 const Hotel = require('../models/Hotel');
@@ -76,13 +76,13 @@ beforeAll(async () => {
   S.resB = await makeReservation(S.B, S.hotelB, S.adminB);
 
   S.full = await makeUser('Admin', 'full');
-  await grantOperator({ userId: S.full._id, actor: S.adminA, reason: 'HOA full', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: S.full._id, actor: S.adminA, reason: 'HOA full', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   S.reader = await makeUser('Collaborateur', 'reader');
-  await grantOperator({ userId: S.reader._id, actor: S.full, reason: 'HOA reader', capabilities: ['platform.hotels.read'] });
+  await provisionPrivilegedOperator({ userId: S.reader._id, actor: S.full, reason: 'HOA reader', capabilities: ['platform.hotels.read'] });
   S.manager = await makeUser('Collaborateur', 'manager');
-  await grantOperator({ userId: S.manager._id, actor: S.full, reason: 'HOA manager', capabilities: ['platform.hotels.manage'] });
+  await provisionPrivilegedOperator({ userId: S.manager._id, actor: S.full, reason: 'HOA manager', capabilities: ['platform.hotels.manage'] });
   S.support = await makeUser('Admin', 'support');
-  await grantOperator({ userId: S.support._id, actor: S.full, reason: 'HOA support', capabilities: ['platform.support.read'] });
+  await provisionPrivilegedOperator({ userId: S.support._id, actor: S.full, reason: 'HOA support', capabilities: ['platform.support.read'] });
 
   S.tenantAdminCanonical = (await createTenantUser({ tenant: S.A, bootstrap: S.adminA, overrides: { role: 'Client' }, businessRole: 'Admin' })).user;
   S.gestionnaire = (await createTenantUser({ tenant: S.A, bootstrap: S.adminA, overrides: { role: 'GestionnaireImmobilier' }, businessRole: 'GestionnaireImmobilier' })).user;

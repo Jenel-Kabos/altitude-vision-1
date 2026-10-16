@@ -3,7 +3,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser, createTenantHotel } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const RoomCategory = require('../models/RoomCategory');
 const HotelReservation = require('../models/HotelReservation');
@@ -88,12 +88,12 @@ beforeAll(async () => {
   managingOperator = await User.create({ name: 'HZ05 Managing Operator', email: 'hz05-managing-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   client = await User.create({ name: 'HZ05 Client', email: 'hz05-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   proprietor = await User.create({ name: 'HZ05 Owner', email: 'hz05-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ05 admin lists certification', capabilities: ['platform.hotels.read'] });
+  await provisionPrivilegedOperator({ userId: operator._id, actor: adminA, reason: 'HZ05 admin lists certification', capabilities: ['platform.hotels.read'] });
   // PLATFORM-ADMIN-04A — la portée globale exige un opérateur éligible.
-  await grantOperator({ userId: platformAdmin._id, actor: adminA, reason: 'PA04A eligible platform admin', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
-  await grantOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ05 missing read certification', capabilities: [] });
-  await grantOperator({ userId: suspendedOperator._id, actor: adminA, reason: 'HZ05 suspended certification', capabilities: ['platform.hotels.read'] });
-  await grantOperator({ userId: managingOperator._id, actor: adminA, reason: 'HZ05 manage certification', capabilities: ['platform.hotels.read', 'platform.hotels.manage'] });
+  await provisionPrivilegedOperator({ userId: platformAdmin._id, actor: adminA, reason: 'PA04A eligible platform admin', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ05 missing read certification', capabilities: [] });
+  await provisionPrivilegedOperator({ userId: suspendedOperator._id, actor: adminA, reason: 'HZ05 suspended certification', capabilities: ['platform.hotels.read'] });
+  await provisionPrivilegedOperator({ userId: managingOperator._id, actor: adminA, reason: 'HZ05 manage certification', capabilities: ['platform.hotels.read', 'platform.hotels.manage'] });
   await PlatformOperator.updateOne({ user: suspendedOperator._id }, { status: 'suspended', suspendedBy: adminA._id, suspendedAt: new Date(), suspensionReason: 'Test' });
 
   hotelA = await createTenantHotel({ tenant: tenantA, manager: proprietor, createdBy: adminA, overrides: { name: 'HZ05 Hotel A' } });

@@ -21,7 +21,6 @@ import { getPendingHotels, reviewHotel } from "../../services/hotelService";
 import { HOTEL_SERVICES, HOTEL_RATE_TYPES } from "../../constants/hotel";
 import { getPublicationErrorMessage } from "../../utils/publicationError";
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from "../../components/dashboard/DashboardUI";
-import { usePlatformTenantRuntime } from "../../context/PlatformTenantRuntimeContext";
 
 const FILTERS = [
   { key: "Tous", label: "Tous" },
@@ -45,7 +44,6 @@ const HotelModerationPage = () => {
   const [rejectReason, setRejectReason] = useState("");
   const [validatingId, setValidatingId] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
-  const { selectedTenantId } = usePlatformTenantRuntime();
 
   const stats = {
     total: hotels.length,
@@ -57,14 +55,14 @@ const HotelModerationPage = () => {
   const fetchHotels = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await getPendingHotels({ platformScoped: !selectedTenantId });
+      const list = await getPendingHotels();
       setHotels(list);
     } catch (err) {
       setError(err.response?.data?.message || "Impossible de charger les hôtels en attente.");
     } finally {
       setLoading(false);
     }
-  }, [selectedTenantId]);
+  }, []);
 
   useEffect(() => { fetchHotels(); }, [fetchHotels]);
 

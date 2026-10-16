@@ -79,6 +79,31 @@ describe('GET /api/hotels/public/:id — projection normalisée H1', () => {
     expect(detail.description).toBe('Un hôtel confortable en plein centre-ville.');
   });
 
+  test('une révision en attente ne remplace pas la dernière version hôtelière approuvée', async () => {
+    const owner = await makeUser();
+    const property = await makeProperty(owner);
+    const hotel = await makeHotel(property, owner, {
+      name: 'Nom live non approuvé',
+      description: 'Description live non approuvée.',
+      approvedPublicSnapshot: {
+        name: 'Nom approuvé',
+        description: 'Description publique approuvée.',
+        starRating: 4,
+        hotelType: 'hotel',
+        gallery: [],
+        policies: { checkInTime: '14:00', checkOutTime: '11:00' },
+      },
+      commercialPublicationVersion: 1,
+    });
+
+    const response = await request(app).get(`/api/hotels/public/${hotel._id}`);
+    expect(response.status).toBe(200);
+    expect(response.body.data.hotel.name).toBe('Nom approuvé');
+    expect(response.body.data.detail.name).toBe('Nom approuvé');
+    expect(response.body.data.detail.description).toBe('Description publique approuvée.');
+    expect(JSON.stringify(response.body)).not.toContain('Nom live non approuvé');
+  });
+
   test('l’état favori est calculé pour le visiteur authentifié, isolé par utilisateur', async () => {
     const owner = await makeUser();
     const favoriteUser = await makeUser({ role: 'Client' });

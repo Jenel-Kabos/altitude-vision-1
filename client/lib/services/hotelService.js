@@ -58,7 +58,7 @@ export const submitHotel = async (id) => {
 };
 
 export const reviewHotel = async (id, action, data = {}) => {
-  const res = await api.patch(`/hotels/${id}/${action}`, data);
+  const res = await api.patch(`/hotels/${id}/${action}`, data, { platformScoped: true });
   return res.data.data.hotel;
 };
 
@@ -81,8 +81,8 @@ export const deleteHotel = async (id) => {
   await api.delete(`/hotels/${id}`);
 };
 
-export const getPendingHotels = async ({ platformScoped = false } = {}) => {
-  const res = await api.get('/hotels/status/pending', platformScoped ? { platformScoped: true } : undefined);
+export const getPendingHotels = async () => {
+  const res = await api.get('/hotels/status/pending', { platformScoped: true });
   return res.data.data.hotels;
 };
 

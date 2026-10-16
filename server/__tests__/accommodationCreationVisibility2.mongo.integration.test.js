@@ -12,7 +12,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
@@ -69,6 +69,9 @@ let adminA;
 let adminB;
 let unscopedAdmin;
 let operator;
+// LOT A — Altitude Vision : PlatformOperator actif, éligible à la Vue
+// plateforme (platform.commercial.manage inclus), en contexte PLATFORM.
+let commercialOperator;
 
 beforeAll(async () => {
   await startFinancialMongo();
@@ -80,7 +83,10 @@ beforeAll(async () => {
   ({ user: adminB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Admin' } }));
   unscopedAdmin = await User.create({ name: 'Unscoped Admin', email: 'hotfix2-unscoped@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   operator = await User.create({ name: 'Scoped Operator', email: 'hotfix2-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HOTFIX accommodation scoped create', capabilities: [] });
+  await provisionPrivilegedOperator({ userId: operator._id, actor: adminA, reason: 'HOTFIX accommodation scoped create', capabilities: [] });
+  commercialOperator = await User.create({ name: 'Commercial Operator', email: 'hotfix2-commercial@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
+  const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
+  await provisionPrivilegedOperator({ userId: commercialOperator._id, actor: adminA, reason: 'LOT A commercial moderation', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
 });
 
 afterAll(stopFinancialMongo);
@@ -99,10 +105,15 @@ test('RED→GREEN — création Admin A persiste le tenant sur la paire et reste
   expect(accommodation.publicationStatus).toBe('soumis');
   expect(property).toMatchObject({ status: 'hebergement', statusAdmin: 'En attente', isPublished: false });
 
-  const pendingA = await request(app).get('/api/accommodations/status/pending').set(bearer(adminA, tenantA));
-  const pendingB = await request(app).get('/api/accommodations/status/pending').set(bearer(adminB, tenantB));
-  expect(pendingA.body.data.accommodations.map((item) => item._id)).toContain(String(accommodation._id));
-  expect(pendingB.body.data.accommodations.map((item) => item._id)).not.toContain(String(accommodation._id));
+  // LOT A — la file de modération est exclusivement plateforme : aucun Admin
+  // tenant (A ou B) n'y accède ; l'opérateur commercial voit l'hébergement de
+  // A sans réattribution de tenant.
+  expect((await request(app).get('/api/accommodations/status/pending').set(bearer(adminA, tenantA))).status).toBe(403);
+  expect((await request(app).get('/api/accommodations/status/pending').set(bearer(adminB, tenantB))).status).toBe(403);
+  const platformQueue = await request(app).get('/api/accommodations/status/pending').set(bearer(commercialOperator));
+  expect(platformQueue.status).toBe(200);
+  expect(platformQueue.body.data.accommodations.map((item) => item._id)).toContain(String(accommodation._id));
+  expect(String((await Accommodation.findById(accommodation._id).lean()).tenant)).toBe(String(tenantA._id));
 });
 
 test('RED→GREEN — tenant B est attribué à B et les créations sans sélection valide échouent fermées', async () => {
@@ -129,7 +140,10 @@ test('RED→GREEN — validation synchronise Property, rend la ressource visible
   const accommodationId = created.body.data.accommodation._id;
   const propertyId = created.body.data.property._id;
 
-  const validated = await request(app).patch(`/api/accommodations/${accommodationId}/validate`).set(bearer(adminA, tenantA));
+  // LOT A — l'Admin du tenant propriétaire ne peut pas valider sa propre
+  // publication ; seul un opérateur commercial plateforme le peut.
+  expect((await request(app).patch(`/api/accommodations/${accommodationId}/validate`).set(bearer(adminA, tenantA))).status).toBe(403);
+  const validated = await request(app).patch(`/api/accommodations/${accommodationId}/validate`).set(bearer(commercialOperator));
   expect(validated.status).toBe(200);
   expect(validated.body.data.accommodation.publicationStatus).toBe('publie');
   expect(await Property.findById(propertyId).lean()).toMatchObject({ statusAdmin: 'Validée', isPublished: true, tenant: tenantA._id });

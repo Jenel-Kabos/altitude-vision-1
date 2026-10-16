@@ -54,6 +54,17 @@ jest.mock('../services/platformTenant/tenantResourceAttributionService', () => (
   resolveResourceTenant: jest.fn().mockResolvedValue({ status: 'resolved', tenantId: '607f1f77bcf86cd799439001' }),
 }));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
+// LOT A — décisions de publication via le service canonique de révisions
+// (CAS/transactions, certifié sur Mongo réel). Ici : garde de route et suite
+// du contrôleur uniquement ; le service est simulé.
+jest.mock('../models/CommercialPublicationRevision', () => ({
+  findOne: jest.fn(() => ({ sort: jest.fn().mockResolvedValue(null) })),
+}));
+jest.mock('../services/commercialPublicationService', () => ({
+  ...jest.requireActual('../services/commercialPublicationService'),
+  createPendingRevision: jest.fn().mockResolvedValue({ _id: 'REVISION-H', resourceType: 'Hotel' }),
+  decideRevision: jest.fn().mockResolvedValue({ _id: 'REVISION-H', status: 'approved' }),
+}));
 jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(),
   notifyStaff: jest.fn().mockResolvedValue(),
@@ -130,6 +141,27 @@ const fakeUser = (id, role = 'Proprietaire') => ({
   _id: id, id, name: 'Test User', email: 'test@altitude.com',
   role, isActive: true, status: 'Actif', tokenVersion: 0,
 });
+// LOT A — Altitude Vision = PlatformOperator actif, éligible, avec
+// platform.commercial.manage, en contexte PLATFORM (aucun tenant). Jamais un
+// rôle User ni une adhésion tenant.
+const { resolveActiveOperator } = require('../services/platformOperator/platformOperatorService');
+const { resolveEffectiveTenantContext } = require('../services/platformTenant/tenantContextService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
+const { decideRevision } = require('../services/commercialPublicationService');
+const asCommercialOperator = (id) => {
+  const operator = { user: id, status: 'active', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] };
+  resolveActiveOperator.mockImplementation(async (userId) => (String(userId) === String(id) ? operator : null));
+  resolveEffectiveTenantContext.mockImplementation(async (userId, requested) => (
+    String(userId) === String(id) && !requested
+      ? { tenant: null, source: 'platform_operator_unscoped', operator }
+      : { tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }
+  ));
+};
+const resetPlatformMocks = () => {
+  resolveActiveOperator.mockReset(); resolveActiveOperator.mockResolvedValue(null);
+  resolveEffectiveTenantContext.mockReset(); resolveEffectiveTenantContext.mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' });
+};
+
 const mockUserAuth = (id, role) => {
   User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser(id, role)) });
   User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
@@ -246,7 +278,10 @@ describe('PUT /api/hotels/mine/:hotelId — version publiée et version proposé
 
   test('une modification ordinaire est immédiate, une modification sensible reste proposée', async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
+    // Un document Mongoose réel expose toObject() (utilisé pour construire le
+    // snapshot proposé de la révision commerciale, LOT A).
     const hotel = { _id: HOTEL_ID, manager: OWNER_ID, property: PROPERTY_ID, publicationStatus: 'publie', name: 'Nom publié', description: 'Description publiée', proposedVersion: null, save: jest.fn().mockResolvedValue() };
+    hotel.toObject = () => ({ _id: hotel._id, manager: hotel.manager, property: hotel.property, publicationStatus: hotel.publicationStatus, name: hotel.name, description: hotel.description });
     const property = { _id: PROPERTY_ID, title: 'Titre publié', description: 'Description publiée', address: { city: 'Brazzaville', arrondissement: 'Centre-ville' }, longitude: 15.28, latitude: -4.26, save: jest.fn().mockResolvedValue() };
     Hotel.findById = jest.fn().mockResolvedValue(hotel);
     Property.findById = jest.fn().mockResolvedValue(property);
@@ -261,6 +296,8 @@ describe('PUT /api/hotels/mine/:hotelId — version publiée et version proposé
     expect(hotel.name).toBe('Nom publié');
     expect(hotel.description).toBe('Description ordinaire mise à jour');
     expect(hotel.proposedVersion.hotelChanges).toEqual({ name: 'Nom proposé' });
+    const { createPendingRevision } = require('../services/commercialPublicationService');
+    expect(createPendingRevision).toHaveBeenCalledWith(expect.objectContaining({ resourceType: 'Hotel', proposedSnapshot: expect.objectContaining({ name: 'Nom proposé' }) }));
     expect(property.description).toBe('Description ordinaire mise à jour');
   });
 
@@ -279,8 +316,23 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
   beforeEach(() => {
     Hotel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
     Property.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+    // LOT A — le modérateur est un opérateur commercial plateforme.
+    asCommercialOperator(ADMIN_ID);
   });
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => { jest.clearAllMocks(); resetPlatformMocks(); });
+
+  test('LOT A — un Admin tenant (rôle + adhésion) sans PlatformOperator ne peut pas valider', async () => {
+    resetPlatformMocks();
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Hotel.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(submitted()) });
+    const res = await request(app)
+      .patch(`/api/hotels/${HOTEL_ID}/validate`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .set('X-Platform-Tenant-Id', TENANT_ID)
+      .send({});
+    expect(res.statusCode).toBe(403);
+    expect(decideRevision).not.toHaveBeenCalled();
+  });
 
   const submitted = (overrides = {}) => ({
     _id: HOTEL_ID,
@@ -370,12 +422,17 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
   });
 
   test('409 — une seconde décision concurrente ne peut pas retraiter la même soumission', async () => {
+    // LOT A — le compare-and-set de la décision est porté par le service de
+    // révisions (certifié sur Mongo réel) : une décision perdante y lève
+    // PUBLICATION_REVISION_STALE, que la route relaie sans effet de bord.
     mockUserAuth(ADMIN_ID, 'Admin');
     const hotel = submitted();
     Hotel.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(hotel) });
     RoomCategory.find = jest.fn().mockResolvedValue([{ _id: CATEGORY_ID }]);
     RatePlan.countDocuments = jest.fn().mockResolvedValue(1);
-    Hotel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 0 });
+    Accommodation.updateMany = jest.fn().mockResolvedValue({});
+    const { CommercialPublicationError } = jest.requireActual('../services/commercialPublicationService');
+    decideRevision.mockRejectedValueOnce(new CommercialPublicationError('PUBLICATION_REVISION_STALE', 'Une décision concurrente a déjà gagné.', 409));
 
     const res = await request(app)
       .patch(`/api/hotels/${HOTEL_ID}/validate`)
@@ -383,8 +440,9 @@ describe('PATCH /api/hotels/:id/:action — décision admin (validate/reject/sus
       .send({});
 
     expect(res.statusCode).toBe(409);
-    expect(res.body.code).toBe('HOTEL_MODERATION_CONFLICT');
+    expect(res.body.code).toBe('PUBLICATION_REVISION_STALE');
     expect(Accommodation.updateMany).not.toHaveBeenCalled();
+    expect(Property.updateOne).not.toHaveBeenCalled();
   });
 
   test('200 — valide atomiquement une version sensible proposée sans changer le statut publié', async () => {

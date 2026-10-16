@@ -18,7 +18,7 @@ const FinancialLedgerEntry = require('../models/FinancialLedgerEntry');
 const FinancialDeduction = require('../models/FinancialDeduction');
 const FinancialRefund = require('../models/FinancialRefund');
 const PlatformOperator = require('../models/PlatformOperator');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const routes = require('../routes/accommodationReservationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
@@ -57,7 +57,7 @@ beforeAll(async () => {
   guest = await User.create({ name: 'Reservation Guest', email: 'reservation-scope-guest@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   operator = await User.create({ name: 'Reservation Operator', email: 'reservation-scope-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   proprietor = await User.create({ name: 'Reservation Owner', email: 'reservation-scope-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'Certification reservation tenant', capabilities: [] });
+  await provisionPrivilegedOperator({ userId: operator._id, actor: adminA, reason: 'Certification reservation tenant', capabilities: [] });
   accommodationA = await makeAccommodation(tenantA, adminA, 'A'); accommodationB = await makeAccommodation(tenantB, adminB, 'B');
 });
 

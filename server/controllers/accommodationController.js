@@ -19,6 +19,8 @@ const {
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const { createFullMobileAccommodation } = require('../services/accommodation/mobileAccommodationPublicationService');
 const { hasCapability } = require('../services/platformOperator/platformOperatorService');
+const CommercialPublicationRevision = require('../models/CommercialPublicationRevision');
+const { publicSnapshot, createPendingRevision, decideRevision } = require('../services/commercialPublicationService');
 const {
   ADMINISTRATION_SCOPE_MODE,
   accommodationScopeFilter,
@@ -465,7 +467,15 @@ exports.update = async (req, res) => {
     } catch (error) {
       return fail(res, error.statusCode || 403, "Vous ne pouvez modifier que vos propres hébergements.");
     }
-    ALLOWED_FIELDS.forEach((key) => { if (req.body[key] !== undefined) accommodation[key] = req.body[key]; });
+    const changes = Object.fromEntries(ALLOWED_FIELDS.filter((key) => req.body[key] !== undefined).map((key) => [key, req.body[key]]));
+    if (accommodation.publicationStatus === 'publie') {
+      const baseline = publicSnapshot(accommodation.approvedPublicSnapshot || accommodation);
+      await createPendingRevision({ resourceType: 'Accommodation', resource: accommodation, proposedSnapshot: { ...baseline, ...publicSnapshot(changes) }, actor: req.user });
+      accommodation.updatedBy = req.user.id;
+      await accommodation.save();
+      return res.json({ status: 'success', data: { accommodation: serializeAccommodation(accommodation), publicationRevisionPending: true } });
+    }
+    Object.assign(accommodation, changes);
     // Une modification après rejet repart en brouillon, jamais republiée
     // silencieusement — la republication doit repasser par /submit.
     if (accommodation.publicationStatus === 'rejete') {
@@ -474,6 +484,7 @@ exports.update = async (req, res) => {
     }
     accommodation.updatedBy = req.user.id;
     await accommodation.save();
+    await createPendingRevision({ resourceType: 'Accommodation', resource: accommodation, proposedSnapshot: publicSnapshot(accommodation), actor: req.user });
     res.json({ status: 'success', data: { accommodation: serializeAccommodation(accommodation) } });
   } catch (error) {
     fail(res, 500, error.message);
@@ -596,17 +607,18 @@ exports.reviewDecision = async (req, res) => {
       'title description owner images bedrooms bathrooms status statusAdmin isPublished availability tenant',
     );
     if (!accommodation) return fail(res, 404, 'Hébergement introuvable.');
+    let publicationRevision = await CommercialPublicationRevision.findOne({ resourceType: 'Accommodation', resource: accommodation._id, status: 'pending' }).sort('-createdAt');
     // TENANT-CERT-3-PRE — route staff-only (aucun propriétaire self-service
     // ici, déjà restreinte à ROLES_ALTIMMO par la route) : n'avait jusqu'ici
     // aucune vérification tenant, un staff du Tenant A pouvait valider/
     // rejeter/suspendre un hébergement du Tenant B.
     try {
-      await assertAccommodationAccessible(req, accommodation, ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'CommunityManager'], 'platform.accommodations.manage');
+      await assertAccommodationAccessible(req, accommodation, [], 'platform.commercial.manage');
     } catch (error) {
       return fail(res, error.statusCode || 403, 'Accès refusé.');
     }
 
-    if (['validate', 'reject'].includes(action) && accommodation.publicationStatus !== 'soumis') {
+    if (['validate', 'reject'].includes(action) && accommodation.publicationStatus !== 'soumis' && !publicationRevision) {
       return fail(res, 409, 'Seul un hébergement soumis peut être validé ou rejeté.');
     }
     if (action === 'suspend' && accommodation.publicationStatus !== 'publie') {
@@ -630,21 +642,42 @@ exports.reviewDecision = async (req, res) => {
 
     const previousStatus = accommodation.publicationStatus;
     const newStatus = { validate: 'publie', reject: 'rejete', suspend: 'suspendu', unsuspend: 'publie' }[action];
-    accommodation.publicationStatus = newStatus;
-    accommodation.reviewedBy = req.user.id;
-    accommodation.rejectionReason = action === 'reject' ? String(req.body.reason).trim() : accommodation.rejectionReason;
-    accommodation.suspensionReason = action === 'suspend' ? String(req.body.reason).trim() : (action === 'unsuspend' ? '' : accommodation.suspensionReason);
-    if (action === 'validate') accommodation.publishedAt = new Date();
-    if (action === 'suspend') accommodation.suspendedAt = new Date();
-    await accommodation.save();
+    if (['validate', 'reject'].includes(action)) {
+      if (!publicationRevision) publicationRevision = await createPendingRevision({ resourceType: 'Accommodation', resource: accommodation, proposedSnapshot: publicSnapshot(accommodation), actor: accommodation.createdBy });
+      const hadApprovedVersion = accommodation.commercialPublicationVersion > 0 || Boolean(accommodation.approvedPublicSnapshot) || previousStatus === 'publie';
+      await decideRevision({
+        revisionId: publicationRevision._id, decision: action === 'validate' ? 'approve' : 'reject', actor: req.user,
+        reason: String(req.body.reason || (action === 'validate' ? 'Approbation commerciale Altitude Vision' : '')).trim(),
+        adapter: { model: Accommodation, buildPromotionUpdate: (approved, revision) => ({ $set: { approvedPublicSnapshot: approved, currentPublicationRevision: revision._id, publicationStatus: 'publie', reviewedBy: req.user.id, publishedAt: new Date() }, $inc: { commercialPublicationVersion: 1 } }) },
+      });
+      if (action === 'reject') await Accommodation.updateOne({ _id: accommodation._id }, { $set: { publicationStatus: hadApprovedVersion ? 'publie' : 'rejete', reviewedBy: req.user.id, rejectionReason: String(req.body.reason).trim() } });
+      const decidedAccommodation = await Accommodation.findById(accommodation._id).lean();
+      accommodation.publicationStatus = decidedAccommodation.publicationStatus;
+      accommodation.commercialPublicationVersion = decidedAccommodation.commercialPublicationVersion;
+      accommodation.approvedPublicSnapshot = decidedAccommodation.approvedPublicSnapshot;
+      accommodation.currentPublicationRevision = decidedAccommodation.currentPublicationRevision;
+      accommodation.reviewedBy = decidedAccommodation.reviewedBy;
+      accommodation.rejectionReason = decidedAccommodation.rejectionReason;
+    } else {
+      accommodation.publicationStatus = newStatus;
+      accommodation.reviewedBy = req.user.id;
+      accommodation.suspensionReason = action === 'suspend' ? String(req.body.reason).trim() : '';
+      if (action === 'suspend') accommodation.suspendedAt = new Date();
+      await accommodation.save();
+    }
 
     if (accommodation.property && ['validate', 'reject'].includes(action)) {
       const previousPropertyState = {
         statusAdmin: accommodation.property.statusAdmin,
         isPublished: accommodation.property.isPublished,
       };
-      accommodation.property.statusAdmin = action === 'validate' ? 'Validée' : 'Rejetée';
-      accommodation.property.isPublished = action === 'validate';
+      const keepPublished = action === 'reject' && (accommodation.commercialPublicationVersion > 0 || Boolean(accommodation.approvedPublicSnapshot));
+      accommodation.property.statusAdmin = action === 'validate' || keepPublished ? 'Validée' : 'Rejetée';
+      accommodation.property.isPublished = action === 'validate' || keepPublished;
+      if (action === 'validate') {
+        accommodation.property.approvedPublicSnapshot = publicSnapshot(accommodation.property);
+        accommodation.property.commercialPublicationVersion = Number(accommodation.property.commercialPublicationVersion || 0) + 1;
+      }
       try {
         await accommodation.property.save();
       } catch (error) {

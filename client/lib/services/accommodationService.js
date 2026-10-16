@@ -3,7 +3,7 @@ import api from './api';
 // ── Hébergement (meublés — Sprint 2) — satellite 1-1 de Property ──
 
 export const getPendingAccommodations = async () => {
-  const res = await api.get('/accommodations/status/pending');
+  const res = await api.get('/accommodations/status/pending', { platformScoped: true });
   return res.data.data.accommodations;
 };
 
@@ -33,7 +33,7 @@ export const submitAccommodation = async (id) => {
 };
 
 export const reviewAccommodation = async (id, action, data = {}) => {
-  const res = await api.patch(`/accommodations/${id}/${action}`, data);
+  const res = await api.patch(`/accommodations/${id}/${action}`, data, { platformScoped: true });
   return res.data.data.accommodation;
 };
 

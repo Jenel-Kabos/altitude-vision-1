@@ -134,6 +134,9 @@ const hotelSchema = new mongoose.Schema(
       reviewedAt: { type: Date, default: null },
       rejectionReason: { type: String, trim: true, default: '' },
     },
+    commercialPublicationVersion: { type: Number, default: 0, min: 0 },
+    approvedPublicSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+    currentPublicationRevision: { type: mongoose.Schema.Types.ObjectId, ref: 'CommercialPublicationRevision', default: null },
     versionHistory: {
       type: [{
         requestId: { type: String, trim: true, required: true },

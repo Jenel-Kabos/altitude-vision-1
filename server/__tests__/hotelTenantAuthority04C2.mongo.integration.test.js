@@ -3,7 +3,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const User = require('../models/User');
 const Hotel = require('../models/Hotel');
@@ -41,14 +41,14 @@ beforeAll(async () => {
   S.hotelB = await Hotel.create({ name: 'C2 Hotel B resource', tenant: S.b.tenant._id, manager: S.b.bootstrap._id, createdBy: S.b.bootstrap._id, publicationStatus: 'publie', active: true });
 
   S.granting = await makeUser('Admin', 'granting');
-  await grantOperator({ userId: S.granting._id, actor: S.a.bootstrap, reason: 'C2 fixture', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: S.granting._id, actor: S.a.bootstrap, reason: 'C2 fixture', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
 });
 afterAll(stopFinancialMongo);
 
 describe('PA-04C2 — PlatformOperator in TENANT needs the exact Hotel capability', () => {
   test('support-only operator cannot read or deactivate a Hotel after selecting its tenant', async () => {
     const support = await makeUser('Admin', 'support-only');
-    await grantOperator({ userId: support._id, actor: S.granting, reason: 'support only', capabilities: ['platform.support.read'] });
+    await provisionPrivilegedOperator({ userId: support._id, actor: S.granting, reason: 'support only', capabilities: ['platform.support.read'] });
 
     const read = await request(app).get(`/api/hotels/${S.hotelA._id}`).set(bearer(support, S.a.tenant));
     const mutate = await request(app).patch(`/api/hotels/${S.hotelA._id}/deactivate`).set(bearer(support, S.a.tenant));
@@ -60,12 +60,12 @@ describe('PA-04C2 — PlatformOperator in TENANT needs the exact Hotel capabilit
 
   test('read capability reads but cannot mutate; manage capability can mutate', async () => {
     const reader = await makeUser('Admin', 'reader');
-    await grantOperator({ userId: reader._id, actor: S.granting, reason: 'reader', capabilities: ['platform.hotels.read'] });
+    await provisionPrivilegedOperator({ userId: reader._id, actor: S.granting, reason: 'reader', capabilities: ['platform.hotels.read'] });
     expect((await request(app).get(`/api/hotels/${S.hotelA._id}`).set(bearer(reader, S.a.tenant))).status).toBe(200);
     expect((await request(app).patch(`/api/hotels/${S.hotelA._id}/deactivate`).set(bearer(reader, S.a.tenant))).status).toBe(403);
 
     const manager = await makeUser('Admin', 'platform-manager');
-    await grantOperator({ userId: manager._id, actor: S.granting, reason: 'manager', capabilities: ['platform.hotels.read', 'platform.hotels.manage'] });
+    await provisionPrivilegedOperator({ userId: manager._id, actor: S.granting, reason: 'manager', capabilities: ['platform.hotels.read', 'platform.hotels.manage'] });
     expect((await request(app).patch(`/api/hotels/${S.hotelA._id}/deactivate`).set(bearer(manager, S.a.tenant))).status).toBe(200);
   });
 });

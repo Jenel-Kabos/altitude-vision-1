@@ -3,7 +3,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Accommodation = require('../models/Accommodation');
@@ -80,12 +80,12 @@ beforeAll(async () => {
   operatorNoRead = await User.create({ name: 'HZ04 Operator No Read', email: 'hz04-operator-no-read@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   client = await User.create({ name: 'HZ04 Client', email: 'hz04-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   proprietor = await User.create({ name: 'HZ04 Owner', email: 'hz04-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operator._id, actor: adminA, reason: 'HZ04 admin lists certification',
     // PLATFORM-ADMIN-04A — opérateur éligible à la Vue plateforme.
     capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES],
   });
-  await grantOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ04 missing read certification', capabilities: [] });
+  await provisionPrivilegedOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ04 missing read certification', capabilities: [] });
   accommodationA1 = await makeAccommodation({ tenant: tenantA, owner: adminA, suffix: 'A1', status: 'soumis', submittedAt: new Date('2028-01-01') });
   accommodationA2 = await makeAccommodation({ tenant: tenantA, owner: adminA, suffix: 'A2', status: 'publie', type: 'appartement_meuble', city: 'Pointe-Noire' });
   accommodationB1 = await makeAccommodation({ tenant: tenantB, owner: adminB, suffix: 'B1', status: 'soumis', submittedAt: new Date('2028-01-02') });
@@ -95,21 +95,21 @@ beforeAll(async () => {
 
 afterAll(stopFinancialMongo);
 
-test.each(['/admin/list', '/status/pending'])(
+test.each(['/admin/list'])(
   'Admin A ne reçoit aucune sentinelle du tenant B sur GET %s',
   async (path) => {
     const response = await request(app).get(`/api/accommodations${path}`).set(bearer(adminA, tenantA));
     expect(response.status).toBe(200);
-    expect(new Set(ids(response))).toEqual(new Set((path === '/status/pending' ? [accommodationA1] : [accommodationA1, accommodationA2]).map((item) => String(item._id))));
+    expect(new Set(ids(response))).toEqual(new Set([accommodationA1, accommodationA2].map((item) => String(item._id))));
   },
 );
 
-test.each(['/admin/list', '/status/pending'])(
+test.each(['/admin/list'])(
   'Admin B ne reçoit aucune sentinelle du tenant A sur GET %s',
   async (path) => {
     const response = await request(app).get(`/api/accommodations${path}`).set(bearer(adminB, tenantB));
     expect(response.status).toBe(200);
-    expect(new Set(ids(response))).toEqual(new Set((path === '/status/pending' ? [accommodationB1] : [accommodationB1, accommodationB2]).map((item) => String(item._id))));
+    expect(new Set(ids(response))).toEqual(new Set([accommodationB1, accommodationB2].map((item) => String(item._id))));
   },
 );
 
@@ -132,7 +132,7 @@ test.each(['/admin/list', '/status/pending'])('PlatformOperator global inclut A,
 });
 
 test('Accommodation tenant:null reste invisible à Tenant A malgré createdBy/owner de Tenant A', async () => {
-  for (const path of ['/admin/list', '/status/pending']) {
+  for (const path of ['/admin/list']) {
     const response = await request(app).get(`/api/accommodations${path}`).set(bearer(adminA, tenantA));
     expect(ids(response)).not.toContain(String(accommodationNull._id));
   }
@@ -145,13 +145,13 @@ test.each(['/admin/list', '/status/pending'])('PlatformOperator sans platform.ac
 test.each([
   ['A', () => tenantA, () => [accommodationA1, accommodationA2]],
   ['B', () => tenantB, () => [accommodationB1, accommodationB2]],
-])('PlatformOperator scoped %s reste isolé sur les deux listes', async (_label, tenant, expected) => {
-  for (const path of ['/admin/list', '/status/pending']) {
+])('PlatformOperator scoped %s reste isolé sur la liste opérationnelle et ne peut ouvrir la file commerciale', async (_label, tenant, expected) => {
+  for (const path of ['/admin/list']) {
     const response = await request(app).get(`/api/accommodations${path}`).set(bearer(operator, tenant()));
     expect(response.status).toBe(200);
-    const wanted = path === '/status/pending' ? expected().filter((item) => item.publicationStatus === 'soumis') : expected();
-    expect(new Set(ids(response))).toEqual(new Set(wanted.map((item) => String(item._id))));
+    expect(new Set(ids(response))).toEqual(new Set(expected().map((item) => String(item._id))));
   }
+  expect((await request(app).get('/api/accommodations/status/pending').set(bearer(operator, tenant()))).status).toBe(403);
 });
 
 test.each([['Client', () => client], ['Proprietaire', () => proprietor]])('%s reste refusé par le RBAC sur les deux listes', async (_role, actor) => {
@@ -181,6 +181,13 @@ test('filtres, recherche, tri, pagination, populate, total et liste vide restent
 test('les deux listes sont strictement read-only', async () => {
   const before = await Accommodation.find().sort({ _id: 1 }).lean();
   expect((await request(app).get('/api/accommodations/admin/list').set(bearer(adminA, tenantA))).status).toBe(200);
-  expect((await request(app).get('/api/accommodations/status/pending').set(bearer(adminA, tenantA))).status).toBe(200);
+  expect((await request(app).get('/api/accommodations/status/pending').set(bearer(operator))).status).toBe(200);
   expect(await Accommodation.find().sort({ _id: 1 }).lean()).toEqual(before);
+});
+
+test.each([
+  ['Admin A', () => adminA, () => tenantA],
+  ['Admin B', () => adminB, () => tenantB],
+])('%s ne peut pas consulter la file commerciale tenant', async (_label, actor, tenant) => {
+  expect((await request(app).get('/api/accommodations/status/pending').set(bearer(actor(), tenant()))).status).toBe(403);
 });

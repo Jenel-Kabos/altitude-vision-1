@@ -14,6 +14,7 @@ const { destroyFromCloudinary } = require('../config/cloudinary');
 const { escapeRegex } = require('../utils/regexEscape');
 const logger = require('../utils/logger');
 const { resolvePropertyCreationTenant } = require('./platformTenant/organizationAssetInvariantService');
+const { projectApprovedPublicResource } = require('./commercialPublicationService');
 
 /**
  * Suppression compensatoire best-effort : ne bloque jamais la propagation de
@@ -139,7 +140,7 @@ function computeCompletionScore(accommodation, property, rates = []) {
 
 function serializeAccommodation(doc, rates = []) {
   if (!doc) return null;
-  const raw = doc.toObject ? doc.toObject() : { ...doc };
+  const raw = projectApprovedPublicResource(doc);
   return { ...raw, rates };
 }
 

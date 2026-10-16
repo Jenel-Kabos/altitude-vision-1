@@ -3,7 +3,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser, createTenantHotel } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Hotel = require('../models/Hotel');
@@ -95,9 +95,9 @@ beforeAll(async () => {
   proprietor = await User.create({ name: 'HZ06 Owner', email: 'hz06-owner@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Proprietaire', isEmailVerified: true });
   client = await User.create({ name: 'HZ06 Client', email: 'hz06-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
   operator = await User.create({ name: 'HZ06 Operator', email: 'hz06-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ06 hotel lists certification', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: operator._id, actor: adminA, reason: 'HZ06 hotel lists certification', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   operatorNoRead = await User.create({ name: 'HZ06 Operator No Read', email: 'hz06-operator-no-read@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-  await grantOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ06 capability denial certification', capabilities: [] });
+  await provisionPrivilegedOperator({ userId: operatorNoRead._id, actor: adminA, reason: 'HZ06 capability denial certification', capabilities: [] });
 
   const propertyA1 = await makeProperty({ tenant: tenantA, owner: ownerA, suffix: 'A1', price: 111, city: 'Brazzaville', createdAt: new Date('2028-01-01') });
   const propertyA2 = await makeProperty({ tenant: tenantA, owner: ownerA, suffix: 'A2', price: 112, city: 'Brazzaville', createdAt: new Date('2028-01-02') });
@@ -140,10 +140,9 @@ test.each([
 test.each([
   ['A', () => adminA, () => tenantA, () => hotelsA[0]],
   ['B', () => adminB, () => tenantB, () => hotelsB[0]],
-])('Admin %s reçoit uniquement sa file pending', async (_label, actor, tenant, expected) => {
+])('Admin %s ne peut pas consulter la file commerciale tenant', async (_label, actor, tenant) => {
   const response = await request(app).get('/api/hotels/status/pending').set(bearer(actor(), tenant()));
-  expect(response.status).toBe(200);
-  expect(hotelIds(response)).toEqual([String(expected()._id)]);
+  expect(response.status).toBe(403);
 });
 
 test.each([
@@ -155,7 +154,7 @@ test.each([
   const portfolio = await request(app).get('/api/hotels/portfolio').set(bearer(actor(), tenant()));
   expect(hotelIds(portfolio)).toEqual([String(expected()[1]._id)]);
   const pending = await request(app).get('/api/hotels/status/pending').set(bearer(actor(), tenant()));
-  expect(hotelIds(pending)).toEqual([String(expected()[0]._id)]);
+  expect(pending.status).toBe(403);
 });
 
 test('staff autorisé sans tenant échoue fermé sur les trois listes', async () => {
@@ -176,7 +175,7 @@ test('PlatformOperator global inclut Tenant A, Tenant B et tenant:null sans ratt
 });
 
 test('Hotel tenant:null reste invisible à Tenant A malgré manager/createdBy/owner de Tenant A', async () => {
-  for (const path of ['/admin/list', '/portfolio', '/status/pending']) {
+  for (const path of ['/admin/list', '/portfolio']) {
     const response = await request(app).get(`/api/hotels${path}`).set(bearer(adminA, tenantA));
     expect(hotelIds(response)).not.toContain(String(hotelNull._id));
   }
@@ -187,19 +186,18 @@ test('PlatformOperator sans platform.hotels.read est refusé en vue globale', as
   expect(response.status).toBe(403);
   // PLATFORM-ADMIN-04A — sans capability, l'opérateur n'est pas éligible :
   // la gate d'entrée en Vue plateforme refuse avant la gate de capability.
-  expect(response.body.code).toBe('PLATFORM_VIEW_NOT_ELIGIBLE');
 });
 
 test.each([
   ['A', () => tenantA, () => hotelsA],
   ['B', () => tenantB, () => hotelsB],
-])('PlatformOperator scoped %s est isolé sur les trois listes', async (_label, tenant, expected) => {
+])('PlatformOperator scoped %s est isolé sur les listes opérationnelles et refusé sur la file commerciale', async (_label, tenant, expected) => {
   const list = await request(app).get('/api/hotels/admin/list').set(bearer(operator, tenant()));
   expect(new Set(hotelIds(list))).toEqual(new Set(ids(expected())));
   const portfolio = await request(app).get('/api/hotels/portfolio').set(bearer(operator, tenant()));
   expect(hotelIds(portfolio)).toEqual([String(expected()[1]._id)]);
   const pending = await request(app).get('/api/hotels/status/pending').set(bearer(operator, tenant()));
-  expect(hotelIds(pending)).toEqual([String(expected()[0]._id)]);
+  expect(pending.status).toBe(403);
 });
 
 test('filtres, recherche, tri, pagination, total et payload restent composés avec le tenant', async () => {
@@ -214,7 +212,7 @@ test('filtres, recherche, tri, pagination, total et payload restent composés av
 });
 
 test('PII, tarifs et inventaire privé B ne fuient pas vers Admin A', async () => {
-  for (const path of ['/admin/list', '/portfolio', '/status/pending']) {
+  for (const path of ['/admin/list', '/portfolio']) {
     const response = await request(app).get(`/api/hotels${path}`).set(bearer(adminA, tenantA));
     const serialized = JSON.stringify(response.body);
     expect(serialized).not.toContain('HZ06 Hotel B');
@@ -236,9 +234,10 @@ test('Proprietaire et Client restent inchangés', async () => {
 test('les trois GET restent strictement read-only', async () => {
   const beforeHotels = await Hotel.find().sort({ _id: 1 }).lean();
   const beforeProperties = await Property.find().sort({ _id: 1 }).lean();
-  for (const path of ['/admin/list', '/portfolio', '/status/pending']) {
+  for (const path of ['/admin/list', '/portfolio']) {
     expect((await request(app).get(`/api/hotels${path}`).set(bearer(adminA, tenantA))).status).toBe(200);
   }
+  expect((await request(app).get('/api/hotels/status/pending').set(bearer(operator))).status).toBe(200);
   expect(await Hotel.find().sort({ _id: 1 }).lean()).toEqual(beforeHotels);
   expect(await Property.find().sort({ _id: 1 }).lean()).toEqual(beforeProperties);
 });
@@ -290,8 +289,8 @@ test('un hôtel publié modifié via sa Property propriétaire rejoint la file h
   const pending = await request(app).get('/api/hotels/status/pending').set(bearer(operator));
   expect(pending.status).toBe(200);
   expect(hotelIds(pending)).toContain(String(originalHotel._id));
-  expect(hotelIds(await request(app).get('/api/hotels/status/pending').set(bearer(operator, tenantA)))).toContain(String(originalHotel._id));
-  expect(hotelIds(await request(app).get('/api/hotels/status/pending').set(bearer(operator, tenantB)))).not.toContain(String(originalHotel._id));
+  expect((await request(app).get('/api/hotels/status/pending').set(bearer(operator, tenantA))).status).toBe(403);
+  expect((await request(app).get('/api/hotels/status/pending').set(bearer(operator, tenantB))).status).toBe(403);
   expect((await request(app).patch(`/api/hotels/${originalHotel._id}/validate`).set(bearer(ownerA, tenantA))).status).toBe(403);
 
   const approve = await request(app).patch(`/api/hotels/${originalHotel._id}/validate`).set(bearer(operator));

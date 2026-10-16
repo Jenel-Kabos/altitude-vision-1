@@ -37,6 +37,23 @@ jest.mock('../services/tenantMembershipService', () => ({
   )),
 }));
 jest.mock('../utils/generateSitemap', () => jest.fn().mockResolvedValue('<xml/>'));
+// LOT A — la modération (décision + file) exige un PlatformOperator actif avec
+// platform.commercial.manage en contexte PLATFORM. Sans stub,
+// resolveActiveOperator interrogerait Mongo (absent ici) jusqu'au délai
+// Mongoose. Les décisions passent par le service canonique de révisions
+// (certifié sur Mongo réel) : simulé ici.
+jest.mock('../services/platformOperator/platformOperatorService', () => ({
+  ...jest.requireActual('../services/platformOperator/platformOperatorService'),
+  resolveActiveOperator: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('../models/CommercialPublicationRevision', () => ({
+  findOne: jest.fn(() => ({ sort: jest.fn().mockResolvedValue(null) })),
+}));
+jest.mock('../services/commercialPublicationService', () => ({
+  ...jest.requireActual('../services/commercialPublicationService'),
+  createPendingRevision: jest.fn().mockResolvedValue({ _id: 'REVISION-A', resourceType: 'Accommodation' }),
+  decideRevision: jest.fn().mockResolvedValue({ _id: 'REVISION-A', status: 'approved' }),
+}));
 jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue(),
   notifyStaff: jest.fn().mockResolvedValue(),
@@ -90,6 +107,23 @@ const fakeUser = (id, role = 'Proprietaire') => ({
   _id: id, id, name: 'Test User', email: 'test@altitude.com',
   role, isActive: true, status: 'Actif', tokenVersion: 0,
 });
+
+const { resolveActiveOperator } = require('../services/platformOperator/platformOperatorService');
+const { resolveEffectiveTenantContext } = require('../services/platformTenant/tenantContextService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
+const asCommercialOperator = (id) => {
+  const operator = { user: id, status: 'active', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] };
+  resolveActiveOperator.mockImplementation(async (userId) => (String(userId) === String(id) ? operator : null));
+  resolveEffectiveTenantContext.mockImplementation(async (userId, requested) => (
+    String(userId) === String(id) && !requested
+      ? { tenant: null, source: 'platform_operator_unscoped', operator }
+      : { tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' }
+  ));
+};
+const resetPlatformMocks = () => {
+  resolveActiveOperator.mockReset(); resolveActiveOperator.mockResolvedValue(null);
+  resolveEffectiveTenantContext.mockReset(); resolveEffectiveTenantContext.mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001' }, source: 'membership' });
+};
 
 const mockUserAuth = (id, role) => {
   User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser(id, role)) });
@@ -244,7 +278,22 @@ describe('POST /api/accommodations/:id/submit — soumission', () => {
 });
 
 describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
-  afterEach(() => jest.clearAllMocks());
+  // LOT A — le modérateur (ADMIN_ID) est un opérateur commercial plateforme.
+  beforeEach(() => asCommercialOperator(ADMIN_ID));
+  afterEach(() => { jest.clearAllMocks(); resetPlatformMocks(); });
+
+  test('LOT A — un Admin tenant (rôle + adhésion) sans PlatformOperator ne peut pas valider', async () => {
+    resetPlatformMocks();
+    mockUserAuth(ADMIN_ID, 'Admin');
+    Accommodation.findById = jest.fn();
+    const res = await request(app)
+      .patch(`/api/accommodations/${ACCOMMODATION_ID}/validate`)
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .set('X-Platform-Tenant-Id', TENANT_ID)
+      .send({});
+    expect(res.statusCode).toBe(403);
+    expect(Accommodation.findById).not.toHaveBeenCalled();
+  });
 
   // Sprint B1 : "validate" exige désormais un score de complétude à 100%
   // (voir computeCompletionScore) — ce fixture est donc volontairement
@@ -283,7 +332,11 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
   test('200 — admin valide un hébergement complet : publicationStatus="publie", publishedAt renseigné', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
     const acc = submitted();
-    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(acc) });
+    // 1er appel : chargement peuplé ; 2e : relecture de l'état persisté par
+    // le service de révisions (LOT A, simulé ici).
+    Accommodation.findById = jest.fn()
+      .mockReturnValueOnce({ populate: jest.fn().mockResolvedValue(acc) })
+      .mockReturnValueOnce({ lean: jest.fn().mockResolvedValue({ publicationStatus: 'publie', commercialPublicationVersion: 1, approvedPublicSnapshot: { title: 'Villa Test' }, reviewedBy: ADMIN_ID }) });
     RatePlan.find = jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([{ mode: 'nightly', amount: 35000, active: true }]) });
     const res = await request(app)
       .patch(`/api/accommodations/${ACCOMMODATION_ID}/validate`)
@@ -294,6 +347,8 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
     expect(acc.publishedAt).not.toBeNull();
     expect(acc.property).toMatchObject({ statusAdmin: 'Validée', isPublished: true });
     expect(acc.property.save).toHaveBeenCalled();
+    const { decideRevision } = require('../services/commercialPublicationService');
+    expect(decideRevision).toHaveBeenCalledWith(expect.objectContaining({ decision: 'approve', revisionId: 'REVISION-A' }));
   });
 
   test('422 — un hébergement incomplet (aucun tarif, aucun équipement) ne peut pas être validé', async () => {
@@ -364,7 +419,10 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
   test('200 — rejet avec motif : publicationStatus="rejete", rejectionReason renseignée', async () => {
     mockUserAuth(ADMIN_ID, 'Admin');
     const acc = submitted();
-    Accommodation.findById = jest.fn().mockReturnValue({ populate: jest.fn().mockResolvedValue(acc) });
+    Accommodation.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+    Accommodation.findById = jest.fn()
+      .mockReturnValueOnce({ populate: jest.fn().mockResolvedValue(acc) })
+      .mockReturnValueOnce({ lean: jest.fn().mockResolvedValue({ publicationStatus: 'rejete', rejectionReason: 'Photos manquantes', reviewedBy: ADMIN_ID }) });
     const res = await request(app)
       .patch(`/api/accommodations/${ACCOMMODATION_ID}/reject`)
       .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
@@ -373,6 +431,7 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
     expect(acc.publicationStatus).toBe('rejete');
     expect(acc.rejectionReason).toBe('Photos manquantes');
     expect(acc.property).toMatchObject({ statusAdmin: 'Rejetée', isPublished: false });
+    expect(Accommodation.updateOne).toHaveBeenCalledWith({ _id: ACCOMMODATION_ID }, { $set: expect.objectContaining({ publicationStatus: 'rejete', rejectionReason: 'Photos manquantes' }) });
   });
 
   test('409 — impossible de valider un hébergement pas encore soumis (toujours brouillon)', async () => {
@@ -387,7 +446,16 @@ describe('PATCH /api/accommodations/:id/:action — décision admin', () => {
 });
 
 describe('GET /api/accommodations/status/pending — file de modération staff', () => {
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => { jest.clearAllMocks(); resetPlatformMocks(); });
+
+  test('LOT A — 403 pour un Admin tenant sans PlatformOperator : la file est exclusivement plateforme', async () => {
+    mockUserAuth(ADMIN_ID, 'Admin');
+    const res = await request(app)
+      .get('/api/accommodations/status/pending')
+      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`)
+      .set('X-Platform-Tenant-Id', TENANT_ID);
+    expect(res.statusCode).toBe(403);
+  });
 
   test("403 — un propriétaire ne peut pas consulter la file de modération", async () => {
     mockUserAuth(OWNER_ID, 'Proprietaire');
@@ -397,7 +465,8 @@ describe('GET /api/accommodations/status/pending — file de modération staff',
     expect(res.statusCode).toBe(403);
   });
 
-  test('200 — un admin récupère la liste des hébergements soumis', async () => {
+  test('200 — un opérateur commercial récupère la liste des hébergements soumis, tous tenants confondus', async () => {
+    asCommercialOperator(ADMIN_ID);
     mockUserAuth(ADMIN_ID, 'Admin');
     const acc = {
       _id: ACCOMMODATION_ID,
@@ -417,11 +486,13 @@ describe('GET /api/accommodations/status/pending — file de modération staff',
     expect(res.statusCode).toBe(200);
     expect(res.body.data.accommodations).toHaveLength(1);
     expect(res.body.data.accommodations[0].completion).toBeDefined();
+    // LOT A — file exclusivement plateforme : tous tenants ET hébergements
+    // sans tenant (particuliers), sans réattribution.
     expect(Accommodation.find).toHaveBeenCalledWith({
       publicationStatus: 'soumis',
-      tenant: TENANT_ID,
       $and: [{ $or: [{ hotel: null }, { hotel: { $exists: false } }] }],
     });
+    expect(Accommodation.find.mock.calls[0][0]).not.toHaveProperty('tenant');
   });
 });
 
