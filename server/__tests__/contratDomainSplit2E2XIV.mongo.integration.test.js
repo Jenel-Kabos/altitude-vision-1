@@ -19,7 +19,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Contrat = require('../models/Contrat');
@@ -82,7 +82,7 @@ async function makeVenteContrat(property, extras = {}) {
 async function operatorWith(capabilities) {
   const user = await makeUser({ role: 'Admin' });
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: user._id, actor: granter, reason: 'CDS fixture', capabilities });
+  await provisionPrivilegedOperator({ userId: user._id, actor: granter, reason: 'CDS fixture', capabilities });
   return user;
 }
 async function scenarioAB() {

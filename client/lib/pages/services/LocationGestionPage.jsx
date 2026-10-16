@@ -2,6 +2,9 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import {
+    AUTONOMOUS_FORMULAS, AUTONOMOUS_VARIABLE_RATE_LABEL, CONFIRMED_RENT_BASIS, DELEGATED_COMMISSION_LABEL, GRATUIT_DISCLOSURE,
+} from '@/lib/constants/altimmoPricing';
 import Link from 'next/link';
 import {
     FaBuilding, FaHome, FaUsers, FaTools,
@@ -52,20 +55,12 @@ const LocationGestionPage = () => {
         { icon: FaShieldAlt, title: 'Sérénité Totale',   description: 'Dormez tranquille, nous gérons tous les aspects de votre location' },
     ];
 
-    const pricing = [
-        {
-            plan: 'Gestion Essentielle', price: '7%', description: 'du loyer mensuel HT',
-            features: ['Recherche et sélection de locataires', 'Rédaction du bail', 'Encaissement des loyers', 'États des lieux', 'Rapport mensuel'],
-        },
-        {
-            plan: 'Gestion Premium', price: '10%', description: 'du loyer mensuel HT', featured: true,
-            features: ['Tous les services Essentielle', 'Gestion des travaux', 'Suivi des charges', 'Assurance loyers impayés', 'Support prioritaire 24/7', 'Optimisation fiscale'],
-        },
-        {
-            plan: 'Gestion sur Mesure', price: 'Sur devis', description: 'selon vos besoins',
-            features: ['Solution personnalisée', 'Gestion de portefeuille', 'Conseiller dédié', 'Services à la carte', 'Reporting avancé'],
-        },
-    ];
+    // F-U2.9 — Gestion déléguée : commission de 10 % (ancienne mention à 7 %
+    // retirée). Gestion autonome : grille validée (altimmoPricing).
+    const delegated = {
+        plan: 'Gestion déléguée', price: DELEGATED_COMMISSION_LABEL, description: CONFIRMED_RENT_BASIS,
+        features: ['Recherche et sélection de locataires', 'Rédaction du bail', 'Encaissement des loyers', 'États des lieux', 'Gestion des travaux', 'Suivi des charges', 'Rapport mensuel'],
+    };
 
     return (
         <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -225,34 +220,48 @@ const LocationGestionPage = () => {
                             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Une Offre Adaptée</h2>
                             <div className="h-1 w-12 bg-gradient-to-r from-emerald-600 to-green-400 rounded-full mb-8" />
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                                {pricing.map((plan, i) => (
-                                    <motion.div key={i}
-                                        initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                                        viewport={{ once: true }} transition={{ delay: i * 0.1 }}
-                                        className={`relative bg-white p-6 rounded-3xl border-2 transition-all hover:shadow-xl ${plan.featured ? 'border-emerald-500 shadow-lg scale-105' : 'border-gray-200 hover:border-emerald-300'}`}>
-                                        {plan.featured && (
-                                            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-4 py-1 rounded-full text-xs font-bold whitespace-nowrap">
-                                                Recommandé
+                            <div className="grid grid-cols-1 gap-5">
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    className="relative bg-white p-6 rounded-3xl border-2 border-emerald-500 shadow-lg">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-emerald-600 mb-1">Nous gérons pour vous</p>
+                                    <h3 className="font-bold text-gray-900 mb-2 text-sm">{delegated.plan}</h3>
+                                    <p className="text-3xl font-bold text-emerald-600 mb-0.5">{delegated.price}</p>
+                                    <p className="text-xs text-gray-500 mb-4">{delegated.description}</p>
+                                    <ul className="grid sm:grid-cols-2 gap-2 mb-6">
+                                        {delegated.features.map((f) => (
+                                            <li key={f} className="flex items-start gap-2 text-xs text-gray-600">
+                                                <FaCheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                                {f}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <button onClick={() => setShowDevisModal(true)}
+                                        className="block w-full py-2.5 text-center font-semibold rounded-full text-sm transition-all bg-emerald-600 text-white hover:bg-emerald-500">
+                                        Choisir
+                                    </button>
+                                </motion.div>
+
+                                <div className="bg-white p-6 rounded-3xl border-2 border-gray-200">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-emerald-600 mb-1">Vous gérez avec Altimmo</p>
+                                    <h3 className="font-bold text-gray-900 mb-1 text-sm">Gestion autonome</h3>
+                                    <p className="text-xs text-gray-500 mb-4">
+                                        Abonnement selon le nombre de biens gérés, plus {AUTONOMOUS_VARIABLE_RATE_LABEL} {CONFIRMED_RENT_BASIS}.
+                                        Aucun frais sur un loyer attendu, facturé ou impayé.
+                                    </p>
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="autonomous-formulas">
+                                        {AUTONOMOUS_FORMULAS.map((formula) => (
+                                            <div key={formula.code} className="rounded-2xl border border-gray-200 p-4">
+                                                <p className="font-bold text-gray-900 text-sm">{formula.label}</p>
+                                                <p className="text-xs text-gray-500 mb-2">{formula.range}</p>
+                                                <p className="text-lg font-bold text-emerald-600">{formula.price}</p>
+                                                <p className="text-xs text-gray-500">+ {AUTONOMOUS_VARIABLE_RATE_LABEL} des loyers encaissés et confirmés</p>
                                             </div>
-                                        )}
-                                        <h3 className="font-bold text-gray-900 mb-2 text-sm">{plan.plan}</h3>
-                                        <p className="text-3xl font-bold text-emerald-600 mb-0.5">{plan.price}</p>
-                                        <p className="text-xs text-gray-500 mb-4">{plan.description}</p>
-                                        <ul className="space-y-2 mb-6">
-                                            {plan.features.map((f, j) => (
-                                                <li key={j} className="flex items-start gap-2 text-xs text-gray-600">
-                                                    <FaCheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                                                    {f}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                        <button onClick={() => setShowDevisModal(true)}
-                                            className={`block w-full py-2.5 text-center font-semibold rounded-full text-sm transition-all ${plan.featured ? 'bg-emerald-600 text-white hover:bg-emerald-500' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}>
-                                            Choisir
-                                        </button>
-                                    </motion.div>
-                                ))}
+                                        ))}
+                                    </div>
+                                    <p className="text-xs text-gray-600 mt-4">{GRATUIT_DISCLOSURE}</p>
+                                </div>
                             </div>
                         </div>
                     </div>

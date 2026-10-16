@@ -4,6 +4,8 @@ const RentalManagement = require('../models/RentalManagement');
 const RentalMaintenanceTicket = require('../models/RentalMaintenanceTicket');
 const TenantLinkRequest = require('../models/TenantLinkRequest');
 const Notification = require('../models/Notification');
+// LOT N — le portail locataire n'expose jamais les notifications de la boîte de support.
+const { SUPPORT_INBOX_NOTIFICATION_TYPES } = require('./notificationService');
 const rentalMaintenanceService = require('./rentalMaintenanceService');
 const { resolveLocataireForUser } = require('./tenantLinkService');
 const { aggregatePaymentSummary, publicPayment } = require('./rentalPaymentProjectionService');
@@ -137,7 +139,7 @@ async function getLinkStatus(userId) {
 }
 async function getDashboard(userId) {
   const l = await requireLocataire(userId); const lease = await getActiveLease(l._id);
-  const [paymentData, notice, maintenanceOpen, documents, notifications] = await Promise.all([getMyPaymentPage(userId, { page: 1, limit: 50 }), getMyNotice(userId), RentalMaintenanceTicket.countDocuments({ tenant: l._id, status: { $in: RentalMaintenanceTicket.OPEN_RENTAL_MAINTENANCE_STATUSES } }), getMyDocumentPage(userId, { page: 1, limit: 5 }), Notification.find({ recipient: userId }).sort({ createdAt: -1 }).limit(5).select('type title body link read createdAt').lean()]);
+  const [paymentData, notice, maintenanceOpen, documents, notifications] = await Promise.all([getMyPaymentPage(userId, { page: 1, limit: 50 }), getMyNotice(userId), RentalMaintenanceTicket.countDocuments({ tenant: l._id, status: { $in: RentalMaintenanceTicket.OPEN_RENTAL_MAINTENANCE_STATUSES } }), getMyDocumentPage(userId, { page: 1, limit: 5 }), Notification.find({ recipient: userId, type: { $nin: [...SUPPORT_INBOX_NOTIFICATION_TYPES] } }).sort({ createdAt: -1 }).limit(5).select('type title body link read createdAt').lean()]);
   const upcoming = paymentData.payments.filter((p) => p.statut !== 'payé').sort((a, b) => (a.annee * 12 + a.mois) - (b.annee * 12 + b.mois))[0] || null;
   return { prochainPaiement: upcoming, montantRestant: paymentData.summary.restant, bailActif: publicLease(lease), dureeRestanteJours: daysUntil(lease?.dateFinBail), prochainRenouvellement: lease?.dateFinBail || null, preavisActif: notice, maintenanceOuverte: maintenanceOpen, documentsRecents: documents.documents, notifications };
 }

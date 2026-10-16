@@ -151,6 +151,10 @@ const contratSchema = new mongoose.Schema({
   indexationAnnuelle: { type: Boolean, default: false },
   chargesIncluses:    { type: Boolean, default: false },
   montantCharges:     { type: Number, min: 0 },
+  // F-U2.12 — nature des charges (facultative ; absente = non renseignée) et
+  // ordre d'imputation contractuel des paiements (absent = loyer d'abord).
+  natureCharges:      { type: String, enum: ['forfait', 'provision', 'reel', 'individualisee', 'exceptionnelle', null], default: null },
+  ordreImputation:    { type: String, enum: ['loyer_d_abord', 'charges_d_abord', null], default: null },
 
   // ─── Vente ─────────────────────────────────────────────────
   acheteur: {

@@ -11,6 +11,7 @@ const Contrat = require('../models/Contrat');
 const Paiement = require('../models/Paiement');
 const IndividualSubscription = require('../models/IndividualSubscription');
 const { errorHandler } = require('../middleware/errorMiddleware');
+const { adoptLeasePolicy } = require('./helpers/leasePolicyFixture');
 
 jest.setTimeout(120000);
 const app = express();
@@ -47,6 +48,10 @@ test('Individual A calcule uniquement ses pénalités, jamais Individual B ni Te
     seedPayment(ownerA, 'TENANT-X', new mongoose.Types.ObjectId()),
   ]);
   await IndividualSubscription.create({ user: ownerA._id, plan: 'premium', status: 'active', modulesIncluded: ['location'] });
+  // F-U2.13 : l'ancien moteur ne pénalise que si la politique du bail stipule
+  // une pénalité — le bailleur A l'a stipulée pour son bail (bail de B : aucune).
+  await adoptLeasePolicy({ actor: { _id: ownerA._id }, leaseId: a.contrat._id, effectiveFrom: new Date('2020-01-01T00:00:00+01:00') });
+  await adoptLeasePolicy({ actor: { _id: ownerB._id }, leaseId: b.contrat._id, terms: {}, effectiveFrom: new Date('2020-01-01T00:00:00+01:00') });
 
   const res = await request(app).post('/api/paiements/location/calculer-penalites?scope=individual').set(as(ownerA));
   expect(res.status).toBe(200);
@@ -54,6 +59,16 @@ test('Individual A calcule uniquement ses pénalités, jamais Individual B ni Te
   expect((await Paiement.findById(a.paiement._id)).penaliteAppliquee).toBe(true);
   expect((await Paiement.findById(b.paiement._id)).penaliteAppliquee).not.toBe(true);
   expect((await Paiement.findById(tenantX.paiement._id)).penaliteAppliquee).not.toBe(true);
+});
+
+test('F-U2.13 : sans politique stipulant une pénalité, l’ancien moteur n’applique plus aucune pénalité', async () => {
+  const ownerA = await makeOwner();
+  const a = await seedPayment(ownerA, 'NO-POLICY');
+  await IndividualSubscription.create({ user: ownerA._id, plan: 'premium', status: 'active', modulesIncluded: ['location'] });
+  const res = await request(app).post('/api/paiements/location/calculer-penalites?scope=individual').set(as(ownerA));
+  expect(res.status).toBe(200);
+  expect(res.body.data).toMatchObject({ verifies: 1, penalites: 0 });
+  expect((await Paiement.findById(a.paiement._id)).penaliteAppliquee).not.toBe(true);
 });
 
 test('abonnement expiré refuse le calcul sans altérer le paiement', async () => {
