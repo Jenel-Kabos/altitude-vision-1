@@ -2,6 +2,12 @@ const FinancialPayment = require('../../models/FinancialPayment');
 const { fail } = require('./financialError');
 const storage = require('../storage/secureStorageService');
 
+// F-U2.0 — `+proof.asset` seul ne charge pas les champs imbriqués
+// `select:false` de privateAssetSchema (publicId, resourceType…) : lecture
+// impossible et ancienne preuve jamais supprimée. Sélection explicite, même
+// convention que les autres contrôleurs documentaires.
+const PROOF_ASSET_SELECT = ['+proof.asset', ...['publicId', 'resourceType', 'deliveryType', 'version', 'format'].map((field) => `+proof.asset.${field}`)].join(' ');
+
 function assertProofFile(file) {
   if (!file?.buffer?.length) fail('FINANCIAL_PROOF_REQUIRED', 'Un justificatif est obligatoire.');
   const b = file.buffer; const mime = file.mimetype;
@@ -12,18 +18,18 @@ function assertProofFile(file) {
 }
 async function uploadManualPaymentProof({ paymentId, actor, file, storageService = storage }) {
   assertProofFile(file);
-  const payment = await FinancialPayment.findById(paymentId).select('+proof.asset');
+  const payment = await FinancialPayment.findById(paymentId).select(PROOF_ASSET_SELECT);
   if (!payment || payment.domain !== 'hotel' || payment.provider !== 'manual') fail('FINANCIAL_PAYMENT_NOT_AVAILABLE', 'Paiement manuel introuvable.', 404);
   if (payment.status !== 'pending') fail('FINANCIAL_PAYMENT_INVALID_TRANSITION', 'Le justificatif ne peut être remplacé que tant que le paiement est en attente.', 409);
   const asset = await storageService.uploadPrivateAsset(file.buffer, { purpose: 'financial', ownerType: 'FinancialPayment', ownerId: payment._id, filename: file.originalname, mimeType: file.mimetype, folder: 'altitude-vision/private/payment-proofs' });
   const previous = payment.proof?.asset?.toObject?.() || payment.proof?.asset;
-  const updated = await FinancialPayment.findOneAndUpdate({ _id: payment._id, status: 'pending', provider: 'manual' }, { $set: { 'proof.asset': asset, 'proof.uploadedBy': actor.id || actor._id, 'proof.uploadedAt': new Date() } }, { new: true }).select('+proof.asset');
+  const updated = await FinancialPayment.findOneAndUpdate({ _id: payment._id, status: 'pending', provider: 'manual' }, { $set: { 'proof.asset': asset, 'proof.uploadedBy': actor.id || actor._id, 'proof.uploadedAt': new Date() } }, { new: true }).select(PROOF_ASSET_SELECT);
   if (!updated) { await storageService.deletePrivateAsset(asset).catch(() => {}); fail('FINANCIAL_PAYMENT_INVALID_TRANSITION', 'Le paiement a changé pendant l’envoi du justificatif.', 409); }
   if (previous) await storageService.deletePrivateAsset(previous).catch(() => {});
   return updated;
 }
 async function readManualPaymentProof(paymentId, storageService = storage) {
-  const payment = await FinancialPayment.findById(paymentId).select('+proof.asset');
+  const payment = await FinancialPayment.findById(paymentId).select(PROOF_ASSET_SELECT);
   if (!payment?.proof?.asset) fail('FINANCIAL_PROOF_NOT_AVAILABLE', 'Aucun justificatif disponible.', 404);
   return { payment, asset: payment.proof.asset, buffer: await storageService.readPrivateAsset(payment.proof.asset.toObject()) };
 }

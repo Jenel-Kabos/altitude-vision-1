@@ -36,6 +36,7 @@ async function recalculateDocument(documentId, { session } = {}) {
 async function replaceDraftLines(documentId, lines, actorId) {
   const document = await FinancialDocument.findOne({ _id: documentId, status: 'draft' });
   if (!document) fail('FINANCIAL_DOCUMENT_IMMUTABLE', 'Une facture émise ne peut plus être modifiée.', 409);
+  if (document.metadata?.trackingObligation) fail('FINANCIAL_DOCUMENT_IMMUTABLE', 'Échéance de suivi : lignes figées.', 409);
   const calculated = calculateDocumentTotals(lines);
   await FinancialDocumentLine.deleteMany({ financialDocument: documentId });
   await FinancialDocumentLine.insertMany(calculated.lines.map((line, index) => ({ ...line, financialDocument: documentId, lineNumber: index + 1, createdBy: actorId })));
@@ -85,6 +86,15 @@ async function issueFinancialDocumentCore({ documentId, actor, businessOperation
     if (!reservation) fail('FINANCIAL_RESERVATION_CHANGED', 'La réservation associée est introuvable.', 409);
     if (['cancelled', 'expired', 'rejected', 'checked_out'].includes(reservation.status)) fail('FINANCIAL_INVALID_TRANSITION', 'La réservation ne permet pas l’émission.', 409);
     if (String(reservation.hotel) !== String(document.establishmentId)) fail('FINANCIAL_ESTABLISHMENT_MISMATCH', 'L’établissement du document est incohérent.', 409);
+    // F-U2.4 — émetteur légal : l'organisation exploitante, jamais présumée
+    // être Altitude Vision. Contrôle activable (désactivé par défaut pour ne
+    // pas interrompre l'émission hôtelière existante) : sans identité légale
+    // vérifiée de l'organisation, l'émission définitive est bloquée ; le
+    // brouillon reste possible.
+    if (process.env.HOTEL_INVOICE_REQUIRE_VERIFIED_ISSUER === 'true') {
+      const readiness = await require('./billing/billingIssuerService').issuerReadiness({ role: 'TENANT', tenantId: document.tenant });
+      if (!readiness.ready) fail('HOTEL_ISSUER_IDENTITY_NOT_VERIFIED', 'Identité légale de l’organisation exploitante non vérifiée : émission définitive bloquée.', 409);
+    }
   }
   const lines = await inSession(FinancialDocumentLine.find({ financialDocument: documentId }), session);
   const { totals } = calculateDocumentTotals(lines.map((line) => line.toObject()));
