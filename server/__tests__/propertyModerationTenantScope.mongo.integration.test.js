@@ -3,7 +3,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Notification = require('../models/Notification');
@@ -71,7 +71,7 @@ beforeAll(async () => {
   ({ user: ownerB } = await createTenantUser({ tenant: tenantB, bootstrap: fixtureB.bootstrap, overrides: { role: 'Proprietaire' } }));
   operator = await User.create({ name: 'HZ07 Operator', email: 'hz07-operator@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   client = await User.create({ name: 'HZ07 Client', email: 'hz07-client@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
-  await grantOperator({ userId: operator._id, actor: adminA, reason: 'HZ07 property moderation certification', capabilities: [] });
+  await provisionPrivilegedOperator({ userId: operator._id, actor: adminA, reason: 'HZ07 property moderation certification', capabilities: [] });
 
   propertiesA = [
     await makeProperty({ tenant: tenantA, owner: ownerA, suffix: 'A-PENDING', statusAdmin: 'En attente', isPublished: false, status: 'vente', type: 'Villa', price: 111000, createdAt: new Date('2028-01-01') }),
@@ -97,16 +97,31 @@ test.each([
   expect(response.body.data.total).toBe(expected().length);
 });
 
+// LOT A — la file de modération (liste + compteur) est exclusivement
+// plateforme : aucun Admin tenant n'y accède ; un PlatformOperator actif
+// avec platform.commercial.manage, sans tenant sélectionné, voit les annonces
+// en attente de tous les tenants sans les réattribuer.
 test.each([
-  ['A', () => adminA, () => tenantA, () => propertiesA[0]],
-  ['B', () => adminB, () => tenantB, () => propertiesB[0]],
-])('Admin %s ne reçoit que son pending et son compteur', async (_label, actor, tenant, pending) => {
-  const list = await request(app).get('/api/properties/status/pending').set(bearer(actor(), tenant()));
+  ['A', () => adminA, () => tenantA],
+  ['B', () => adminB, () => tenantB],
+])('Admin %s n\'accède ni à la file ni au compteur de modération', async (_label, actor, tenant) => {
+  expect((await request(app).get('/api/properties/status/pending').set(bearer(actor(), tenant()))).status).toBe(403);
+  expect((await request(app).get('/api/properties/status/pending-count').set(bearer(actor(), tenant()))).status).toBe(403);
+});
+
+test('l\'opérateur commercial plateforme voit les annonces en attente de A et B, compteur compris', async () => {
+  const commercial = await User.create({ name: 'HZ07 Commercial', email: 'hz07-commercial@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
+  const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
+  await provisionPrivilegedOperator({ userId: commercial._id, actor: adminA, reason: 'LOT A commercial moderation', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  const list = await request(app).get('/api/properties/status/pending').set(bearer(commercial));
   expect(list.status).toBe(200);
-  expect(rootIds(list)).toEqual([String(pending()._id)]);
-  const count = await request(app).get('/api/properties/status/pending-count').set(bearer(actor(), tenant()));
+  expect(new Set(rootIds(list))).toEqual(new Set([String(propertiesA[0]._id), String(propertiesB[0]._id)]));
+  const count = await request(app).get('/api/properties/status/pending-count').set(bearer(commercial));
   expect(count.status).toBe(200);
-  expect(count.body.data.unreadCount).toBe(1);
+  expect(count.body.data.unreadCount).toBe(2);
+  expect(String((await Property.findById(propertiesA[0]._id).lean()).tenant)).toBe(String(tenantA._id));
+  const PlatformOperator = require('../models/PlatformOperator');
+  await PlatformOperator.deleteOne({ user: commercial._id });
 });
 
 test.each(['Admin', 'GestionnaireImmobilier', 'Collaborateur'])(

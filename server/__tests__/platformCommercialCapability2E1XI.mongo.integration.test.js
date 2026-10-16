@@ -9,7 +9,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_OPERATOR_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const User = require('../models/User');
 const Property = require('../models/Property');
@@ -56,7 +56,7 @@ const makeTransaction = (property, client, agent) => Transaction.collection.inse
 async function makeOperator(capabilities) {
   const opUser = await makeUser({ role: 'Admin' });
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opUser._id, actor: granter, reason: 'COMM-CAP fixture', capabilities });
+  await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'COMM-CAP fixture', capabilities });
   return opUser;
 }
 
@@ -84,10 +84,10 @@ describe('COMM-CAP — canonical registry + Admin+Operator+capability contract',
     expect(PLATFORM_OPERATOR_CAPABILITIES).toContain('platform.commercial.manage');
   });
 
-  test('COMM-CAP-02 (unknown capability remains rejected — grantOperator schema/validation)', async () => {
+  test('COMM-CAP-02 (unknown capability remains rejected — provisionPrivilegedOperator schema/validation)', async () => {
     const target = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await expect(grantOperator({
+    await expect(provisionPrivilegedOperator({
       userId: target._id, actor: granter, reason: 'unknown cap test',
       capabilities: ['platform.nonexistent.manage'],
     })).rejects.toBeDefined();
@@ -112,7 +112,7 @@ describe('COMM-CAP — canonical registry + Admin+Operator+capability contract',
     const { txId } = await scenario();
     const nonAdminOp = await makeUser({ role: 'Proprietaire' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: nonAdminOp._id, actor: granter, reason: 'COMM-CAP-05', capabilities: ['platform.commercial.manage'] });
+    await provisionPrivilegedOperator({ userId: nonAdminOp._id, actor: granter, reason: 'COMM-CAP-05', capabilities: ['platform.commercial.manage'] });
     const res = await request(app).patch(`/api/transactions/${txId}/notes`).set(bearer(nonAdminOp)).send({ notes: 'hostile' });
     expect(res.status).toBe(403);
   });

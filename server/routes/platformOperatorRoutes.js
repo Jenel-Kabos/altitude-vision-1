@@ -23,5 +23,9 @@ router.post('/', requirePlatformGovernanceScope, controller.grantOperator);
 router.patch('/:userId/suspend', requirePlatformGovernanceScope, controller.suspendOperator);
 router.patch('/:userId/reactivate', requirePlatformGovernanceScope, controller.reactivateOperator);
 router.patch('/:userId/revoke', requirePlatformGovernanceScope, controller.revokeOperator);
+// PLATFORM-ACCREDITATIONS-1 — habilitations déléguables une par une (liste
+// fermée PLATFORM_DELEGABLE_CAPABILITIES), lecture comme mutation en PLATFORM.
+router.get('/:userId/capabilities', requirePlatformGovernanceScope, controller.getDelegatedCapabilities);
+router.post('/:userId/capabilities', requirePlatformGovernanceScope, controller.changeDelegatedCapability);
 
 module.exports = router;

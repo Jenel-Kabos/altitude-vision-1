@@ -16,7 +16,9 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
+const PlatformOperator = require('../models/PlatformOperator');
+const { grantAuthorization, revokeAuthorization } = require('../services/contactAuthorizationService');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
@@ -85,7 +87,7 @@ beforeEach(async () => {
   await addTenantMember({ tenant: fixtureB.tenant, user: staffMulti, bootstrap: fixtureB.bootstrap });
 
   poGlobal = await mkUser({ role: 'Admin' });
-  await grantOperator({ userId: poGlobal._id, actor: adminA, reason: 'SECURITY-CLOSURE-P0-WAVE-1 test', capabilities: [] });
+  await provisionPrivilegedOperator({ userId: poGlobal._id, actor: adminA, reason: 'SECURITY-CLOSURE-P0-WAVE-1 test', capabilities: [] });
 
   convPrivateBC = await Conversation.create({ participants: [clientB._id, clientC._id], isStaffInbox: false, lastMessage: null });
   const otherClient = await mkUser();
@@ -123,25 +125,26 @@ describe('SECURITY-CLOSURE-P0-WAVE-1 (P0-A) — acteurs SANS autorité (doivent 
 });
 
 describe('SECURITY-CLOSURE-P0-WAVE-1 (P0-A) — acteurs AVEC autorité (préservés, comportement historique)', () => {
-  test('4. Client B (participant réel) envoie dans sa conversation → 201', async () => {
+  test('4. Conversation client-client héritée sans autorisation → lecture seule', async () => {
     const res = await sendMsg(convPrivateBC, clientB);
-    expect(res.status).toBe(201);
-    expect(await Message.countDocuments({ conversation: convPrivateBC._id })).toBe(1);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('CONTACT_AUTHORIZATION_REQUIRED');
+    expect(await Message.countDocuments({ conversation: convPrivateBC._id })).toBe(0);
   });
 
-  test('5. Staff A (même tenant, NON-participant) sur conversation privée d’un collègue (staffB) → 201 — autorité staff tenant-wide PRÉSERVÉE', async () => {
+  test('5. Staff A de tenant sans autorité plateforme ne contourne pas la médiation', async () => {
     const res = await sendMsg(convStaffBClient, staffA, fixtureA.tenant._id);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
   });
 
-  test('6. Admin A sur une conversation quelconque de son tenant → 201', async () => {
+  test('6. Admin A de tenant ne reçoit aucun privilège commercial implicite', async () => {
     const res = await sendMsg(convStaffBClient, adminA, fixtureA.tenant._id);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
   });
 
-  test('7. PlatformOperator scopé A → 201 sur une conversation du tenant A', async () => {
+  test('7. PlatformOperator sans platform.commercial.manage reste en lecture seule', async () => {
     const res = await sendMsg(convStaffBClient, poGlobal, fixtureA.tenant._id);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
   });
 });
 
@@ -169,8 +172,27 @@ describe('SECURITY-CLOSURE-P0-WAVE-1 (P0-A) — side effects sur envoi non autor
     expect(await Message.countDocuments({ conversation: convTenantB._id })).toBe(0);
   });
 
-  test('12. receiverId direct (hors conversationId) reste inchangé pour un envoi légitime', async () => {
+  test('12. receiverId direct ne suffit plus à créer une relation commerciale', async () => {
     const res = await request(app).post('/api/messages').set(bearer(clientB)).send({ receiverId: String(clientC._id), content: 'DIRECT' });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('COMMERCIAL_CONTEXT_REQUIRED');
+    expect(await Message.countDocuments({ sender: clientB._id, receiver: clientC._id })).toBe(0);
+  });
+});
+
+describe('INTERMEDIATION-C — autorisation commerciale vérifiée à chaque envoi', () => {
+  test('autorisation active permet puis révocation bloque le même canal sans effacer son historique', async () => {
+    await PlatformOperator.updateOne({ user: poGlobal._id }, { $addToSet: { capabilities: 'platform.commercial.manage' } });
+    const propertyId = new (require('mongoose').Types.ObjectId)();
+    const dossierId = new (require('mongoose').Types.ObjectId)();
+    const authorization = await grantAuthorization({ clientId: clientB._id, representativeId: proprietaireA._id, propertyId, dossierType: 'RealEstateApplication', dossierId, tenantId: null, scopes: ['direct_transactional_messaging'], actor: poGlobal, reason: 'Test route' });
+    const conversation = await Conversation.create({ participants: [clientB._id, proprietaireA._id], relatedProperty: propertyId, relatedDossierType: 'RealEstateApplication', relatedDossier: dossierId, channelType: 'commercial_direct' });
+
+    expect((await sendMsg(conversation, clientB)).status).toBe(201);
+    await revokeAuthorization({ authorizationId: authorization._id, actor: poGlobal, reason: 'Retrait concurrent' });
+    const denied = await sendMsg(conversation, clientB);
+    expect(denied.status).toBe(403);
+    expect(denied.body.code).toBe('CONTACT_AUTHORIZATION_REQUIRED');
+    expect(await Message.countDocuments({ conversation: conversation._id })).toBe(1);
   });
 });

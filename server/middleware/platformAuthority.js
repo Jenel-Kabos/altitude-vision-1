@@ -142,6 +142,15 @@ const isPlatformGovernanceScope = async (req) => {
   return Boolean(context && !context.tenant && context.source === PLATFORM_WIDE_CONTEXT_SOURCE);
 };
 
+const requirePlatformScope = async (req, res, next) => {
+  if (await isPlatformGovernanceScope(req)) return next();
+  return res.status(403).json({
+    status: 'fail',
+    code: 'PLATFORM_SCOPE_REQUIRED',
+    message: 'Action refusée : cette opération commerciale exige la Vue plateforme sans tenant sélectionné.',
+  });
+};
+
 // Mutations of PlatformOperator identities are PLATFORM operations only.
 const requirePlatformGovernanceScope = async (req, res, next) => {
   if (await isPlatformGovernanceScope(req)) return next();
@@ -154,6 +163,7 @@ const requirePlatformGovernanceScope = async (req, res, next) => {
 
 module.exports = {
   isPlatformGovernanceScope,
+  requirePlatformScope,
   requirePlatformGovernanceScope,
   requirePlatformNativeCapability,
   requirePlatformOperatorCapability,

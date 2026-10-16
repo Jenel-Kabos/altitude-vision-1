@@ -28,7 +28,7 @@ const OrgMembership = require('../models/OrgMembership');
 const PlatformOperator = require('../models/PlatformOperator');
 const Document = require('../models/Document');
 const Contrat = require('../models/Contrat');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const documentRoutes = require('../routes/documentRoutes');
 const gestionDocumentRoutes = require('../routes/gestionDocumentRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -121,7 +121,7 @@ beforeEach(async () => {
   await addTenantMember({ tenant: tenantB, user: tenantAdminB, bootstrap: bootstrapB });
   await setRole(tenantAdminB._id, tenantB, 'Admin');
 
-  // Platform operators — grantOperator interdit le self-grant, on utilise un
+  // Platform operators — provisionPrivilegedOperator interdit le self-grant, on utilise un
   // grantor séparé porteur de platform.operators.manage.
   platformGrantor = await makeUser({ role: 'Admin' });
   await PlatformOperator.create({
@@ -139,28 +139,28 @@ beforeEach(async () => {
   // only { messages.read, messages.manage, visits.read } — zero documents.*
   // leakage — and is the correct control User.role for these tests.
   operatorRead = await makeUser({ role: 'Communicant' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorRead._id, actor: platformGrantor,
     capabilities: ['platform.documents.read', 'platform.tenants.read'],
     reason: 'PDOC operator with documents.read only',
   });
 
   operatorManage = await makeUser({ role: 'Communicant' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorManage._id, actor: platformGrantor,
     capabilities: ['platform.documents.manage', 'platform.tenants.read'],
     reason: 'PDOC operator with documents.manage (superset read)',
   });
 
   operatorWrongCap = await makeUser({ role: 'Communicant' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorWrongCap._id, actor: platformGrantor,
     capabilities: ['platform.finance.read', 'platform.rentals.read', 'platform.crm.read'],
     reason: 'PDOC operator with adjacent-only capabilities, no documents.*',
   });
 
   operatorSuspended = await makeUser({ role: 'Communicant' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorSuspended._id, actor: platformGrantor,
     capabilities: ['platform.documents.read'],
     reason: 'PDOC operator to be suspended',
@@ -171,7 +171,7 @@ beforeEach(async () => {
   );
 
   operatorRevoked = await makeUser({ role: 'Communicant' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorRevoked._id, actor: platformGrantor,
     capabilities: ['platform.documents.read'],
     reason: 'PDOC operator to be revoked',

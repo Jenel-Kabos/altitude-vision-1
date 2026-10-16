@@ -241,6 +241,9 @@ const maintenanceRoutes      = require('./routes/maintenanceRoutes');
 const salePropertyRoutes     = require('./routes/salePropertyRoutes');
 const rentalPropertyRoutes   = require('./routes/rentalPropertyRoutes');
 const financialRoutes        = require('./routes/financialRoutes');
+const contractualFinanceRoutes = require('./routes/contractualFinanceRoutes'); // F-U1.G
+const financialKycRoutes = require('./routes/financialKycRoutes'); // F-U1.I
+const billingRoutes = require('./routes/billingRoutes'); // F-U2
 const paymentProviderRoutes  = require('./routes/paymentProviderRoutes');
 const dashboardAnalyticsRoutes = require('./routes/dashboardAnalyticsRoutes');
 const accommodationReservationRoutes = require('./routes/accommodationReservationRoutes');
@@ -322,6 +325,9 @@ app.use('/api/altimmo', altimmoSearchRoutes);
 app.use('/api/hotel-reservations', hotelReservationRoutes);
 // 💰 Noyau financier F1 — routes staff protégées, sans fournisseur réel.
 app.use('/api/financial', financialRoutes);
+app.use('/api/v1/contractual-finance', contractualFinanceRoutes); // F-U1.G
+app.use('/api/v1/financial-kyc', financialKycRoutes); // F-U1.I
+app.use('/api/v1/billing', billingRoutes); // F-U2
 app.use('/api/payments/providers', paymentProviderRoutes);
 app.use('/api/dashboard-analytics', dashboardAnalyticsRoutes);
 app.use('/api/accommodation-reservations', accommodationReservationRoutes);
@@ -393,6 +399,8 @@ app.use('/api/dev-portal', require('./routes/apiPlatformAdminRoutes'));
 // 'marketing'), Notifications (notify(), type 'marketing_message') — ne
 // crée aucun second moteur, aucune seconde API.
 app.use('/api/marketing', require('./routes/marketingRoutes'));
+// MARKETING-CONSENT-1 — désinscription publique par jeton signé (POST).
+app.use('/api/marketing-preferences', require('./routes/marketingPreferencesRoutes'));
 
 // ERP-CORE-1 — Centre d'Administration Global : couche d'orchestration
 // pure au-dessus de Reporting/CRM/Organisation/Marketing/API Gateway/
@@ -410,6 +418,7 @@ app.use('/api/platform-tenants', require('./routes/platformTenantRoutes'));
 // distincte de la gestion des tenants (routeur ci-dessus). Réservé Admin +
 // capacité `platform.operators.manage` (voir platformOperatorRoutes.js).
 app.use('/api/platform-operators', require('./routes/platformOperatorRoutes'));
+app.use('/api/contact-authorizations', require('./routes/contactAuthorizationRoutes'));
 
 // 💬 Messagerie & Emails
 app.use("/api/conversations", conversationRoutes);

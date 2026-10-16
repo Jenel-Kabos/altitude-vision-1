@@ -16,7 +16,7 @@ const PlatformTenantSubscription = require('../models/PlatformTenantSubscription
 const Contrat = require('../models/Contrat');
 const Locataire = require('../models/Locataire');
 const Proprietaire = require('../models/Proprietaire');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const routes = require('../routes/rentalContractRegularizationRoutes');
 
@@ -88,7 +88,7 @@ beforeEach(async () => {
   globalAdmin = await makeUser({ role: 'Admin' }); // no tenant membership
 
   opFull = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opFull._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read', 'platform.users.read', 'platform.users.manage'] });
+  await provisionPrivilegedOperator({ userId: opFull._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read', 'platform.users.read', 'platform.users.manage'] });
 
   proprietaireAdmin = await makeUser({ role: 'Proprietaire' });
   await addTenantMember({ tenant: tA, user: proprietaireAdmin, bootstrap: bA });

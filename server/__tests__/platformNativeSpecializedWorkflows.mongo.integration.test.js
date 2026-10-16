@@ -14,7 +14,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const User = require('../models/User');
 const Property = require('../models/Property');
@@ -51,7 +51,7 @@ const makeUser = (role, label) => {
 };
 const makeOperator = async (label, capabilities, actor) => {
   const user = await makeUser('Admin', label);
-  await grantOperator({ userId: user._id, actor, reason: `PA04A closure ${label}`, capabilities });
+  await provisionPrivilegedOperator({ userId: user._id, actor, reason: `PA04A closure ${label}`, capabilities });
   return user;
 };
 const makeProperty = (owner, tenant, status = 'vente') => Property.create({

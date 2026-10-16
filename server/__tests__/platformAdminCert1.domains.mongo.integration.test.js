@@ -16,7 +16,7 @@ const CrmCustomer = require('../models/CrmCustomer');
 const MarketingTemplate = require('../models/MarketingTemplate');
 const MarketingCampaign = require('../models/MarketingCampaign');
 const RentalManagement = require('../models/RentalManagement');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { createApiKey } = require('../services/publicApi/apiKeyService');
 
 const hotelRoutes = require('../routes/hotelRoutes');
@@ -89,7 +89,7 @@ beforeAll(async () => {
     name: 'Operator D', email: `operator-d-${Date.now()}@example.test`,
     password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
   });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorUser._id, actor: grantingAdmin, reason: 'Test domaines PLATFORM-ADMIN-CERT-1',
     capabilities: [
       'platform.hotels.read', 'platform.hotels.manage', 'platform.accommodations.read',
@@ -164,7 +164,7 @@ describe('CRM — dont fusion cross-tenant', () => {
       name: 'Operator CRM read', email: `operator-crm-read-${Date.now()}@example.test`,
       password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
     });
-    await grantOperator({ userId: operatorCrmReadOnly._id, actor: grantingAdmin, reason: 'Test CRM read-only', capabilities: ['platform.crm.read'] });
+    await provisionPrivilegedOperator({ userId: operatorCrmReadOnly._id, actor: grantingAdmin, reason: 'Test CRM read-only', capabilities: ['platform.crm.read'] });
   });
 
   test('PATH B : PlatformOperator platform.crm.read, sans membership, Tenant B sélectionné → customers de B uniquement', async () => {
@@ -229,10 +229,15 @@ describe('Marketing', () => {
     expect(res.status).toBe(403);
   });
 
-  test('TESTÉ DIRECTEMENT : PlatformOperator sans tenant sélectionné refusé (pas de mode global fabriqué)', async () => {
+  // LOT E — le marketing n'a plus de mode tenant : c'est un workflow
+  // plateforme exclusif exigeant `platform.marketing.manage` (lecture
+  // comprise). Cet opérateur ne détient que `platform.marketing.read` : il est
+  // refusé faute de capacité, sans qu'aucun mode global soit fabriqué.
+  test('TESTÉ DIRECTEMENT : PlatformOperator sans platform.marketing.manage refusé, avec ou sans tenant sélectionné', async () => {
     const res = await request(app).get('/api/marketing/campaigns').set(bearer(operatorUser));
     expect(res.status).toBe(403);
-    expect(res.body.code).toBe('PLATFORM_OPERATOR_TENANT_SELECTION_REQUIRED');
+    expect(res.body.data).toBeUndefined();
+    expect(res.body.message).toMatch(/capacité opérateur plateforme requise/);
   });
 });
 
@@ -354,7 +359,7 @@ describe('GL — RentalManagement', () => {
       name: 'Operator no rentals', email: `operator-no-rentals-${Date.now()}@example.test`,
       password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
     });
-    await grantOperator({ userId: operatorNoRentals._id, actor: grantingAdmin, reason: 'Test sans rentals', capabilities: ['platform.crm.read'] });
+    await provisionPrivilegedOperator({ userId: operatorNoRentals._id, actor: grantingAdmin, reason: 'Test sans rentals', capabilities: ['platform.crm.read'] });
   });
 
   test('PATH B : PlatformOperator platform.rentals.read, sans membership, Tenant B sélectionné → rentals de B uniquement', async () => {

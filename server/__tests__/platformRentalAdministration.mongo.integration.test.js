@@ -20,7 +20,7 @@ const RentalManagement = require('../models/RentalManagement');
 const PlatformOperator = require('../models/PlatformOperator');
 const PlatformTenantSubscription = require('../models/PlatformTenantSubscription');
 const PlatformTenantFeature = require('../models/PlatformTenantFeature');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const rentalRoutes = require('../routes/rentalManagementRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
@@ -145,26 +145,26 @@ beforeEach(async () => {
   });
 
   operatorRead = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorRead._id, actor: grantor, capabilities: ['platform.rentals.read'], reason: 'RNT read op' });
+  await provisionPrivilegedOperator({ userId: operatorRead._id, actor: grantor, capabilities: ['platform.rentals.read'], reason: 'RNT read op' });
 
   operatorManage = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorManage._id, actor: grantor, capabilities: ['platform.rentals.manage'], reason: 'RNT manage op' });
+  await provisionPrivilegedOperator({ userId: operatorManage._id, actor: grantor, capabilities: ['platform.rentals.manage'], reason: 'RNT manage op' });
 
   operatorNoRentals = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorNoRentals._id, actor: grantor, capabilities: ['platform.tenants.read'], reason: 'RNT no-rental-cap op' });
+  await provisionPrivilegedOperator({ userId: operatorNoRentals._id, actor: grantor, capabilities: ['platform.tenants.read'], reason: 'RNT no-rental-cap op' });
 
   operatorSuspended = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorSuspended._id, actor: grantor, capabilities: ['platform.rentals.manage'], reason: 'RNT suspended op' });
+  await provisionPrivilegedOperator({ userId: operatorSuspended._id, actor: grantor, capabilities: ['platform.rentals.manage'], reason: 'RNT suspended op' });
   await PlatformOperator.updateOne(
     { user: operatorSuspended._id },
     { $set: { status: 'suspended', suspendedBy: grantor._id, suspendedAt: new Date(), suspensionReason: 'RNT' } },
   );
 
   operatorTenantsManageOnly = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorTenantsManageOnly._id, actor: grantor, capabilities: ['platform.tenants.manage'], reason: 'RNT tenants.manage-only' });
+  await provisionPrivilegedOperator({ userId: operatorTenantsManageOnly._id, actor: grantor, capabilities: ['platform.tenants.manage'], reason: 'RNT tenants.manage-only' });
 
   operatorPropertiesManageOnly = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorPropertiesManageOnly._id, actor: grantor, capabilities: ['platform.properties.manage', 'platform.properties.read'], reason: 'RNT properties-only op' });
+  await provisionPrivilegedOperator({ userId: operatorPropertiesManageOnly._id, actor: grantor, capabilities: ['platform.properties.manage', 'platform.properties.read'], reason: 'RNT properties-only op' });
 
   bareGlobalAdmin = await makeUser({ role: 'Admin' });
 });

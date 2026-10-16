@@ -12,7 +12,7 @@ const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareF
 const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformTenant = require('../models/PlatformTenant');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { protect } = require('../middleware/authMiddleware');
 const { attachTenantContext } = require('../middleware/tenantContext');
 const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
@@ -158,7 +158,7 @@ describe('AUTH — forgery and cross-tenant', () => {
 
   test('AUTH-10 · AUTH-11: PlatformOperator without membership → 403 (capability does NOT satisfy tenant role)', async () => {
     const op = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: op._id, actor: bA, reason: 'op fixture', capabilities: ['platform.support.read', 'platform.users.manage'] });
+    await provisionPrivilegedOperator({ userId: op._id, actor: bA, reason: 'op fixture', capabilities: ['platform.support.read', 'platform.users.manage'] });
     // No OrgMembership on tenant A.
     const res = await request(app).get('/admin').set(bearer(op, tA._id));
     expect(res.status).toBe(403);

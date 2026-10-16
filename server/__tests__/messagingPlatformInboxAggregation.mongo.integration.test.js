@@ -3,6 +3,12 @@
 // préserve TOUJOURS le tenant de la conversation (ni req.platformTenant ni
 // body ne peuvent le réassigner). Couvre MSG-A-01 → MSG-A-12 avec fixtures
 // réelles Mongo.
+//
+// P0 SUPPORT-INBOX (révision) : la boîte de support appartient exclusivement
+// à Altitude Vision. Le staff d'une organisation cliente n'y accède plus,
+// même pour son propre tenant (MSG-A-04/05 → 403). La réponse exige la
+// capacité distincte `platform.support.reply` (MSG-A-09/12 via `opSupportReply`) ;
+// un agent en lecture seule ne répond pas.
 
 const express = require('express');
 const request = require('supertest');
@@ -14,7 +20,7 @@ const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const PlatformOperator = require('../models/PlatformOperator');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const conversationRoutes = require('../routes/conversationRoutes');
 const messageRoutes = require('../routes/messageRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -37,13 +43,13 @@ const createOperator = async ({ label, capabilities, actor }) => {
     name: label, email: `${label.toLowerCase().replace(/\W+/g, '-')}-${Date.now()}@example.test`,
     password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
   });
-  await grantOperator({ userId: user._id, actor, reason: `fixture ${label}`, capabilities });
+  await provisionPrivilegedOperator({ userId: user._id, actor, reason: `fixture ${label}`, capabilities });
   return user;
 };
 
 let tenantA; let tenantB; let bootstrapA; let clientA;
 let staffTenantA; let staffTenantB;
-let opWithSupport; let opNoSupport; let adminOnly;
+let opWithSupport; let opSupportReply; let opNoSupport; let adminOnly;
 
 beforeAll(async () => {
   await startFinancialMongo();
@@ -62,6 +68,7 @@ beforeEach(async () => {
   staffTenantB = (await createTenantUser({ tenant: tenantB, bootstrap: fB.bootstrap, overrides: { role: 'Admin' } })).user;
 
   opWithSupport = await createOperator({ label: 'OpSupport', capabilities: ['platform.support.read'], actor: bootstrapA });
+  opSupportReply = await createOperator({ label: 'OpSupportReply', capabilities: ['platform.support.read', 'platform.support.reply'], actor: bootstrapA });
   opNoSupport = await createOperator({ label: 'OpNoSupport', capabilities: ['platform.tenants.read'], actor: bootstrapA });
   adminOnly = await User.create({
     name: 'Admin bare', email: `admin-only-${Date.now()}@example.test`,
@@ -86,18 +93,11 @@ describe('MSG-A — staff-inbox authority', () => {
     expect(res.body.results).toBe(2);
   });
 
-  test('MSG-A-04 · MSG-A-05: tenant staff scoped — Mila ne voit pas Altitude et inversement', async () => {
+  test('MSG-A-04 · MSG-A-05: staff d’organisation → 403, même sur une conversation de son propre tenant', async () => {
     const resA = await request(app).get('/api/conversations/staff-inbox').set(bearer(staffTenantA, tenantA._id));
-    expect(resA.status).toBe(200);
-    const idsA = resA.body.data.conversations.map((c) => String(c.tenant));
-    expect(idsA).toContain(String(tenantA._id));
-    expect(idsA).not.toContain(String(tenantB._id));
-
+    expect(resA.status).toBe(403);
     const resB = await request(app).get('/api/conversations/staff-inbox').set(bearer(staffTenantB, tenantB._id));
-    expect(resB.status).toBe(200);
-    const idsB = resB.body.data.conversations.map((c) => String(c.tenant));
-    expect(idsB).toContain(String(tenantB._id));
-    expect(idsB).not.toContain(String(tenantA._id));
+    expect(resB.status).toBe(403);
   });
 
   test('MSG-A-06 · MSG-A-15: Admin sans PlatformOperator → refus mode plateforme', async () => {
@@ -127,7 +127,7 @@ describe('MSG-A — global open / read / reply', () => {
 
   test('MSG-A-09 · MSG-A-10: staff plateforme répond → message conservé sur tenant Mila', async () => {
     const res = await request(app).post('/api/messages')
-      .set(bearer(opWithSupport))
+      .set(bearer(opSupportReply))
       .send({ conversationId: String(milaConv._id), content: 'Réponse staff plateforme' });
     expect(res.status).toBe(201);
     const persisted = await Message.findById(res.body.data.message._id).lean();
@@ -137,7 +137,7 @@ describe('MSG-A — global open / read / reply', () => {
 
   test('MSG-A-11: X-Platform-Tenant-Id: <Altitude> ne peut pas réattribuer un message Mila', async () => {
     const res = await request(app).post('/api/messages')
-      .set(bearer(opWithSupport, tenantB._id))
+      .set(bearer(opSupportReply, tenantB._id))
       .send({ conversationId: String(milaConv._id), content: 'Tentative de reroutage' });
     // La conversation est Mila : l'operateur y a accès via capability. Le
     // message doit rester rattaché à Mila, jamais à Altitude Vision.
@@ -159,7 +159,7 @@ describe('MSG-A — global open / read / reply', () => {
 
   test('MSG-A-12: body.tenantId ne peut pas réattribuer un message (le champ n\'est pas autoritaire)', async () => {
     const res = await request(app).post('/api/messages')
-      .set(bearer(opWithSupport))
+      .set(bearer(opSupportReply))
       .send({
         conversationId: String(milaConv._id),
         content: 'Body forgé',
@@ -170,6 +170,24 @@ describe('MSG-A — global open / read / reply', () => {
     expect(res.status).toBe(201);
     const persisted = await Message.findById(res.body.data.message._id).lean();
     expect(String(persisted.tenant)).toBe(String(tenantA._id));
+  });
+
+  test('P0 SUPPORT-INBOX: agent support en lecture seule (sans platform.support.reply) → réponse 403, aucun message', async () => {
+    const res = await request(app).post('/api/messages')
+      .set(bearer(opWithSupport))
+      .send({ conversationId: String(milaConv._id), content: 'Réponse non habilitée' });
+    expect(res.status).toBe(403);
+    expect(await Message.countDocuments({ conversation: milaConv._id })).toBe(0);
+  });
+
+  test('P0 SUPPORT-INBOX: staff du tenant Mila ne peut ni ouvrir ni répondre à un prospect sur son propre tenant', async () => {
+    const open = await request(app).get(`/api/conversations/${milaConv._id}`).set(bearer(staffTenantA, tenantA._id));
+    expect(open.status).toBe(403);
+    const reply = await request(app).post('/api/messages')
+      .set(bearer(staffTenantA, tenantA._id))
+      .send({ conversationId: String(milaConv._id), content: 'Contournement de la médiation' });
+    expect(reply.status).toBe(403);
+    expect(await Message.countDocuments({ conversation: milaConv._id })).toBe(0);
   });
 
   test('MSG-A-13 · MSG-A-14: staff du tenant B ne peut ni ouvrir ni répondre à une conversation Mila', async () => {

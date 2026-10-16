@@ -24,7 +24,9 @@ const CAPABILITIES_BY_ROLE = {
 
 const renderAsRole = (role, explicitCapabilities, tenantBusinessRole = role) => {
   const capabilities = explicitCapabilities || CAPABILITIES_BY_ROLE[role] || [];
-  const can = (capability) => capability === 'platform.tenant_applications.read'
+  // Comme le `can` réel (PlatformTenantRuntimeContext) : une capacité
+  // `platform.*` n'est jamais héritée d'un rôle ni du joker Admin.
+  const can = (capability) => String(capability).startsWith('platform.')
     ? capabilities.includes(capability)
     : capabilities.includes('*') || capabilities.includes('legacy.full') || capabilities.includes(capability);
   vi.doMock('../context/AuthContext', () => ({
@@ -181,8 +183,41 @@ describe('AdminDashboard — domaines métier Altimmo (Sprint 0) — TEST DATA',
     const { default: Dashboard } = await import('../pages/dashboard/AdminDashboard');
     render(<Dashboard><p>CONTENU</p></Dashboard>);
     expect(screen.getByRole('link', { name: 'Customers & pipeline' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Marketing Automation' })).toBeInTheDocument();
+    // LOT E — le CRM opérationnel reste au tenant ; le marketing commercial
+    // n'est jamais ouvert par un rôle ou une adhésion tenant.
+    expect(screen.queryByRole('link', { name: 'Marketing Automation' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: "Centre d'Administration" })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Historique' })).not.toBeInTheDocument();
+  });
+
+  test('LOT E — le lien Marketing n\'apparaît qu\'avec platform.marketing.manage (PlatformOperator), jamais par le rôle', async () => {
+    renderAsRole('CommunityManager', undefined, 'CommunityManager');
+    const { default: TenantDashboard } = await import('../pages/dashboard/AdminDashboard');
+    const { unmount } = render(<TenantDashboard><p>CONTENU</p></TenantDashboard>);
+    expect(screen.queryByRole('link', { name: 'Marketing Automation' })).not.toBeInTheDocument();
+    unmount();
+
+    vi.resetModules();
+    renderAsRole('Client', ['platform.marketing.manage'], null);
+    const { default: OperatorDashboard } = await import('../pages/dashboard/AdminDashboard');
+    render(<OperatorDashboard><p>CONTENU</p></OperatorDashboard>);
+    expect(screen.getByRole('link', { name: 'Marketing Automation' })).toHaveAttribute('href', '/dashboard/altcom/marketing');
+  });
+
+  test('P0 SUPPORT-INBOX — « Messages clients » n\'apparaît qu\'avec platform.support.read, jamais par un rôle d\'organisation', async () => {
+    for (const role of ['Admin', 'Collaborateur', 'CommunityManager']) {
+      vi.resetModules();
+      renderAsRole(role, undefined, role);
+      const { default: TenantDashboard } = await import('../pages/dashboard/AdminDashboard');
+      const { unmount } = render(<TenantDashboard><p>CONTENU</p></TenantDashboard>);
+      expect(screen.queryByRole('link', { name: 'Messages clients' })).not.toBeInTheDocument();
+      unmount();
+    }
+
+    vi.resetModules();
+    renderAsRole('Client', ['platform.support.read'], null);
+    const { default: AgentDashboard } = await import('../pages/dashboard/AdminDashboard');
+    render(<AgentDashboard><p>CONTENU</p></AgentDashboard>);
+    expect(screen.getByRole('link', { name: 'Messages clients' })).toHaveAttribute('href', '/dashboard/conversations');
   });
 });

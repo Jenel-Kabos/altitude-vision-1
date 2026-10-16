@@ -10,7 +10,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const User = require('../models/User');
 const Property = require('../models/Property');
@@ -53,16 +53,16 @@ beforeAll(async () => {
 
   // Administrateur plateforme réel : éligible ET membre Admin du seul Tenant A.
   S.platformAdmin = await makeUser('Admin', 'platform-admin');
-  await grantOperator({ userId: S.platformAdmin._id, actor: S.adminA, reason: 'PA04B1 full operator', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: S.platformAdmin._id, actor: S.adminA, reason: 'PA04B1 full operator', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   await addTenantMember({ tenant: S.tenantA, user: S.platformAdmin, bootstrap: S.adminA, businessRole: 'Admin' });
   // Opérateur éligible sans aucune adhésion tenant.
   S.platformAdminNoMembership = await makeUser('Admin', 'platform-admin-no-membership');
-  await grantOperator({ userId: S.platformAdminNoMembership._id, actor: S.adminA, reason: 'PA04B1 full operator no membership', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: S.platformAdminNoMembership._id, actor: S.adminA, reason: 'PA04B1 full operator no membership', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   // Opérateurs partiels : avec et sans la capability de lecture du pilotage.
   S.partialReporting = await makeUser('Admin', 'partial-reporting');
-  await grantOperator({ userId: S.partialReporting._id, actor: S.adminA, reason: 'PA04B1 partial reporting', capabilities: ['platform.reporting.read'] });
+  await provisionPrivilegedOperator({ userId: S.partialReporting._id, actor: S.adminA, reason: 'PA04B1 partial reporting', capabilities: ['platform.reporting.read'] });
   S.partialSupport = await makeUser('Admin', 'partial-support');
-  await grantOperator({ userId: S.partialSupport._id, actor: S.adminA, reason: 'PA04B1 partial support', capabilities: ['platform.support.read'] });
+  await provisionPrivilegedOperator({ userId: S.partialSupport._id, actor: S.adminA, reason: 'PA04B1 partial support', capabilities: ['platform.support.read'] });
 
   await makeProperty(S.adminA, S.tenantA, 'PA04B1 bien A');
   await makeProperty(S.adminA, S.tenantA, 'PA04B1 bien A2');

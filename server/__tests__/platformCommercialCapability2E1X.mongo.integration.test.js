@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
 const {
-  grantOperator,
+  provisionPrivilegedOperator,
   suspendOperator,
   hasCapability,
   PlatformOperatorError,
@@ -81,7 +81,7 @@ describe('COMM-CAP — platform.commercial.manage registry and middleware', () =
     expect(PlatformOperator.PLATFORM_OPERATOR_CAPABILITIES).toContain('platform.commercial.manage');
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await expect(grantOperator({
+    await expect(provisionPrivilegedOperator({
       userId: opUser._id, actor: granter, reason: 'COMM-CAP-01',
       capabilities: ['platform.commercial.manage'],
     })).resolves.toMatchObject({ status: 'active', capabilities: expect.arrayContaining(['platform.commercial.manage']) });
@@ -90,7 +90,7 @@ describe('COMM-CAP — platform.commercial.manage registry and middleware', () =
   test('COMM-CAP-02 (unknown capability remains rejected)', async () => {
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await expect(grantOperator({
+    await expect(provisionPrivilegedOperator({
       userId: opUser._id, actor: granter, reason: 'COMM-CAP-02',
       capabilities: ['platform.commercial.godmode'],
     })).rejects.toMatchObject({ code: 'PLATFORM_OPERATOR_INVALID_CAPABILITY' });
@@ -125,7 +125,7 @@ describe('COMM-CAP — platform.commercial.manage registry and middleware', () =
     const fA = await tenantF('A');
     const nonAdminOp = await makeUser({ role: 'Proprietaire' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: nonAdminOp._id, actor: granter, reason: 'COMM-CAP-05', capabilities: ['platform.commercial.manage'] });
+    await provisionPrivilegedOperator({ userId: nonAdminOp._id, actor: granter, reason: 'COMM-CAP-05', capabilities: ['platform.commercial.manage'] });
     const owner = await makeUser({ role: 'Proprietaire' });
     const client = await makeUser({ role: 'Client' });
     const agent = await makeUser({ role: 'Admin' });
@@ -139,7 +139,7 @@ describe('COMM-CAP — platform.commercial.manage registry and middleware', () =
     const fA = await tenantF('A');
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'COMM-CAP-06', capabilities: ['platform.commercial.manage'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'COMM-CAP-06', capabilities: ['platform.commercial.manage'] });
     await suspendOperator({ userId: opUser._id, actor: granter, reason: 'COMM-CAP-06 suspend' });
     const owner = await makeUser({ role: 'Proprietaire' });
     const client = await makeUser({ role: 'Client' });
@@ -154,7 +154,7 @@ describe('COMM-CAP — platform.commercial.manage registry and middleware', () =
     const fA = await tenantF('A');
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'COMM-CAP-07', capabilities: ['platform.finance.read'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'COMM-CAP-07', capabilities: ['platform.finance.read'] });
     const owner = await makeUser({ role: 'Proprietaire' });
     const client = await makeUser({ role: 'Client' });
     const agent = await makeUser({ role: 'Admin' });
@@ -168,7 +168,7 @@ describe('COMM-CAP — platform.commercial.manage registry and middleware', () =
     const fA = await tenantF('A');
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'COMM-CAP-08', capabilities: ['platform.commercial.manage'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'COMM-CAP-08', capabilities: ['platform.commercial.manage'] });
     const owner = await makeUser({ role: 'Proprietaire' });
     const client = await makeUser({ role: 'Client' });
     const agent = await makeUser({ role: 'Admin' });
@@ -208,7 +208,7 @@ describe('COMM-CAP — platform.commercial.manage registry and middleware', () =
     const fA = await tenantF('A');
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({
+    await provisionPrivilegedOperator({
       userId: opUser._id, actor: granter, reason: 'COMM-CAP-10',
       capabilities: ['platform.finance.manage', 'platform.crm.manage'],
     });
@@ -270,7 +270,7 @@ describe('COMM-NOTE — updateNotes requires platform.commercial.manage', () => 
     const { tx } = await scenario();
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'COMM-NOTE-05', capabilities: ['platform.properties.manage'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'COMM-NOTE-05', capabilities: ['platform.properties.manage'] });
     const res = await request(app).patch(`/api/transactions/${tx._id}/notes`).set(bearer(opUser)).send({ notes: 'x' });
     expect(res.status).toBe(403);
   });
@@ -279,7 +279,7 @@ describe('COMM-NOTE — updateNotes requires platform.commercial.manage', () => 
     const { tx } = await scenario();
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'COMM-NOTE-06', capabilities: ['platform.finance.manage'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'COMM-NOTE-06', capabilities: ['platform.finance.manage'] });
     const res = await request(app).patch(`/api/transactions/${tx._id}/notes`).set(bearer(opUser)).send({ notes: 'finance-does-not-imply-commercial' });
     expect(res.status).toBe(403);
   });
@@ -288,7 +288,7 @@ describe('COMM-NOTE — updateNotes requires platform.commercial.manage', () => 
     const { fA, tx } = await scenario();
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'COMM-NOTE-07', capabilities: ['platform.commercial.manage'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'COMM-NOTE-07', capabilities: ['platform.commercial.manage'] });
     // USER-TENANT-MEMBERSHIP-ARCHITECTURE — un PlatformOperator doit
     // sélectionner explicitement un tenant à administrer (X-Platform-Tenant-Id)
     // pour que la frontière ressource puisse résoudre la Transaction.
@@ -337,7 +337,7 @@ describe('FIN-CAP — commercial.manage does not grant financial authority', () 
     const tx = await makeTransaction(property, client, agent);
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP', capabilities: ['platform.commercial.manage'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP', capabilities: ['platform.commercial.manage'] });
     return { fA, tx, opUser, property, client, agent };
   }
 
@@ -375,7 +375,7 @@ describe('FIN-CAP — commercial.manage does not grant financial authority', () 
     const tx = await makeTransaction(property, client, agent);
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP-04', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP-04', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const res = await request(app).post(`/api/transactions/${tx._id}/finalize`).set(bearer(opUser));
     expect(res.status).not.toBe(403);
   });
@@ -389,7 +389,7 @@ describe('FIN-CAP — commercial.manage does not grant financial authority', () 
     const tx = await makeTransaction(property, client, agent);
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP-05', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'FIN-CAP-05', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const paiementId = new mongoose.Types.ObjectId();
     const res = await request(app)
       .patch(`/api/transactions/${tx._id}/paiements/${paiementId}/valider`)

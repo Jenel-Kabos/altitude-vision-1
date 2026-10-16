@@ -79,8 +79,10 @@ describe('SECURITY-CLOSURE-P0-WAVE-1 (P0-E) — GET /api/admin/properties, /stat
     const b = await buildTenantWithProperty('D');
     await organizationService.grantMembership({ userId: staffMulti._id, orgUnitId: a.tenant.rootOrgUnit, actor: a.admin });
     await organizationService.grantMembership({ userId: staffMulti._id, orgUnitId: b.tenant.rootOrgUnit, actor: b.admin });
+    // LOT A — la file de modération est exclusivement plateforme : même un
+    // Admin tenant correctement scopé est refusé ; le staff ambigu aussi.
     const scoped = await request(app).get('/api/admin/properties/status/pending').set(bearer(a.admin, a.tenant._id));
-    expect(scoped.status).toBe(200);
+    expect(scoped.status).toBe(403);
     const ambiguous = await request(app).get('/api/admin/properties/status/pending').set(bearer(staffMulti));
     expect(ambiguous.status).toBe(403);
   });
@@ -110,10 +112,14 @@ describe('SECURITY-CLOSURE-P0-WAVE-1 (P0-E) — PATCH approve/reject, DELETE', (
     expect(fresh).not.toBeNull();
   });
 
-  test('6. Admin A PEUT approuver/supprimer une propriété de son propre tenant (comportement historique préservé)', async () => {
+  test('6. Admin A ne peut plus approuver sa propre propriété (LOT A : Altitude Vision seule) mais PEUT la supprimer (droit de gestion préservé)', async () => {
     const a = await buildTenantWithProperty('K');
+    const before = await Property.findById(a.property._id).lean();
     const approve = await request(app).patch(`/api/admin/properties/${a.property._id}/approve`).set(bearer(a.admin, a.tenant._id));
-    expect(approve.status).toBe(200);
+    expect(approve.status).toBe(403);
+    const after = await Property.findById(a.property._id).lean();
+    expect(after.reviewedAt || null).toEqual(before.reviewedAt || null);
+    expect(await require('../models/CommercialPublicationRevision').countDocuments({ resource: a.property._id })).toBe(0);
     const del = await request(app).delete(`/api/admin/properties/${a.property._id}`).set(bearer(a.admin, a.tenant._id));
     expect(del.status).toBe(204);
     expect(await Property.findById(a.property._id)).toBeNull();

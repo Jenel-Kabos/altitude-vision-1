@@ -12,6 +12,7 @@ const router  = express.Router();
 const { STAFF_ALL } = require('../utils/roles');
 
 const adminController = require('../controllers/adminController');
+const propertyController = require('../controllers/propertyController');
 const authController  = require('../controllers/authController');
 // SECURITY-CLOSURE-P0-WAVE-1 (P0-E, finding RA-09) — ce fichier duplique un
 // flux de modération Property legacy jamais aligné sur le correctif
@@ -21,6 +22,7 @@ const authController  = require('../controllers/authController');
 const { requireTenantScopeForStaffAllowPlatformWide } = require('../middleware/tenantContext');
 const {
   requirePlatformOperatorCapability,
+  requirePlatformScope,
   requireTenantBusinessRoleOrPlatformCapability,
 } = require('../middleware/platformAuthority');
 
@@ -58,12 +60,12 @@ router.get('/stats', requireTenantScopeForStaffAllowPlatformWide, reportingAutho
 router.get('/activity', requireTenantScopeForStaffAllowPlatformWide, reportingAuthority, adminController.getActivityReport);
 
 // ── Propriétés : lecture (CM + Gestionnaire) ─────────────────────
-router.get('/properties/status/pending', requireTenantScopeForStaffAllowPlatformWide, propertyReadAuthority, adminController.getPendingProperties);
+router.get('/properties/status/pending', requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, propertyController.getPendingProperties);
 router.get('/properties',               requireTenantScopeForStaffAllowPlatformWide, propertyReadAuthority, adminController.getAllProperties);
 
 // ── Propriétés : modération / suppression (Admin uniquement) ─────
-router.patch('/properties/:id/approve', requireTenantScopeForStaffAllowPlatformWide, propertyManageAuthority, adminController.approveProperty);
-router.patch('/properties/:id/reject',  requireTenantScopeForStaffAllowPlatformWide, propertyManageAuthority, adminController.rejectProperty);
+router.patch('/properties/:id/approve', requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, (req, _res, next) => { req.params.action = 'validate'; next(); }, propertyController.updatePropertyStatus);
+router.patch('/properties/:id/reject',  requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, (req, _res, next) => { req.params.action = 'reject'; next(); }, propertyController.updatePropertyStatus);
 router.delete('/properties/:id',        requireTenantScopeForStaffAllowPlatformWide, propertyManageAuthority, adminController.deleteProperty);
 
 // ── Utilisateurs (Admin uniquement) ──────────────────────────────

@@ -20,7 +20,8 @@ const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
 const Property = require('../models/Property');
 const PlatformOperator = require('../models/PlatformOperator');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const propertyRoutes = require('../routes/propertyRoutes');
 const propertyAssetRoutes = require('../routes/propertyAssetRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -52,6 +53,7 @@ let propertyA1; let propertyA2; let propertyB1; let propertyLegacyNull;
 let tenantAdminA; let gestionA;
 let operatorRead; let operatorManage; let operatorNoProp; let operatorSuspended;
 let operatorTenantsManageOnly; let bareGlobalAdmin;
+let operatorCommercial;
 let grantor;
 
 beforeAll(async () => {
@@ -94,7 +96,7 @@ beforeEach(async () => {
   tenantAdminA = (await createTenantUser({ tenant: tenantA, bootstrap: bootstrapA, businessRole: 'Admin', overrides: { role: 'Admin' } })).user;
   gestionA = (await createTenantUser({ tenant: tenantA, bootstrap: bootstrapA, businessRole: 'GestionnaireImmobilier', overrides: { role: 'Collaborateur' } })).user;
 
-  // Grantor for operator bootstrap (grantOperator forbids self-grant).
+  // Grantor for operator bootstrap (provisionPrivilegedOperator forbids self-grant).
   grantor = await makeGlobalUser({ role: 'Admin' });
   await PlatformOperator.create({
     user: grantor._id, status: 'active',
@@ -103,25 +105,28 @@ beforeEach(async () => {
   });
 
   operatorRead = await makeGlobalUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorRead._id, actor: grantor, capabilities: ['platform.properties.read'], reason: 'PROP read op' });
+  await provisionPrivilegedOperator({ userId: operatorRead._id, actor: grantor, capabilities: ['platform.properties.read'], reason: 'PROP read op' });
 
   operatorManage = await makeGlobalUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorManage._id, actor: grantor, capabilities: ['platform.properties.manage'], reason: 'PROP manage op' });
+  await provisionPrivilegedOperator({ userId: operatorManage._id, actor: grantor, capabilities: ['platform.properties.manage'], reason: 'PROP manage op' });
 
   operatorNoProp = await makeGlobalUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorNoProp._id, actor: grantor, capabilities: ['platform.tenants.read'], reason: 'PROP no-property-cap op' });
+  await provisionPrivilegedOperator({ userId: operatorNoProp._id, actor: grantor, capabilities: ['platform.tenants.read'], reason: 'PROP no-property-cap op' });
 
   operatorSuspended = await makeGlobalUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorSuspended._id, actor: grantor, capabilities: ['platform.properties.manage'], reason: 'PROP suspended op' });
+  await provisionPrivilegedOperator({ userId: operatorSuspended._id, actor: grantor, capabilities: ['platform.properties.manage'], reason: 'PROP suspended op' });
   await PlatformOperator.updateOne(
     { user: operatorSuspended._id },
     { $set: { status: 'suspended', suspendedBy: grantor._id, suspendedAt: new Date(), suspensionReason: 'PROP' } },
   );
 
   operatorTenantsManageOnly = await makeGlobalUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorTenantsManageOnly._id, actor: grantor, capabilities: ['platform.tenants.manage'], reason: 'PROP tenants.manage-only op' });
+  await provisionPrivilegedOperator({ userId: operatorTenantsManageOnly._id, actor: grantor, capabilities: ['platform.tenants.manage'], reason: 'PROP tenants.manage-only op' });
 
   bareGlobalAdmin = await makeGlobalUser({ role: 'Admin' });
+
+  operatorCommercial = await makeGlobalUser({ role: 'Admin' });
+  await PlatformOperator.create({ user: operatorCommercial._id, status: 'active', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES], grantedBy: grantor._id, grantReason: 'PROP commercial moderation op' });
 });
 
 // ─── P-PROPERTY-01/02/03/04 — cross-tenant listing + null exclusion ────────
@@ -194,9 +199,15 @@ test('P-PROPERTY-04: Tenant A response contains no tenant:null property (hotfix 
 
 // ─── P-PROPERTY-05/06 — read cannot write ─────────────────────────────────
 
-test('P-PROPERTY-05: platform.properties.read can read pending moderation queue', async () => {
+test('P-PROPERTY-05: platform.properties.read ne donne plus accès à la file commerciale', async () => {
   const res = await request(app).get('/api/properties/status/pending').set(bearer(operatorRead, tenantA._id));
+  expect(res.status).toBe(403);
+});
+
+test('P-PROPERTY-05b: platform.commercial.manage lit la file globale, y compris tenant:null', async () => {
+  const res = await request(app).get('/api/properties/status/pending').set(bearer(operatorCommercial));
   expect(res.status).toBe(200);
+  expect(res.body.data.properties.map((item) => String(item._id))).toContain(String(propertyLegacyNull._id));
 });
 
 test('P-PROPERTY-06: platform.properties.read cannot mutate (validate) a property', async () => {
@@ -206,18 +217,25 @@ test('P-PROPERTY-06: platform.properties.read cannot mutate (validate) a propert
 
 // ─── P-PROPERTY-07/08 — manage capability across tenants ──────────────────
 
-test('P-PROPERTY-07: platform.properties.manage can validate a Tenant A property', async () => {
+test('P-PROPERTY-07: platform.properties.manage ne peut pas valider une annonce commerciale', async () => {
   const res = await request(app).patch(`/api/properties/admin/${propertyA1._id}/validate`).set(bearer(operatorManage, tenantA._id)).send({});
-  expect(res.status).toBe(200);
+  expect(res.status).toBe(403);
   const after = await Property.findById(propertyA1._id).lean();
-  expect(after.statusAdmin).toBe('Validée');
+  expect(after.statusAdmin).not.toBe('Validée');
 });
 
-test('P-PROPERTY-08: same manage capability validates a Tenant B property after explicit switch', async () => {
+test('P-PROPERTY-08: la capacité properties.manage reste insuffisante dans un autre tenant', async () => {
   const res = await request(app).patch(`/api/properties/admin/${propertyB1._id}/validate`).set(bearer(operatorManage, tenantB._id)).send({});
-  expect(res.status).toBe(200);
+  expect(res.status).toBe(403);
   const after = await Property.findById(propertyB1._id).lean();
-  expect(after.statusAdmin).toBe('Validée');
+  expect(after.statusAdmin).not.toBe('Validée');
+});
+
+test('P-PROPERTY-08b: l’opérateur commercial approuve une annonce tenant sans transfert de propriété', async () => {
+  const res = await request(app).patch(`/api/properties/admin/${propertyA1._id}/validate`).set(bearer(operatorCommercial)).send({ reason: 'Annonce vérifiée' });
+  expect(res.status).toBe(200);
+  const after = await Property.findById(propertyA1._id).lean();
+  expect(after).toMatchObject({ statusAdmin: 'Validée', isPublished: true, owner: ownerA._id, tenant: tenantA._id });
 });
 
 // ─── P-PROPERTY-09/10/11/12 — negative authority ──────────────────────────
@@ -251,21 +269,21 @@ test('P-PROPERTY-13: Tenant A context + Tenant B property ID → 403 (property.t
   expect(after.statusAdmin).not.toBe('Validée');
 });
 
-test('P-PROPERTY-14: Tenant A context + tenant:null property ID → 403 (property.tenant is null)', async () => {
-  const res = await request(app).patch(`/api/properties/admin/${propertyLegacyNull._id}/validate`).set(bearer(operatorManage, tenantA._id)).send({});
-  expect(res.status).toBe(403);
+test('P-PROPERTY-14: l’opérateur commercial modère tenant:null sans réattribution', async () => {
+  const res = await request(app).patch(`/api/properties/admin/${propertyLegacyNull._id}/validate`).set(bearer(operatorCommercial)).send({ reason: 'Annonce personnelle vérifiée' });
+  expect(res.status).toBe(200);
   const after = await Property.findById(propertyLegacyNull._id).lean();
-  expect(after.statusAdmin).not.toBe('Validée');
+  expect(after.statusAdmin).toBe('Validée');
   expect(after.tenant).toBeNull();
 });
 
 // ─── P-PROPERTY-15 — tenant Admin unchanged ───────────────────────────────
 
-test('P-PROPERTY-15: normal Tenant Admin behavior unchanged (PATH A still validates)', async () => {
+test('P-PROPERTY-15: un Admin de tenant ne peut plus auto-valider', async () => {
   const res = await request(app).patch(`/api/properties/admin/${propertyA2._id}/validate`).set(bearer(tenantAdminA, tenantA._id)).send({});
-  expect(res.status).toBe(200);
+  expect(res.status).toBe(403);
   const after = await Property.findById(propertyA2._id).lean();
-  expect(after.statusAdmin).toBe('Validée');
+  expect(after.statusAdmin).not.toBe('Validée');
 });
 
 // ─── P-PROPERTY-16/17 — capability-specificity ───────────────────────────

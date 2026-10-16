@@ -36,7 +36,7 @@ const PlatformOperator = require('../models/PlatformOperator');
 const Document = require('../models/Document');
 const Transaction = require('../models/Transaction');
 const Contrat = require('../models/Contrat');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const documentRoutes = require('../routes/documentRoutes');
 const gestionDocumentRoutes = require('../routes/gestionDocumentRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -134,28 +134,28 @@ beforeEach(async () => {
   // n'a pas documents.* dans DEFAULT_CAPABILITIES). Isole la sémantique
   // du nouveau PATH B.
   operatorManage = await makeUser({ role: 'User' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorManage._id, actor: platformGrantor,
     capabilities: ['platform.documents.manage', 'platform.tenants.read'],
     reason: 'PDOCW operator with documents.manage',
   });
 
   operatorRead = await makeUser({ role: 'User' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorRead._id, actor: platformGrantor,
     capabilities: ['platform.documents.read', 'platform.tenants.read'],
     reason: 'PDOCW operator with documents.read only (must not write)',
   });
 
   operatorWrongCap = await makeUser({ role: 'User' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorWrongCap._id, actor: platformGrantor,
     capabilities: ['platform.finance.manage', 'platform.rentals.manage', 'platform.crm.manage'],
     reason: 'PDOCW operator with adjacent caps only, no documents.*',
   });
 
   operatorSuspended = await makeUser({ role: 'User' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorSuspended._id, actor: platformGrantor,
     capabilities: ['platform.documents.manage'],
     reason: 'PDOCW operator to be suspended',
@@ -166,7 +166,7 @@ beforeEach(async () => {
   );
 
   operatorRevoked = await makeUser({ role: 'User' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorRevoked._id, actor: platformGrantor,
     capabilities: ['platform.documents.manage'],
     reason: 'PDOCW operator to be revoked',

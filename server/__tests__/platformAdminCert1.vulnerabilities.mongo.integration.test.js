@@ -27,7 +27,7 @@ async function makeAttributedProperty(owner, tenant) {
     availability: 'Disponible', owner: owner._id, tenant: tenant._id,
   });
 }
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 
 const userRoutes = require('../routes/userRoutes');
 const locataireRoutes = require('../routes/locataireRoutes');
@@ -81,7 +81,7 @@ beforeAll(async () => {
     name: 'Operator V', email: `operator-v-${Date.now()}@example.test`,
     password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
   });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorUser._id, actor: grantingAdmin, reason: 'Test V1-V4',
     capabilities: ['platform.users.read', 'platform.users.manage', 'platform.rentals.read', 'platform.rentals.manage'],
   });

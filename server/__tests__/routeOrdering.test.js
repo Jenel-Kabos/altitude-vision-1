@@ -128,13 +128,29 @@ describe("Contrôle final — routage Hotel/Accommodation : aucune route dynamiq
   });
 
   test('GET /api/hotels/status/pending (authentifié, staff) appelle bien pending — jamais interprété comme /:id', async () => {
+    // LOT A — la file de modération est réservée à un PlatformOperator actif
+    // (platform.commercial.manage) en contexte PLATFORM ; l'objet de ce test
+    // reste l'ordre des routes.
+    const { resolveActiveOperator } = require('../services/platformOperator/platformOperatorService');
+    const { resolveEffectiveTenantContext } = require('../services/platformTenant/tenantContextService');
+    const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
+    const operator = { user: ADMIN_ID, status: 'active', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] };
+    const previousContext = resolveEffectiveTenantContext.getMockImplementation();
+    resolveActiveOperator.mockResolvedValue(operator);
+    resolveEffectiveTenantContext.mockResolvedValue({ tenant: null, source: 'platform_operator_unscoped', operator });
     mockUserAuth(ADMIN_ID, 'Admin');
     Hotel.find = jest.fn().mockReturnValue(hotelFindQuery());
     RoomCategory.find = jest.fn().mockResolvedValue([]);
 
-    const res = await request(app)
-      .get('/api/hotels/status/pending')
-      .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
+    let res;
+    try {
+      res = await request(app)
+        .get('/api/hotels/status/pending')
+        .set('Authorization', `Bearer ${makeToken(ADMIN_ID)}`);
+    } finally {
+      resolveActiveOperator.mockResolvedValue(null);
+      if (previousContext) resolveEffectiveTenantContext.mockImplementation(previousContext);
+    }
 
     expect(res.statusCode).toBe(200);
     expect(res.body.data).toHaveProperty('hotels');

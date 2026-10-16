@@ -135,6 +135,13 @@ test('Marketing refuse lecture et activation d’un template adverse', async () 
     { tenant: tenantB._id, family: 'welcome', name: 'B', channel: 'email', body: 'B', status: 'draft' },
   ]);
   expect(await templateService.listActiveTemplates({ tenantId: tenantA._id })).toHaveLength(1);
+  // LOT E — un membre tenant n'a aucune autorité marketing (refus avant toute
+  // lecture du modèle adverse) ; même un PlatformOperator habilité ne peut
+  // activer un modèle rattaché à un tenant (consentement non transférable).
+  await expect(templateService.activateTemplate(templateB._id, { actor: userA, tenantId: tenantA._id })).rejects.toMatchObject({ code: 'PLATFORM_MARKETING_AUTHORITY_REQUIRED' });
+  const PlatformOperator = require('../models/PlatformOperator');
+  await PlatformOperator.create({ user: userA._id, status: 'active', capabilities: ['platform.marketing.manage'], grantedBy: userA._id, grantReason: 'TEST DATA tenant hardening' });
+  await expect(templateService.activateTemplate(templateB._id, { actor: userA })).rejects.toMatchObject({ code: 'MARKETING_TENANT_SCOPE_FORBIDDEN' });
   await expect(templateService.activateTemplate(templateB._id, { actor: userA, tenantId: tenantA._id })).rejects.toMatchObject({ code: 'TEMPLATE_NOT_FOUND' });
   expect((await MarketingTemplate.findById(templateB._id)).status).toBe('draft');
   expect(templateA.tenant.toString()).toBe(String(tenantA._id));

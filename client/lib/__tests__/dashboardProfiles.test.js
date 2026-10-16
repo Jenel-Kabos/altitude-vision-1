@@ -31,7 +31,10 @@ describe('DASH-1 — architecture des overviews staff', () => {
 
   test('le Community Manager reçoit uniquement communication et médias', () => {
     const labels = getVisibleProfileModules('CommunityManager', canFor('CommunityManager')).map(module => module.label);
-    expect(labels).toEqual(['Altcom', 'Mila Events', 'Marketing']);
+    // LOT E — le module Marketing exige platform.marketing.manage
+    // (PlatformOperator) : un Community Manager tenant ne le reçoit pas.
+    expect(labels).toEqual(['Altcom', 'Mila Events']);
+    expect(getVisibleProfileModules('CommunityManager', (c) => c === 'platform.marketing.manage' || canFor('CommunityManager')(c)).map(module => module.label)).toContain('Marketing');
     expect(getProfileDashboard('CommunityManager').title).toMatch(/Community Manager/);
   });
 });

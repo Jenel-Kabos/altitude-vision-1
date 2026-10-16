@@ -7,7 +7,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const OrgMembership = require('../models/OrgMembership');
 const User = require('../models/User');
 const Property = require('../models/Property');
@@ -139,7 +139,7 @@ describe('CTX-LEASE — canonical tenant authority for rental lease lifecycle', 
     const fA = await buildTenant('A');
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'CTX-LEASE-05', capabilities: [] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'CTX-LEASE-05', capabilities: [] });
     const { contrat } = await buildLease(fA.tenant);
     const res = await request(app)
       .post(`/api/rental-lease-lifecycle/${contrat._id}/transition`)

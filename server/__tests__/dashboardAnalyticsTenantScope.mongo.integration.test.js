@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const PlatformTenant = require('../models/PlatformTenant');
 const Property = require('../models/Property');
@@ -98,7 +98,7 @@ beforeAll(async () => {
   operatorUser = await standalone('AnalyticsOperator');
   client = await standalone('AnalyticsClient', 'Client');
   proprietor = await standalone('AnalyticsOwner', 'Proprietaire');
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorUser._id,
     actor: plainAdmin,
     reason: 'Analytics tenant test',

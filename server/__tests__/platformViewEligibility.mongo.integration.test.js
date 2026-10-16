@@ -13,7 +13,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, createTenantUser, createTenantHotel } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const User = require('../models/User');
 const Property = require('../models/Property');
@@ -80,9 +80,9 @@ beforeAll(async () => {
   S.partial = await makeUser('Admin', 'partial-operator');
   S.partialGovernance = await makeUser('Admin', 'partial-governance');
   S.legacyAdmin = await makeUser('Admin', 'legacy-admin');
-  await grantOperator({ userId: S.full._id, actor: S.adminA, reason: 'PA04A full operator', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
-  await grantOperator({ userId: S.partial._id, actor: S.adminA, reason: 'PA04A partial operator', capabilities: without('platform.operators.manage') });
-  await grantOperator({ userId: S.partialGovernance._id, actor: S.adminA, reason: 'PA04A partial governance', capabilities: without('platform.marketing.read') });
+  await provisionPrivilegedOperator({ userId: S.full._id, actor: S.adminA, reason: 'PA04A full operator', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: S.partial._id, actor: S.adminA, reason: 'PA04A partial operator', capabilities: without('platform.operators.manage') });
+  await provisionPrivilegedOperator({ userId: S.partialGovernance._id, actor: S.adminA, reason: 'PA04A partial governance', capabilities: without('platform.marketing.read') });
 
   S.A1 = await makeHebergement({ tenant: S.tenantA, owner: S.adminA, title: 'PA04A A1' });
   S.B1 = await makeHebergement({ tenant: S.tenantB, owner: S.adminB, title: 'PA04A B1' });
@@ -252,10 +252,12 @@ describe('Groupe E — surfaces platform-native et /platform-operators/me', () =
 });
 
 describe('Groupe F — opérateur partiel avec tenant sélectionné et isolation', () => {
-  test('opérateur partiel + Tenant A → modération hébergement A uniquement', async () => {
+  // LOT A — la modération commerciale (file comprise) est exclusivement
+  // plateforme : un opérateur partiel, même avec un tenant sélectionné, n'y
+  // accède pas (il n'est pas éligible à la Vue plateforme).
+  test('opérateur partiel + Tenant A → aucune modération hébergement (file exclusivement plateforme)', async () => {
     const res = await request(app).get('/api/accommodations/status/pending').set(bearer(S.partial, S.tenantA));
-    expect(res.status).toBe(200);
-    expect(pendingTitles(res)).toEqual(['PA04A A1']);
+    expect(res.status).toBe(403);
   });
 
   test('opérateur partiel + Tenant B → registre B uniquement, jamais tenant:null', async () => {
@@ -299,8 +301,9 @@ describe('Groupe F — opérateur partiel avec tenant sélectionné et isolation
   });
 
   test('Admin tenant A ne peut pas entrer en Vue plateforme', async () => {
+    // LOT A — sans PlatformOperator, aucune file de modération (ni repli sur
+    // son tenant, ni Vue plateforme).
     const res = await request(app).get('/api/accommodations/status/pending').set(bearer(S.adminA));
-    expect(res.status).toBe(200);
-    expect(pendingTitles(res)).toEqual(['PA04A A1']);
+    expect(res.status).toBe(403);
   });
 });

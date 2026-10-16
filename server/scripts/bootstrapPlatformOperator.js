@@ -58,7 +58,9 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const connectDB = require('../config/db');
 const User = require('../models/User');
-const { grantOperator, getOperatorByUserId } = require('../services/platformOperator/platformOperatorService');
+// PLATFORM-DELEGATION-POLICY-1 — chemin légitime d'administration initiale et
+// de récupération d'accès : provisionnement privilégié, jamais exposé en HTTP.
+const { provisionPrivilegedOperator, getOperatorByUserId } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_OPERATOR_CAPABILITIES } = require('../constants/platformOperatorConstants');
 
 const args = new Set(process.argv.slice(2));
@@ -131,7 +133,7 @@ async function main() {
   } else if (existing && existing.status !== 'active' && !reactivate) {
     output.result = `NOOP — opérateur existant au statut "${existing.status}". Ajouter --reactivate pour une réattribution explicite.`;
   } else if (apply) {
-    const doc = await grantOperator({ userId: targetUser._id, capabilities, actor: grantedByUser, reason, req: null, allowSelfGrant });
+    const doc = await provisionPrivilegedOperator({ userId: targetUser._id, capabilities, actor: grantedByUser, reason, req: null, allowSelfGrant });
     output.result = { status: doc.status, capabilities: doc.capabilities, grantedAt: doc.grantedAt };
   } else {
     output.result = 'DRY-RUN — aucune écriture effectuée. Relancer avec --apply pour appliquer.';

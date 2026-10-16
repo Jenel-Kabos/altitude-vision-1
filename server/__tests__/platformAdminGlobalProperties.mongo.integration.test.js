@@ -8,7 +8,7 @@ const Property = require('../models/Property');
 const PlatformOperator = require('../models/PlatformOperator');
 const propertyRoutes = require('../routes/propertyRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 
 jest.setTimeout(180000);
@@ -100,10 +100,10 @@ beforeAll(async () => {
   legacyAdmin = await makeUser({ role: 'Admin', label: 'legacy-admin' });
   // PLATFORM-ADMIN-04A — le registre global relève de la Vue plateforme :
   // lecteur éligible (toutes les capabilities requises, dont properties.read).
-  await grantOperator({ userId: reader._id, actor: tenantAdminA, reason: 'PA03 read', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
-  await grantOperator({ userId: partialReader._id, actor: tenantAdminA, reason: 'PA04A partial reader', capabilities: ['platform.properties.read'] });
-  await grantOperator({ userId: wrongCapability._id, actor: tenantAdminA, reason: 'PA03 wrong capability', capabilities: ['platform.users.read'] });
-  await grantOperator({ userId: inactiveOperator._id, actor: tenantAdminA, reason: 'PA03 inactive', capabilities: ['platform.properties.read'] });
+  await provisionPrivilegedOperator({ userId: reader._id, actor: tenantAdminA, reason: 'PA03 read', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: partialReader._id, actor: tenantAdminA, reason: 'PA04A partial reader', capabilities: ['platform.properties.read'] });
+  await provisionPrivilegedOperator({ userId: wrongCapability._id, actor: tenantAdminA, reason: 'PA03 wrong capability', capabilities: ['platform.users.read'] });
+  await provisionPrivilegedOperator({ userId: inactiveOperator._id, actor: tenantAdminA, reason: 'PA03 inactive', capabilities: ['platform.properties.read'] });
   await PlatformOperator.updateOne({ user: inactiveOperator._id }, { $set: { status: 'suspended' } });
 });
 

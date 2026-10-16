@@ -29,7 +29,6 @@ const BLUE = '#2E7BB5';
 const ALL_STAFF     = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'CommunityManager', 'Communicant'];
 const ROLES_ESTIM   = ['Admin', 'Collaborateur', 'GestionnaireImmobilier', 'Secretaire', 'Communicant'];
 const ROLES_ALTIMMO = ['Admin', 'Collaborateur', 'GestionnaireImmobilier'];
-const ROLES_CM      = ['Admin', 'Collaborateur', 'CommunityManager'];
 const ROLES_DOCS    = ['Admin', 'Collaborateur', 'Secretaire'];
 const ROLES_LITIGES = ['Admin', 'Collaborateur', 'GestionnaireImmobilier'];
 const ROLES_MOD     = ['Admin', 'Collaborateur'];
@@ -126,9 +125,10 @@ const NAV_SECTIONS = [
     links: [
       { to: '/dashboard/events', end: false, Icon: Calendar, label: 'Mila Events', accent: '#D42B2B', capability: 'events.read' },
       { to: '/dashboard/altcom', end: false, Icon: Briefcase, label: 'Altcom', accent: GOLD, capability: 'altcom.read' },
-      // MARKETING-AUTOMATION-1 — même périmètre rôles qu'Altcom (ROLES_CM) :
-      // segments, modèles, campagnes, journal d'envoi.
-      { to: '/dashboard/altcom/marketing',   end: false, Icon: Megaphone,    label: 'Marketing Automation', accent: GOLD,      tenantRoles: ROLES_CM   },
+      // MARKETING-AUTOMATION-1 / LOT E — segments, modèles, campagnes, journal
+      // d'envoi : marketing commercial Altitude Vision, réservé à la capacité
+      // PlatformOperator `platform.marketing.manage` (jamais un rôle tenant).
+      { to: '/dashboard/altcom/marketing',   end: false, Icon: Megaphone,    label: 'Marketing Automation', accent: GOLD,      capability: 'platform.marketing.manage' },
     ],
   },
   {
@@ -163,7 +163,9 @@ const NAV_SECTIONS = [
     links: [
       { to: '/dashboard/messages',       end: false, Icon: Mail,          label: 'Boîte de Réception',  accent: GOLD,      roles: ALL_STAFF, badge: 'internalMails' },
       { to: '/dashboard/contact-messages', end: false, Icon: Mail,        label: 'Messages contact',    accent: GOLD,      roles: ALL_STAFF, badge: 'contacts' },
-      { to: '/dashboard/conversations',  end: false, Icon: MessageCircle, label: 'Messages clients',    accent: GOLD,      roles: ALL_STAFF, badge: 'conversations' },
+      // P0 SUPPORT-INBOX — boîte de support commerciale Altitude Vision :
+      // agents PlatformOperator `platform.support.read` uniquement (jamais un rôle tenant).
+      { to: '/dashboard/conversations',  end: false, Icon: MessageCircle, label: 'Messages clients',    accent: GOLD,      capability: 'platform.support.read', badge: 'conversations' },
       { to: '/dashboard/emails',         end: false, Icon: ShieldCheck,   label: 'Gestion des Emails',  accent: '#F59E0B', roles: ROLES_DOCS },
       { to: '/dashboard/publicites',     end: false, Icon: Megaphone,     label: 'Publicités',          accent: GOLD,      roles: ['Admin']  },
     ],

@@ -14,7 +14,7 @@ const platformTenantRoutes = require('../routes/platformTenantRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const {
-  grantOperator,
+  provisionPrivilegedOperator,
   suspendOperator,
   revokeOperator,
 } = require('../services/platformOperator/platformOperatorService');
@@ -119,17 +119,17 @@ beforeAll(async () => {
   tenantsReader = await makeUser({ role: 'Client', label: 'tenants-reader' });
   platformAdmin = await makeUser({ role: 'Client', label: 'platform-admin' });
 
-  await grantOperator({ userId: propertiesReader._id, actor: tenantAdminA, reason: 'properties read test', capabilities: ['platform.properties.read'] });
-  await grantOperator({ userId: propertiesManager._id, actor: tenantAdminA, reason: 'properties manage test', capabilities: ['platform.properties.manage'] });
-  await grantOperator({ userId: reportingReader._id, actor: tenantAdminA, reason: 'reporting test', capabilities: ['platform.reporting.read'] });
-  await grantOperator({ userId: unrelatedOperator._id, actor: tenantAdminA, reason: 'wrong capability test', capabilities: ['platform.users.read'] });
-  await grantOperator({ userId: inactiveOperator._id, actor: tenantAdminA, reason: 'inactive operator test', capabilities: ['platform.properties.read', 'platform.reporting.read'] });
-  await grantOperator({ userId: usersReader._id, actor: tenantAdminA, reason: 'users reader test', capabilities: ['platform.users.read'] });
-  await grantOperator({ userId: tenantsReader._id, actor: tenantAdminA, reason: 'tenants reader test', capabilities: ['platform.tenants.read'] });
+  await provisionPrivilegedOperator({ userId: propertiesReader._id, actor: tenantAdminA, reason: 'properties read test', capabilities: ['platform.properties.read'] });
+  await provisionPrivilegedOperator({ userId: propertiesManager._id, actor: tenantAdminA, reason: 'properties manage test', capabilities: ['platform.properties.manage'] });
+  await provisionPrivilegedOperator({ userId: reportingReader._id, actor: tenantAdminA, reason: 'reporting test', capabilities: ['platform.reporting.read'] });
+  await provisionPrivilegedOperator({ userId: unrelatedOperator._id, actor: tenantAdminA, reason: 'wrong capability test', capabilities: ['platform.users.read'] });
+  await provisionPrivilegedOperator({ userId: inactiveOperator._id, actor: tenantAdminA, reason: 'inactive operator test', capabilities: ['platform.properties.read', 'platform.reporting.read'] });
+  await provisionPrivilegedOperator({ userId: usersReader._id, actor: tenantAdminA, reason: 'users reader test', capabilities: ['platform.users.read'] });
+  await provisionPrivilegedOperator({ userId: tenantsReader._id, actor: tenantAdminA, reason: 'tenants reader test', capabilities: ['platform.tenants.read'] });
   // PLATFORM-ADMIN-04A — seul un opérateur éligible (toutes les capabilities
   // requises, aucun User.role Admin) entre dans le scope global ; les
   // opérateurs à capability unique ci-dessus n'y entrent plus.
-  await grantOperator({ userId: platformAdmin._id, actor: tenantAdminA, reason: 'PA04A eligible platform admin', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: platformAdmin._id, actor: tenantAdminA, reason: 'PA04A eligible platform admin', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   await PlatformOperator.updateOne({ user: inactiveOperator._id }, { $set: { status: 'suspended' } });
 });
 
@@ -252,7 +252,7 @@ describe('PLATFORM-ADMIN-01 — last viable PlatformOperator', () => {
     await resetViableOperators();
     const actor = await makeUser({ role: 'Client', label: 'operator-actor' });
     const only = await makeUser({ role: 'Client', label: 'only-viable' });
-    await grantOperator({ userId: only._id, actor, reason: 'only viable', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: only._id, actor, reason: 'only viable', capabilities: ['platform.operators.manage'] });
 
     await expect(suspendOperator({ userId: only._id, actor, reason: 'must fail' }))
       .rejects.toMatchObject({ code: 'LAST_PLATFORM_OPERATOR' });
@@ -266,9 +266,9 @@ describe('PLATFORM-ADMIN-01 — last viable PlatformOperator', () => {
     await resetViableOperators();
     const actor = await makeUser({ role: 'Client', label: 'capability-actor' });
     const only = await makeUser({ role: 'Client', label: 'last-capable' });
-    await grantOperator({ userId: only._id, actor, reason: 'last capable', capabilities: ['platform.operators.manage', 'platform.users.read'] });
+    await provisionPrivilegedOperator({ userId: only._id, actor, reason: 'last capable', capabilities: ['platform.operators.manage', 'platform.users.read'] });
 
-    await expect(grantOperator({ userId: only._id, actor, reason: 'remove manage', capabilities: ['platform.users.read'] }))
+    await expect(provisionPrivilegedOperator({ userId: only._id, actor, reason: 'remove manage', capabilities: ['platform.users.read'] }))
       .rejects.toMatchObject({ code: 'LAST_PLATFORM_OPERATOR' });
   });
 
@@ -277,8 +277,8 @@ describe('PLATFORM-ADMIN-01 — last viable PlatformOperator', () => {
     const actor = await makeUser({ role: 'Client', label: 'two-actor' });
     const first = await makeUser({ role: 'Client', label: 'two-first' });
     const second = await makeUser({ role: 'Client', label: 'two-second' });
-    await grantOperator({ userId: first._id, actor, reason: 'first viable', capabilities: ['platform.operators.manage'] });
-    await grantOperator({ userId: second._id, actor, reason: 'second viable', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: first._id, actor, reason: 'first viable', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: second._id, actor, reason: 'second viable', capabilities: ['platform.operators.manage'] });
 
     await expect(suspendOperator({ userId: first._id, actor, reason: 'second remains' })).resolves.toMatchObject({ status: 'suspended' });
     await expect(revokeOperator({ userId: first._id, actor, reason: 'second remains' })).resolves.toMatchObject({ status: 'revoked' });
@@ -289,8 +289,8 @@ describe('PLATFORM-ADMIN-01 — last viable PlatformOperator', () => {
     const actor = await makeUser({ role: 'Client', label: 'concurrent-actor' });
     const first = await makeUser({ role: 'Client', label: 'concurrent-first' });
     const second = await makeUser({ role: 'Client', label: 'concurrent-second' });
-    await grantOperator({ userId: first._id, actor, reason: 'first concurrent', capabilities: ['platform.operators.manage'] });
-    await grantOperator({ userId: second._id, actor, reason: 'second concurrent', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: first._id, actor, reason: 'first concurrent', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: second._id, actor, reason: 'second concurrent', capabilities: ['platform.operators.manage'] });
 
     const results = await Promise.allSettled([
       suspendOperator({ userId: first._id, actor, reason: 'concurrent first' }),
@@ -312,7 +312,7 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
     // PLATFORM-ADMIN-04A — l'acteur global est éligible, donc lui-même viable
     // (platform.operators.manage requis) : il est le dernier opérateur viable
     // du scénario ; `target` est un second opérateur viable.
-    await grantOperator({ userId: actor._id, actor: tenantAdminA, reason: `${label} user manager`, capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+    await provisionPrivilegedOperator({ userId: actor._id, actor: tenantAdminA, reason: `${label} user manager`, capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     return { actor, target };
   };
 
@@ -345,7 +345,7 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
   test('self-service anonymization rejects the last viable operator', async () => {
     await PlatformOperator.updateMany({}, { $pull: { capabilities: 'platform.operators.manage' } });
     const target = await makeUser({ role: 'Client', label: 'self-last-operator' });
-    await grantOperator({ userId: target._id, actor: tenantAdminA, reason: 'self last viable', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: target._id, actor: tenantAdminA, reason: 'self last viable', capabilities: ['platform.operators.manage'] });
     const res = await request(app).delete('/api/users/me').set(bearer(target));
     expect(res.status).toBe(409);
     expect(await User.findById(target._id)).toMatchObject({ isActive: true });
@@ -356,9 +356,9 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
     const actor = await makeUser({ role: 'Admin', label: 'coherence-actor' });
     const target = await makeUser({ role: 'Client', label: 'coherence-target' });
     const survivor = await makeUser({ role: 'Client', label: 'coherence-survivor' });
-    await grantOperator({ userId: actor._id, actor: tenantAdminA, reason: 'coherence user manager', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
-    await grantOperator({ userId: target._id, actor, reason: 'coherence target', capabilities: ['platform.operators.manage'] });
-    await grantOperator({ userId: survivor._id, actor, reason: 'coherence survivor', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: actor._id, actor: tenantAdminA, reason: 'coherence user manager', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+    await provisionPrivilegedOperator({ userId: target._id, actor, reason: 'coherence target', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: survivor._id, actor, reason: 'coherence survivor', capabilities: ['platform.operators.manage'] });
 
     const res = await request(app).patch(`/api/admin/owners/${target._id}/suspend`).set(bearer(actor));
     expect(res.status).toBe(200);
@@ -370,9 +370,9 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
     const actor = await makeUser({ role: 'Admin', label: 'operator-delete-actor' });
     const target = await makeUser({ role: 'Client', label: 'operator-delete-target' });
     const survivor = await makeUser({ role: 'Client', label: 'operator-delete-survivor' });
-    await grantOperator({ userId: actor._id, actor: tenantAdminA, reason: 'delete user manager', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
-    await grantOperator({ userId: target._id, actor, reason: 'delete target', capabilities: ['platform.operators.manage'] });
-    await grantOperator({ userId: survivor._id, actor, reason: 'delete survivor', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: actor._id, actor: tenantAdminA, reason: 'delete user manager', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+    await provisionPrivilegedOperator({ userId: target._id, actor, reason: 'delete target', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: survivor._id, actor, reason: 'delete survivor', capabilities: ['platform.operators.manage'] });
 
     const legacyDelete = await request(app).delete(`/api/admin/owners/${target._id}`).set(bearer(actor));
     const canonicalDelete = await request(app).delete(`/api/users/${target._id}`).set(bearer(actor));
@@ -386,8 +386,8 @@ describe('PLATFORM-ADMIN-01 — User lifecycle cannot bypass platform viability'
     const actor = await makeUser({ role: 'Client', label: 'self-coherence-actor' });
     const target = await makeUser({ role: 'Client', label: 'self-coherence-target' });
     const survivor = await makeUser({ role: 'Client', label: 'self-coherence-survivor' });
-    await grantOperator({ userId: target._id, actor, reason: 'self coherence target', capabilities: ['platform.operators.manage'] });
-    await grantOperator({ userId: survivor._id, actor, reason: 'self coherence survivor', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: target._id, actor, reason: 'self coherence target', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: survivor._id, actor, reason: 'self coherence survivor', capabilities: ['platform.operators.manage'] });
 
     const res = await request(app).delete('/api/users/me').set(bearer(target));
     expect(res.status).toBe(200);

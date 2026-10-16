@@ -9,7 +9,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Transaction = require('../models/Transaction');
@@ -124,8 +124,8 @@ describe('SALE-PLAT — marketplace sale commercial authority is PLATFORM-ONLY',
     const { tx } = await scenario();
     const nonAdminOp = await makeUser({ role: 'Proprietaire' });
     const granter = await makeUser({ role: 'Admin' });
-    // Try to grant operator to non-Admin — but grantOperator only requires targetUser exists; the middleware still checks role='Admin'.
-    await grantOperator({ userId: nonAdminOp._id, actor: granter, reason: 'SALE-PLAT-07', capabilities: ['platform.finance.manage'] });
+    // Try to grant operator to non-Admin — but provisionPrivilegedOperator only requires targetUser exists; the middleware still checks role='Admin'.
+    await provisionPrivilegedOperator({ userId: nonAdminOp._id, actor: granter, reason: 'SALE-PLAT-07', capabilities: ['platform.finance.manage'] });
     const res = await request(app).post(`/api/transactions/${tx._id}/finalize`).set(bearer(nonAdminOp));
     expect(res.status).toBe(403);
   });
@@ -134,7 +134,7 @@ describe('SALE-PLAT — marketplace sale commercial authority is PLATFORM-ONLY',
     const { tx } = await scenario();
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PLAT-08', capabilities: ['platform.finance.read'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PLAT-08', capabilities: ['platform.finance.read'] });
     const res = await request(app).post(`/api/transactions/${tx._id}/finalize`).set(bearer(opUser));
     expect(res.status).toBe(403);
   });
@@ -143,7 +143,7 @@ describe('SALE-PLAT — marketplace sale commercial authority is PLATFORM-ONLY',
     const { tx } = await scenario();
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PLAT-09', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PLAT-09', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const res = await request(app).post(`/api/transactions/${tx._id}/finalize`).set(bearer(opUser));
     // La couche autorité laisse passer ; le résultat métier peut être 200/4xx business selon l'état
     // de la transaction (fixture raw sans finalization payload) — l'invariant testé ici est
@@ -240,7 +240,7 @@ describe('SALE-PAY — payment mutations are PLATFORM FINANCIAL', () => {
     const tx = await makeTransaction(property, client, agent);
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PAY-10', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'SALE-PAY-10', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const res = await request(app).post(`/api/transactions/${tx.insertedId}/paiements/especes`).set(bearer(opUser)).send({ montant: 1000000 });
     expect(res.status).not.toBe(403);
   });

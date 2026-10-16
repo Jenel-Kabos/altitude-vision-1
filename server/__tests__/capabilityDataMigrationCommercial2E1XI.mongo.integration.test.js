@@ -5,7 +5,7 @@
 // s'exécutent en isolation contre MongoMemoryReplSet.
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const PlatformOperator = require('../models/PlatformOperator');
 const Property = require('../models/Property');
@@ -29,7 +29,7 @@ const makeUser = (over = {}) => {
 async function makeOperator({ userRole = 'Admin', status = 'active', capabilities = ['platform.finance.manage'] } = {}) {
   const user = await makeUser({ role: userRole });
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: user._id, actor: granter, reason: 'CAP-MIG fixture', capabilities });
+  await provisionPrivilegedOperator({ userId: user._id, actor: granter, reason: 'CAP-MIG fixture', capabilities });
   if (status !== 'active') {
     await PlatformOperator.updateOne({ user: user._id }, { $set: { status } });
   }
@@ -63,7 +63,7 @@ describe('CAP-MIG — safety and preconditions', () => {
   });
 
   test('CAP-MIG-07 (non-Admin associated User → no grant, TARGET_GLOBAL_ADMIN_PREREQUISITE_MISSING)', async () => {
-    // NB: grantOperator crée l'operator, mais la garde `isTechnical:{$ne:true}` ne
+    // NB: provisionPrivilegedOperator crée l'operator, mais la garde `isTechnical:{$ne:true}` ne
     // regarde pas User.role. On peut donc avoir un PlatformOperator sur un User
     // non-Admin après un downgrade. Le script doit refuser ce cas.
     const { user, op } = await makeOperator();
