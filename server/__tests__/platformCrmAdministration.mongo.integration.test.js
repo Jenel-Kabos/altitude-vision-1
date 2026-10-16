@@ -22,7 +22,7 @@ const CrmActivity = require('../models/CrmActivity');
 const CrmAutomationRule = require('../models/CrmAutomationRule');
 const Property = require('../models/Property');
 const PlatformOperator = require('../models/PlatformOperator');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const crmRoutes = require('../routes/crmRoutes');
 const crmAutomationRoutes = require('../routes/crmAutomationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -103,32 +103,32 @@ beforeEach(async () => {
   });
 
   operatorRead = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorRead._id, actor: grantor, capabilities: ['platform.crm.read'], reason: 'CRM read op' });
+  await provisionPrivilegedOperator({ userId: operatorRead._id, actor: grantor, capabilities: ['platform.crm.read'], reason: 'CRM read op' });
 
   operatorManage = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorManage._id, actor: grantor, capabilities: ['platform.crm.manage'], reason: 'CRM manage op' });
+  await provisionPrivilegedOperator({ userId: operatorManage._id, actor: grantor, capabilities: ['platform.crm.manage'], reason: 'CRM manage op' });
 
   operatorNoCrm = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorNoCrm._id, actor: grantor, capabilities: ['platform.tenants.read'], reason: 'CRM no-crm-cap op' });
+  await provisionPrivilegedOperator({ userId: operatorNoCrm._id, actor: grantor, capabilities: ['platform.tenants.read'], reason: 'CRM no-crm-cap op' });
 
   operatorSuspended = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorSuspended._id, actor: grantor, capabilities: ['platform.crm.manage'], reason: 'CRM suspended op' });
+  await provisionPrivilegedOperator({ userId: operatorSuspended._id, actor: grantor, capabilities: ['platform.crm.manage'], reason: 'CRM suspended op' });
   await PlatformOperator.updateOne(
     { user: operatorSuspended._id },
     { $set: { status: 'suspended', suspendedBy: grantor._id, suspendedAt: new Date(), suspensionReason: 'CRM' } },
   );
 
   operatorTenantsMgOnly = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorTenantsMgOnly._id, actor: grantor, capabilities: ['platform.tenants.manage'], reason: 'tenants.manage only' });
+  await provisionPrivilegedOperator({ userId: operatorTenantsMgOnly._id, actor: grantor, capabilities: ['platform.tenants.manage'], reason: 'tenants.manage only' });
 
   operatorPropertiesMgOnly = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorPropertiesMgOnly._id, actor: grantor, capabilities: ['platform.properties.manage'], reason: 'properties.manage only' });
+  await provisionPrivilegedOperator({ userId: operatorPropertiesMgOnly._id, actor: grantor, capabilities: ['platform.properties.manage'], reason: 'properties.manage only' });
 
   operatorMarketingMgOnly = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorMarketingMgOnly._id, actor: grantor, capabilities: ['platform.marketing.manage'], reason: 'marketing.manage only' });
+  await provisionPrivilegedOperator({ userId: operatorMarketingMgOnly._id, actor: grantor, capabilities: ['platform.marketing.manage'], reason: 'marketing.manage only' });
 
   operatorCommercialMgOnly = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: operatorCommercialMgOnly._id, actor: grantor, capabilities: ['platform.commercial.manage'], reason: 'commercial.manage only' });
+  await provisionPrivilegedOperator({ userId: operatorCommercialMgOnly._id, actor: grantor, capabilities: ['platform.commercial.manage'], reason: 'commercial.manage only' });
 
   bareGlobalAdmin = await makeUser({ role: 'Admin' });
 });
@@ -292,7 +292,7 @@ test('P-CRM-18: platform.properties.manage alone insufficient for CRM authority'
 
 test('P-CRM-19: platform.rentals.manage alone insufficient for CRM authority', async () => {
   const opRentals = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opRentals._id, actor: grantor, capabilities: ['platform.rentals.manage'], reason: 'rentals only' });
+  await provisionPrivilegedOperator({ userId: opRentals._id, actor: grantor, capabilities: ['platform.rentals.manage'], reason: 'rentals only' });
   const res = await request(app).get('/api/crm/customers').set(bearer(opRentals, tenantA._id));
   expect(res.status).toBe(403);
 });

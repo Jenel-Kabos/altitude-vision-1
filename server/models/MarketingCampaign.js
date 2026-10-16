@@ -32,6 +32,9 @@ const schema = new mongoose.Schema({
     totalRecipients: { type: Number, default: 0 },
     sentCount: { type: Number, default: 0 },
     failedCount: { type: Number, default: 0 },
+    // MARKETING-CONSENT-1 — destinataires écartés avant envoi (consentement
+    // absent ou retiré, compte supprimé/inactif, doublon, hors périmètre).
+    excludedCount: { type: Number, default: 0 },
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },

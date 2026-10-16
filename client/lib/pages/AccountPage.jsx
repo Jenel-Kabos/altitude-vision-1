@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import MarketingPreferencesPanel from '../components/MarketingPreferencesPanel';
 import Image from 'next/image';
 import { useAuth } from '../context/AuthContext';
 import { updateMe, updateMyPassword } from "../services/userService";
@@ -544,6 +545,9 @@ const AccountPage = () => {
                             </div>
                         </form>
                     </motion.div>
+
+                    {/* ── MARKETING-CONSENT-1 — Communications ─ */}
+                    <MarketingPreferencesPanel />
 
                 </div>
             </div>

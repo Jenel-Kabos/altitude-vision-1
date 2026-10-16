@@ -4,6 +4,14 @@ const privateAssetSchema = require('./schemas/privateAssetSchema');
 const bcrypt   = require('bcryptjs');
 const crypto   = require('crypto');
 const { isSimpleValidEmail, EMAIL_MAX_LENGTH } = require('../utils/emailValidation');
+const { CONSENT_STATUSES, CONSENT_SOURCES } = require('../constants/marketingConsent');
+
+const marketingChannelPreferenceSchema = new mongoose.Schema({
+    status:      { type: String, enum: CONSENT_STATUSES, default: 'unknown' },
+    updatedAt:   { type: Date, default: null },
+    source:      { type: String, enum: [...CONSENT_SOURCES, null], default: null },
+    textVersion: { type: String, default: null },
+}, { _id: false });
 
 // ======================================================
 // 🧩 SCHÉMA UTILISATEUR
@@ -77,6 +85,21 @@ const userSchema = new mongoose.Schema(
             trim:      true,
             maxlength: [300, 'La biographie ne peut pas dépasser 300 caractères.'],
             default:   null,
+        },
+
+        // 🔹 MARKETING-CONSENT-1 — Préférences de communications marketing,
+        //    par canal. 'unknown' (défaut, y compris pour tous les comptes
+        //    existants) est traité comme un refus : aucun consentement n'est
+        //    déduit de la création du compte. Écrit EXCLUSIVEMENT par
+        //    marketingConsentService (historique dans MarketingConsentEvent).
+        marketingPreferences: {
+            type: new mongoose.Schema({
+                email:    { type: marketingChannelPreferenceSchema, default: () => ({}) },
+                push:     { type: marketingChannelPreferenceSchema, default: () => ({}) },
+                sms:      { type: marketingChannelPreferenceSchema, default: () => ({}) },
+                whatsapp: { type: marketingChannelPreferenceSchema, default: () => ({}) },
+            }, { _id: false }),
+            default: () => ({}),
         },
 
         // 🔹 Statut général du compte

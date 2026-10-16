@@ -1,5 +1,7 @@
 const Paiement = require('../models/Paiement');
+const RentLatePenaltyAssessment = require('../models/RentLatePenaltyAssessment');
 const zohoMailService = require('./zohoMailService');
+const { activePenaltyEngine, ENGINES } = require('./finance/billing/rentPenaltyEngine');
 
 const TAUX_PENALITE = 0.03;
 const SEUIL_RETARD  = 5; // jours (retard >= 5j = à partir du 6 du mois)
@@ -68,6 +70,13 @@ const claimAndSendPenaltyEmail = async ({ paiement, penalite, retardJours, now =
 // JAMAIS déduite d'une absence d'input de requête : c'est l'appelant
 // interne qui décide explicitement d'un scope tenant.
 const verifierPaiementsEnRetard = async ({ contratIds = null } = {}) => {
+  // F-U2.11 — choke point unique de l'ancien moteur (cron + routes
+  // `calculer-penalites`) : inactif dès que le moteur canonique est retenu.
+  const engine = activePenaltyEngine();
+  if (engine !== ENGINES.LEGACY) {
+    console.log(`⚠️ [Alerte] ancien moteur de pénalités inactif (moteur : ${engine}) — aucun calcul`);
+    return { verifies: 0, penalites: 0, skipped: true, engine };
+  }
   const aujourd_hui = new Date();
 
   const filter = { statut: { $in: ['impayé', 'en_retard'] } };
@@ -86,6 +95,25 @@ const verifierPaiementsEnRetard = async ({ contratIds = null } = {}) => {
   });
 
   let nbPenalitesAppliquees = 0;
+  // F-U2.11 — garde par échéance : jamais de pénalité historique sur une
+  // échéance déjà évaluée par le moteur canonique (retour arrière compris).
+  const leaseIds = [...new Set(paiements.map((p) => String(p.contrat?._id || p.contrat)).filter(Boolean))];
+  const canonical = leaseIds.length ? await RentLatePenaltyAssessment.find({ lease: { $in: leaseIds } }).select('lease period').lean() : [];
+  const canonicalKeys = new Set(canonical.map((a) => `${a.lease}:${a.period}`));
+  const periodKey = (p) => `${p.contrat?._id || p.contrat}:${p.annee}-${String(p.mois).padStart(2, '0')}`;
+  // F-U2.13 — l'ancien moteur ne peut plus imposer une pénalité hors politique
+  // contractuelle : seulement si la politique du bail pour la période stipule
+  // une pénalité (et, pour les conditions Altitude Vision, après acceptation
+  // du locataire). Sinon : aucun calcul ni e-mail de pénalité.
+  const allowedByPolicy = async (paiement) => {
+    const contrat = paiement.contrat;
+    if (!contrat?._id || !contrat.bien || !paiement.annee || !paiement.mois) return false;
+    const { resolvePolicyForPeriod, consentStatusAt } = require('./finance/billing/leasePolicyService');
+    const label = `${paiement.annee}-${String(paiement.mois).padStart(2, '0')}`;
+    const resolution = await resolvePolicyForPeriod({ lease: contrat._id, propertyId: contrat.bien, periodLabel: label });
+    if (resolution.status !== 'RESOLVED' || !resolution.terms?.penalty) return false;
+    return (await consentStatusAt(resolution, aujourd_hui)).valid;
+  };
 
   for (const paiement of paiements) {
     const dateEcheance = new Date(paiement.annee, (paiement.mois || 1) - 1, 1);
@@ -97,7 +125,7 @@ const verifierPaiementsEnRetard = async ({ contratIds = null } = {}) => {
 
     const update = { retardJours, statut: 'en_retard' };
 
-    if (retardJours >= SEUIL_RETARD && !paiement.penaliteAppliquee) {
+    if (retardJours >= SEUIL_RETARD && !paiement.penaliteAppliquee && !canonicalKeys.has(periodKey(paiement)) && await allowedByPolicy(paiement)) {
       const penalite = Math.round(paiement.montant * TAUX_PENALITE);
       const outcome = await claimAndSendPenaltyEmail({ paiement, penalite, retardJours, now: aujourd_hui });
       if (outcome.claimed) nbPenalitesAppliquees++;

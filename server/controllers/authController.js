@@ -7,6 +7,7 @@ const User                  = require('../models/User');
 const PendingRegistration   = require('../models/PendingRegistration');
 const Document              = require('../models/Document');
 const sendEmail = require('../utils/email');
+const marketingConsentService = require('../services/marketingConsentService');
 const { uploadToCloudinary, destroyFromCloudinary } = require('../config/cloudinary');
 const logger = require('../utils/logger');
 const { uploadPrivateAsset } = require('../services/storage/secureStorageService');
@@ -90,8 +91,9 @@ exports.signup = async (req, res) => {
         const {
             name, email, password, passwordConfirm, role, phone,
             contratAccepte, informationsVraies, estProprietaireLegal,
-            engagementHonnetete, commissionAcceptee,
+            engagementHonnetete, commissionAcceptee, marketingConsent,
         } = req.body;
+        const signupConsent = marketingConsentService.normalizeConsentInput(marketingConsent);
 
         const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
             || req.socket?.remoteAddress
@@ -164,6 +166,10 @@ exports.signup = async (req, res) => {
                 estProprietaireLegal: !!estProprietaireLegal,
                 engagementHonnetete:  !!engagementHonnetete,
                 commissionAcceptee:   !!commissionAcceptee,
+                marketingConsent: {
+                    email: signupConsent.email === true,
+                    push:  signupConsent.push === true,
+                },
                 verificationToken: hashedToken,
                 expiresAt,
             },
@@ -257,6 +263,17 @@ exports.verifyEmail = async (req, res) => {
         const newUser = new User(userData);
         newUser.unmarkModified('password'); // bypass pre('save') hash hook
         await newUser.save({ validateBeforeSave: false });
+
+        // MARKETING-CONSENT-1 — seules les cases cochées produisent un
+        // consentement ; une case non cochée laisse le statut 'unknown'.
+        try {
+            await marketingConsentService.applyConsentChanges(newUser._id, {
+                email: pending.marketingConsent?.email === true,
+                push:  pending.marketingConsent?.push === true,
+            }, { source: 'signup' });
+        } catch (consentError) {
+            logger.warn?.('⚠️ [Auth] Consentement marketing non enregistré à l\'inscription', consentError?.code || consentError?.name);
+        }
 
         // ─── PDF contrat Proprietaire (fire & forget) ────────────
         // Ne bloque pas la réponse HTTP — la connexion automatique
@@ -766,6 +783,14 @@ exports.googleToken = async (req, res) => {
         });
         newUser.lastLoginAt = new Date();
         await newUser.save({ validateBeforeSave: false });
+
+        // MARKETING-CONSENT-1 — l'inscription Google n'emporte aucun
+        // consentement ; il peut être donné explicitement à l'étape
+        // « Compléter le profil » ou dans les paramètres.
+        const googleConsent = marketingConsentService.normalizeConsentInput(req.body?.marketingConsent);
+        if (Object.keys(googleConsent).length) {
+            await marketingConsentService.applyConsentChanges(newUser._id, googleConsent, { source: 'signup' }).catch(() => null);
+        }
 
         return sendGoogleAuthResponse(newUser, 201, true, res);
     } catch (error) {

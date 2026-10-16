@@ -21,6 +21,7 @@ const CrmAutomationRule = require('../models/CrmAutomationRule');
 const CrmAutomationRun = require('../models/CrmAutomationRun');
 const { ACTION_HANDLERS } = require('./crmAutomationActions');
 const { registerNotificationObserver } = require('./notificationObservationPort');
+const { assertTenantAutomationAction } = require('./crmActionPolicy');
 
 function getPath(obj, path) {
   return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
@@ -67,15 +68,24 @@ async function handleEvent(event, { simulate = false } = {}) {
     let status = 'success';
     let error = null;
     try {
+      // Validation de TOUTES les actions avant le moindre effet : une règle
+      // mixte (opérationnel + marketing) n'exécute jamais sa partie autorisée.
+      for (const action of rule.actions) assertTenantAutomationAction(action.actionId, action.params || {});
       for (const action of rule.actions) {
         const handler = ACTION_HANDLERS[action.actionId];
-        if (!handler) { actionsRun.push(`${action.actionId}:unknown_action`); continue; }
         // rule.delayMinutes pilote le délai des actions rappel/tâche tant
         // qu'un délai n'est pas explicitement fixé par l'action elle-même —
         // permet à l'administration (Phase 7) de régler UN seul champ par
         // règle plutôt que de rouvrir chaque action.
         const params = { ...(action.params || {}) };
         if (params.dueInMinutes === undefined && rule.delayMinutes) params.dueInMinutes = rule.delayMinutes;
+        // LOT E — les règles sont toujours tenant : seule une action
+        // opérationnelle du registre fermé est exécutable. Une action
+        // marketing ou inconnue échoue fermée AVANT tout effet, y compris
+        // pour une règle enregistrée avant cette politique. L'autorité n'est
+        // jamais déduite de l'émetteur ou du destinataire de l'événement.
+        assertTenantAutomationAction(action.actionId, params);
+        if (!handler) throw new Error(`CRM_OUTBOUND_ACTION_NOT_ALLOWED:${action.actionId}`);
         const outcome = await handler(event, params);
         actionsRun.push(`${action.actionId}:${outcome?.status || 'done'}`);
       }
@@ -90,7 +100,7 @@ async function handleEvent(event, { simulate = false } = {}) {
       entityType: event.entityType || null, entityId: event.entityId || null,
       status, actionsRun, error,
     }).catch(() => null);
-    results.push({ ruleId: rule.ruleId, status, runId: run ? String(run._id) : null, actionsRun });
+    results.push({ ruleId: rule.ruleId, status, runId: run ? String(run._id) : null, actionsRun, ...(error ? { error } : {}) });
   }
   return results;
 }

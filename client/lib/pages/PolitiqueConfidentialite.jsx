@@ -76,6 +76,10 @@ const sections = [
             <p className="font-medium text-gray-900">Données de service</p>
             <p className="text-sm mt-1">Annonces immobilières, demandes de visite, transactions, documents</p>
           </div>
+          <div>
+            <p className="font-medium text-gray-900">Préférences de communication</p>
+            <p className="text-sm mt-1">Vos choix de consentement marketing par canal (e-mail, notifications promotionnelles), avec leur date, leur origine et la version du texte accepté</p>
+          </div>
         </div>
       </div>
     ),
@@ -95,6 +99,7 @@ const sections = [
             'Améliorer nos services via des statistiques anonymisées',
             'Respecter nos obligations légales et contractuelles',
             'Sécuriser notre plateforme contre les abus',
+            'Uniquement si vous l\'avez accepté : vous adresser les offres et actualités d\'Altitude Vision (voir « Communications marketing »)',
           ].map((item) => (
             <li key={item} className="flex items-start gap-2">
               <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5">•</span>
@@ -123,6 +128,34 @@ const sections = [
           </div>
         </div>
         <p className="text-sm font-medium">Aucun transfert à des tiers à des fins commerciales sans votre consentement explicite.</p>
+      </div>
+    ),
+  },
+  {
+    id: 'marketing',
+    icon: Bell,
+    title: 'Communications marketing',
+    content: (
+      <div className="space-y-4 text-gray-600">
+        <p>
+          Altitude Vision ne vous adresse des offres et actualités que si vous
+          l'avez explicitement accepté, canal par canal (e-mail, notifications
+          promotionnelles). Les cases ne sont jamais précochées et la création
+          d'un compte ne vaut pas consentement.
+        </p>
+        <ul className="space-y-3">
+          {[
+            'Données utilisées : nom, e-mail, identifiant de compte, profil (client, propriétaire, exploitant d\'établissement), ville lorsqu\'elle figure dans un dossier de gestion locative, et historique de votre relation avec Altitude Vision enregistré dans notre outil de gestion de la relation client (CRM).',
+            'Refuser n\'a aucune incidence sur l\'utilisation de nos services : les messages nécessaires à votre compte (sécurité, réservations, paiements, contrats, visites) restent envoyés.',
+            'Retrait à tout moment : depuis votre compte (section « Communications et offres »), via le lien « Se désinscrire » présent dans chaque e-mail promotionnel, ou par e-mail à support@altitudevision.agency.',
+            'Nous n\'envoyons pas de SMS ni de message WhatsApp promotionnels.',
+          ].map((item) => (
+            <li key={item} className="flex items-start gap-2">
+              <span className="text-blue-600 font-bold flex-shrink-0 mt-0.5">•</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     ),
   },
@@ -275,7 +308,7 @@ const sections = [
             <span className="text-gray-500">google.com</span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-gray-900">Zoho Mail (emails transactionnels)</span>
+            <span className="font-medium text-gray-900">Zoho Mail (e-mails transactionnels et, avec votre accord, promotionnels)</span>
             <span className="text-gray-500">zoho.com</span>
           </div>
         </div>
@@ -324,9 +357,11 @@ const sections = [
               <Camera className="w-4 h-4 text-blue-600" /> Photos et documents
             </p>
             <p className="text-sm mt-1">
-              L'appareil photo et l'accès aux images sont utilisés pour
-              votre photo de profil et les photos de vos annonces et
-              dossiers. Les fichiers sont hébergés par Cloudinary.
+              Le sélecteur de photos du système est utilisé pour votre
+              photo de profil et les photos de vos annonces et dossiers :
+              seules les images que vous choisissez sont transmises, aucune
+              prise de vue n'est faite par l'application. Les fichiers sont
+              hébergés par Cloudinary.
             </p>
           </div>
           <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">
@@ -412,6 +447,14 @@ const sections = [
             push) sont effacées ou remplacées par des valeurs anonymes.
             Vos sessions actives sont immédiatement invalidées.
           </p>
+          <p className="text-sm mt-2">
+            Tous vos consentements marketing sont retirés immédiatement ;
+            votre fiche dans notre outil de relation client est anonymisée
+            et archivée (ou purgée des coordonnées issues de votre compte
+            lorsqu'elle provient aussi d'un dossier de gestion locative) et
+            vos coordonnées sont retirées des journaux d'envoi. Aucune
+            campagne, même déjà programmée, ne peut plus vous être adressée.
+          </p>
         </div>
         <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
           <p className="font-medium text-amber-900 mb-1">
@@ -424,9 +467,16 @@ const sections = [
             documents financiers (transactions, contrats, factures,
             paiements) et messages échangés dans la messagerie interne
             (l'auteur est anonymisé, le contenu reste visible aux
-            autres participants). Aucune durée précise n'est fixée par
-            cette politique&nbsp;: elle dépend des obligations locales
-            applicables.
+            autres participants). Sont également conservés à titre de
+            preuve&nbsp;: si vous avez accepté le contrat d'hébergement
+            propriétaire, ce contrat (PDF), vos engagements et l'adresse IP
+            de signature&nbsp;; l'historique de vos choix marketing (sans
+            coordonnées). Sans contrat accepté, l'adresse IP d'inscription
+            et les engagements sont effacés. Les dossiers de candidature et
+            d'activation professionnelle restent rattachés aux dossiers
+            concernés. Aucune durée précise n'est fixée par cette
+            politique&nbsp;: elle dépend des obligations locales applicables
+            et fait l'objet d'une validation juridique.
           </p>
         </div>
         <div className="bg-slate-50 p-4 rounded-xl border border-gray-200">

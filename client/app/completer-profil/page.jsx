@@ -8,6 +8,8 @@ import { Check, FileText, Loader2, User, Phone, AlertTriangle } from 'lucide-rea
 import { contratHebergement } from '@/lib/data/contratHebergement';
 import api from '@/lib/services/api';
 import { useAuth } from '@/lib/context/AuthContext';
+import MarketingConsentCheckboxes from '@/lib/components/MarketingConsentCheckboxes';
+import { EMPTY_MARKETING_CONSENT } from '@/lib/constants/marketingConsent';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -41,6 +43,8 @@ export default function CompleterProfil() {
   });
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
+  // MARKETING-CONSENT-1 — l'inscription Google n'emporte aucun consentement.
+  const [marketingConsent, setMarketingConsent] = useState(EMPTY_MARKETING_CONSENT);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/login');
@@ -90,6 +94,7 @@ export default function CompleterProfil() {
         telephone: telClean,
         role,
         ...(isProprietaire && { certifications }),
+        marketingConsent,
       });
 
       const updatedUser = res.data?.data?.user;
@@ -265,6 +270,8 @@ export default function CompleterProfil() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            <MarketingConsentCheckboxes value={marketingConsent} onChange={setMarketingConsent} disabled={loading} />
 
             {/* Bouton soumettre */}
             <motion.button

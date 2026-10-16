@@ -5,29 +5,26 @@
 const router = require('express').Router();
 const auth = require('../middleware/authMiddleware');
 const controller = require('../controllers/marketingController');
-const { ROLES_CM } = require('../utils/roles');
-const { requireTenantScope } = require('../middleware/tenantContext');
-const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
+const { requirePlatformOperatorCapability, requirePlatformScope } = require('../middleware/platformAuthority');
 
-const STAFF = ROLES_CM; // ['Admin', 'Collaborateur', 'CommunityManager'] — même périmètre qu'Altcom
-const MANAGERS = ['Admin', 'CommunityManager'];
-
-router.use(auth.protect, requireTenantScope, requireTenantMembershipRole(...STAFF));
+// Le CRM marketing est un workflow plateforme Altitude Vision. Un rôle ou
+// une adhésion tenant ne confère jamais cette autorité.
+router.use(auth.protect, requirePlatformOperatorCapability('platform.marketing.manage'), requirePlatformScope);
 
 router.get('/segments', controller.listSegments);
 router.get('/segments/:key/preview', controller.previewSegment);
 
 router.get('/templates', controller.listTemplates);
 router.get('/templates/:family/history', controller.templateHistory);
-router.post('/templates', requireTenantMembershipRole(...MANAGERS), controller.createTemplateVersion);
-router.patch('/templates/:id/activate', requireTenantMembershipRole(...MANAGERS), controller.activateTemplate);
+router.post('/templates', controller.createTemplateVersion);
+router.patch('/templates/:id/activate', controller.activateTemplate);
 router.post('/templates/:id/preview', controller.previewTemplate);
 
 router.get('/campaigns', controller.listCampaigns);
-router.post('/campaigns', requireTenantMembershipRole(...MANAGERS), controller.createCampaign);
-router.patch('/campaigns/:id/approve', requireTenantMembershipRole(...MANAGERS), controller.approveCampaign);
-router.patch('/campaigns/:id/cancel', requireTenantMembershipRole(...MANAGERS), controller.cancelCampaign);
-router.post('/campaigns/:id/send', requireTenantMembershipRole(...MANAGERS), controller.sendCampaign);
+router.post('/campaigns', controller.createCampaign);
+router.patch('/campaigns/:id/approve', controller.approveCampaign);
+router.patch('/campaigns/:id/cancel', controller.cancelCampaign);
+router.post('/campaigns/:id/send', controller.sendCampaign);
 
 router.get('/sends', controller.listSends);
 

@@ -5,7 +5,9 @@
 // services/reporting/domains/marketingReport.js).
 const mongoose = require('mongoose');
 
-const SEND_STATUSES = ['sent', 'failed', 'opened', 'clicked', 'unsubscribed'];
+// 'excluded' (MARKETING-CONSENT-1) : destinataire écarté avant envoi ; le
+// motif est un code non nominatif dans `error` (ex. ACCOUNT_DELETED).
+const SEND_STATUSES = ['sent', 'failed', 'opened', 'clicked', 'unsubscribed', 'excluded'];
 
 const schema = new mongoose.Schema({
   tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'PlatformTenant', default: null, index: true },

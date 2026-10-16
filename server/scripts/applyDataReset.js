@@ -86,13 +86,13 @@ async function main() {
     const CrmCustomer = require('../models/CrmCustomer');
     const platformTenantService = require('../services/platformTenant/platformTenantService');
     const organizationService = require('../services/organizationService');
-    const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+    const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
     const { PLATFORM_OPERATOR_CAPABILITIES } = require('../constants/platformOperatorConstants');
 
     const admin = await User.create({ name: adminName, email: adminEmail, password, passwordConfirm: password, role: 'Admin', isEmailVerified: true });
     const tenant = await platformTenantService.createTenant({ name: 'Altitude Vision', actor: admin, req: null });
     await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, roleInUnit: 'owner', actor: admin, metadata: { reason: 'DATA-RESET-1 bootstrap' }, req: null });
-    await grantOperator({ userId: admin._id, capabilities: PLATFORM_OPERATOR_CAPABILITIES, actor: admin, reason: 'DATA-RESET-1 bootstrap', req: null, allowSelfGrant: true });
+    await provisionPrivilegedOperator({ userId: admin._id, capabilities: PLATFORM_OPERATOR_CAPABILITIES, actor: admin, reason: 'DATA-RESET-1 bootstrap', req: null, allowSelfGrant: true });
 
     const crmIndex = (await CrmCustomer.collection.indexes()).find((index) => index.name === 'one_crm_customer_per_tenant_source');
     const counts = {

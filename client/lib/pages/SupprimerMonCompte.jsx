@@ -131,6 +131,20 @@ const SupprimerMonCompte = () => {
                 <li>Jeton Expo Push (fin des notifications)</li>
                 <li>Identifiant Google (si connexion Google)</li>
                 <li>Toutes vos sessions actives (déconnexion globale)</li>
+                <li>
+                  Consentements marketing&nbsp;: tous retirés immédiatement,
+                  y compris pour les campagnes déjà programmées
+                </li>
+                <li>
+                  Fiche de relation client (CRM)&nbsp;: anonymisée et
+                  archivée, ou purgée des coordonnées issues de votre compte
+                  si elle provient aussi d'un dossier de gestion locative
+                </li>
+                <li>Vos coordonnées dans les journaux d'envoi marketing</li>
+                <li>
+                  Adresse IP d'inscription et engagements, si vous n'avez
+                  pas accepté de contrat d'hébergement propriétaire
+                </li>
               </ul>
             </div>
             <div>
@@ -156,6 +170,21 @@ const SupprimerMonCompte = () => {
                 <li>
                   Journaux d'activité et logs techniques&nbsp;: conservés
                   pour la sécurité et la lutte contre la fraude
+                </li>
+                <li>
+                  Contrat d'hébergement propriétaire (PDF), engagements et
+                  adresse IP de signature&nbsp;: conservés comme preuve
+                  contractuelle si vous avez accepté ce contrat
+                </li>
+                <li>
+                  Historique de vos choix marketing&nbsp;: conservé comme
+                  preuve du consentement ou de son retrait, sans vos
+                  coordonnées
+                </li>
+                <li>
+                  Candidatures, offres et dossiers d'activation
+                  professionnelle&nbsp;: restent rattachés aux dossiers
+                  concernés
                 </li>
               </ul>
             </div>

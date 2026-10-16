@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
+const marketingPreferencesController = require('../controllers/marketingPreferencesController');
 const { upload } = require('../config/cloudinary');
 const { protect } = require('../middleware/authMiddleware');
 const {
@@ -47,6 +48,12 @@ router.patch('/complete-profile',                         userController.complet
 
 // ✅ Enregistrer le token Expo Push (appelé par le mobile au démarrage)
 router.patch('/push-token',                               userController.savePushToken);
+
+// MARKETING-CONSENT-1 — Préférences de communications marketing (par canal).
+//    Seul point d'écriture utilisateur du consentement ; /updateMe et
+//    /complete-profile ne peuvent jamais (ré)abonner quelqu'un.
+router.get('/me/marketing-preferences',                  marketingPreferencesController.getMyPreferences);
+router.patch('/me/marketing-preferences',                marketingPreferencesController.updateMyPreferences);
 
 // 🔴 GOOGLE-PLAY-P0-1 — Suppression self-service du compte de
 //    l'utilisateur authentifié. L'autorité provient EXCLUSIVEMENT de

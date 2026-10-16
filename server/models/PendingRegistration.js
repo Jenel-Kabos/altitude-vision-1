@@ -19,6 +19,14 @@ const pendingRegistrationSchema = new mongoose.Schema(
     engagementHonnetete:  Boolean,
     commissionAcceptee:   Boolean,
 
+    // MARKETING-CONSENT-1 — cases explicitement cochées à l'inscription
+    // (jamais précochées). Appliquées par marketingConsentService à la
+    // création effective du compte (verifyEmail), avec source 'signup'.
+    marketingConsent: {
+      email: { type: Boolean, default: false },
+      push:  { type: Boolean, default: false },
+    },
+
     verificationToken: { type: String, required: true }, // hashé sha256
     expiresAt: {
       type:     Date,

@@ -236,6 +236,28 @@ describe('CRM360 — tenant boundary is strict on every relation', () => {
     expect(idsB).not.toContain(String(propA._id));
   });
 
+  // P0 SUPPORT-INBOX — la boîte de support appartient à Altitude Vision : la
+  // 360 d'une organisation n'expose ni la conversation de support d'un
+  // prospect ni ses messages, même attribués au tenant de l'organisation.
+  test('CRM360-21 (support inbox): la conversation de support et ses messages n\'apparaissent jamais dans la 360 du tenant', async () => {
+    const propA = await makeProperty(sharedUser, tenantA);
+    const otherUser = await makeUser({ role: 'Client' });
+    const inbox = await Conversation.create({ participants: [sharedUser._id], tenant: tenantA._id, relatedProperty: propA._id, isStaffInbox: true, lastMessage: 'PROSPECT-SECRET' });
+    const inboxMsg = await Message.create({ conversation: inbox._id, tenant: tenantA._id, sender: sharedUser._id, receiver: null, subject: 'Support', content: 'PROSPECT-SECRET' });
+    const direct = await Conversation.create({ participants: [sharedUser._id, otherUser._id], tenant: tenantA._id, relatedProperty: propA._id });
+    const directMsg = await Message.create({ conversation: direct._id, tenant: tenantA._id, sender: sharedUser._id, receiver: otherUser._id, subject: 'Direct', content: 'Opérationnel' });
+
+    const res = await fetch360(adminA, tenantA, customerA._id);
+    expect(res.status).toBe(200);
+    const convIds = res.body.data.communication.conversations.map((c) => String(c._id));
+    expect(convIds).toContain(String(direct._id));
+    expect(convIds).not.toContain(String(inbox._id));
+    const msgIds = res.body.data.communication.messages.map((m) => String(m._id));
+    expect(msgIds).toContain(String(directMsg._id));
+    expect(msgIds).not.toContain(String(inboxMsg._id));
+    expect(JSON.stringify(res.body)).not.toContain('PROSPECT-SECRET');
+  });
+
   test('CRM360-20 (no regression): tenant A voit bien SES données quand seul le tenant A est utilisé', async () => {
     const propA1 = await makeProperty(sharedUser, tenantA);
     const propA2 = await makeProperty(sharedUser, tenantA);

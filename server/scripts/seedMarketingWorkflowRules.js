@@ -27,6 +27,7 @@
 // (voir crmAutomationActions.sendMarketingMessage), jamais une erreur.
 const mongoose = require('mongoose');
 const CrmAutomationRule = require('../models/CrmAutomationRule');
+const { assertTenantAutomationAction } = require('../services/crmActionPolicy');
 
 const RULES = [
   {
@@ -73,6 +74,15 @@ const RULES = [
 ];
 
 async function seed({ apply = false } = {}) {
+  // LOT E — catalogue conservé pour mémoire uniquement : toute règle
+  // d'automatisation est tenant et le moteur refuse les actions marketing
+  // (consentement Altitude Vision non transférable). Aucune écriture n'est
+  // donc autorisée ; le dry-run reste disponible pour l'inventaire.
+  if (apply) {
+    for (const rule of RULES) {
+      for (const action of rule.actions) assertTenantAutomationAction(action.actionId, action.params || {});
+    }
+  }
   const summary = { scanned: RULES.length, wouldCreate: [], wouldUpdate: [], created: [], updated: [] };
   for (const rule of RULES) {
     // eslint-disable-next-line no-await-in-loop

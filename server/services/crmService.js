@@ -50,7 +50,9 @@ async function loadIdentitySources(scopeUserIds = null) {
   const userFilter = scopeUserIds ? { _id: { $in: [...scopeUserIds] } } : {};
   const linkedUserFilter = scopeUserIds ? { user: { $in: [...scopeUserIds] } } : {};
   const [users, owners, tenants, contacts, quotes, projects, signalSets] = await Promise.all([
-    User.find({ ...userFilter, isTechnical: { $ne: true } }).select('name email phone role').lean(),
+    // MARKETING-CONSENT-1 — un compte supprimé n'est jamais réindexé : ses
+    // coordonnées d'origine ne doivent pas réapparaître dans le CRM.
+    User.find({ ...userFilter, isTechnical: { $ne: true }, status: { $ne: 'Supprimé' } }).select('name email phone role').lean(),
     Proprietaire.find(linkedUserFilter).select('nom prenom email telephone adresse ville user').lean(),
     Locataire.find(linkedUserFilter).select('nom prenom email telephone adresse ville user').lean(),
     scopeUserIds ? [] : ContactMessage.find().select('name email phone').lean(),
@@ -148,6 +150,10 @@ async function getCustomer360(customerId, { tenantId } = {}) {
   // `requireTenantScope + requireTenantMembershipRole`, so a null tenant
   // reaches this service only from platform-owned CRM code paths.
   const tenantFilterOr = (filter) => tenantFilter(tenantId, filter);
+  // P0 SUPPORT-INBOX — la boîte de support appartient exclusivement à
+  // Altitude Vision : ni ses conversations ni leurs messages (qui héritent du
+  // tenant du bien) ne sont projetés dans une 360 CRM, quel que soit le scope.
+  const supportInboxIds = await Conversation.find({ isStaffInbox: true, participants: { $in: userIds } }).distinct('_id');
   const [properties, contracts, visits, transactions, stays, hotelStays, financialDocs, conversations, messages, notifications, opportunities, activities, contacts, quotes, projects] = await Promise.all([
     Property.find(tenantFilterOr({ owner: { $in: userIds } })).select('title type status availability owner createdAt').lean(),
     // Contrat has no `tenant` field: canonical attribution is via `bien`
@@ -181,8 +187,8 @@ async function getCustomer360(customerId, { tenantId } = {}) {
     AccommodationReservation.find(tenantFilterOr({ $or: [{ guest: { $in: userIds } }, { user: { $in: userIds } }, { email: { $in: emails } }] })).select('status totalAmount checkIn checkOut createdAt').lean(),
     HotelReservation.find(tenantFilterOr({ $or: [{ customer: { $in: userIds } }, { user: { $in: userIds } }, { guestEmail: { $in: emails } }] })).select('status totalAmount checkIn checkOut createdAt').lean(),
     FinancialDocument.find(tenantFilterOr({ $or: [{ 'customer.userId': { $in: userIds } }, { 'customer.email': { $in: emails } }] })).select('documentType documentNumber status currency totalMinor amountAllocatedMinor refundedAmountMinor balanceMinor issueDate createdAt').lean(),
-    Conversation.find(tenantFilterOr({ participants: { $in: userIds } })).select('lastMessage relatedProperty relatedEvent updatedAt').lean(),
-    Message.find(tenantFilterOr({ $or: [{ sender: { $in: userIds } }, { receiver: { $in: userIds } }] })).select('subject content conversation createdAt').sort({ createdAt: -1 }).limit(50).lean(),
+    Conversation.find(tenantFilterOr({ participants: { $in: userIds }, isStaffInbox: { $ne: true } })).select('lastMessage relatedProperty relatedEvent updatedAt').lean(),
+    Message.find(tenantFilterOr({ $or: [{ sender: { $in: userIds } }, { receiver: { $in: userIds } }], conversation: { $nin: supportInboxIds } })).select('subject content conversation createdAt').sort({ createdAt: -1 }).limit(50).lean(),
     // Notification uses `platformTenant` (not `tenant`).
     Notification.find(tenantId
       ? { recipient: { $in: userIds }, platformTenant: tenantId }
@@ -396,4 +402,44 @@ async function consolidateCustomers({ customerA, customerB, decision, justificat
 
 async function listConsolidations({ tenantId } = {}) { return CrmConsolidation.find(tenantFilter(tenantId)).populate('actor', 'name email').populate('keptCustomer archivedCustomer', 'displayName status').sort({ decidedAt: -1 }).limit(200).lean(); }
 
-module.exports = { CrmError, synchronizeCustomers, listCustomers, getCustomer360, createOpportunity, moveOpportunity, setOpportunityOutcome, createActivity, updateActivity, getDashboard, getPipeline, getActivities, globalSearch, assessDuplicate, findDuplicates, compareCustomers, consolidateCustomers, listConsolidations };
+// MARKETING-CONSENT-1 — Suppression de compte (appelée par
+// accountSelfDeletionService, dans sa transaction). Pour chaque fiche CRM
+// liée au compte, tous tenants confondus :
+//   - fiche alimentée UNIQUEMENT par le compte → anonymisée et archivée ;
+//   - fiche alimentée aussi par une source métier (Proprietaire, Locataire,
+//     devis…) → seules les coordonnées issues du compte sont retirées ; les
+//     données de la source métier restent régies par leur propre domaine.
+// La clé `user:<id>` est conservée : elle empêche toute réimportation sous
+// une nouvelle fiche et garde l'historique (opportunités, activités) relié.
+async function detachDeletedUserFromCrm(userId, { originalEmail = null, originalPhone = null, session = null } = {}) {
+  const userKey = `user:${userId}`;
+  const email = clean(originalEmail).toLowerCase();
+  const phone = clean(originalPhone);
+  const query = CrmCustomer.find({ identityKeys: userKey });
+  const customers = session ? await query.session(session) : await query;
+  const now = new Date();
+  for (const customer of customers) {
+    const onlyFromAccount = (customer.sourceRefs || []).every((ref) => ref.entityType === 'User' && String(ref.entityId) === String(userId));
+    if (onlyFromAccount) {
+      customer.displayName = 'Contact supprimé';
+      customer.firstName = '';
+      customer.lastName = '';
+      customer.company = '';
+      customer.emails = [];
+      customer.phones = [];
+      customer.addresses = [];
+      customer.languages = [];
+      customer.identityKeys = [userKey];
+      customer.status = 'archived';
+    } else {
+      customer.emails = (customer.emails || []).filter((value) => !email || value !== email);
+      customer.phones = (customer.phones || []).filter((value) => !phone || clean(value) !== phone);
+      customer.identityKeys = (customer.identityKeys || []).filter((key) => !email || key !== `email:${email}`);
+    }
+    customer.audit.push({ action: 'account_deleted_detached', actor: null, at: now, metadata: { anonymized: onlyFromAccount } });
+    await customer.save(session ? { session } : {});
+  }
+  return customers.map((c) => c._id);
+}
+
+module.exports = { CrmError, synchronizeCustomers, detachDeletedUserFromCrm, listCustomers, getCustomer360, createOpportunity, moveOpportunity, setOpportunityOutcome, createActivity, updateActivity, getDashboard, getPipeline, getActivities, globalSearch, assessDuplicate, findDuplicates, compareCustomers, consolidateCustomers, listConsolidations };

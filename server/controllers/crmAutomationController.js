@@ -6,13 +6,30 @@ const CrmAutomationRun = require('../models/CrmAutomationRun');
 const { handleEvent } = require('../services/crmAutomationEngine');
 const { computeCustomerScore } = require('../services/crmScoreService');
 const { getCockpit } = require('../services/crmCockpitService');
+const { assertTenantAutomationAction } = require('../services/crmActionPolicy');
 
 exports.listRules = asyncHandler(async (req, res) => {
   const rules = await CrmAutomationRule.find({ tenant: req.platformTenant._id }).sort({ priority: 1, ruleId: 1 }).lean();
   res.json({ status: 'success', data: { rules } });
 });
 
+// LOT E — une organisation cliente conserve son CRM opérationnel mais ne
+// peut enregistrer aucune action marketing ni sortante inconnue (le moteur
+// refuse de toute façon de les exécuter).
+function rejectForbiddenActions(actions, res) {
+  for (const action of Array.isArray(actions) ? actions : []) {
+    try { assertTenantAutomationAction(action?.actionId, action?.params || {}); }
+    catch (error) {
+      if (error.name !== 'CrmActionPolicyError') throw error;
+      res.status(403).json({ status: 'fail', code: error.code, message: 'Action d’automatisation réservée à Altitude Vision ou non autorisée.' });
+      return true;
+    }
+  }
+  return false;
+}
+
 exports.createRule = asyncHandler(async (req, res) => {
+  if (rejectForbiddenActions(req.body?.actions, res)) return;
   const rule = await CrmAutomationRule.create({ ...req.body, tenant: req.platformTenant._id, createdBy: req.user._id, updatedBy: req.user._id });
   res.status(201).json({ status: 'success', data: { rule } });
 });
@@ -22,6 +39,7 @@ exports.updateRule = asyncHandler(async (req, res) => {
   const updates = {};
   ALLOWED.forEach((key) => { if (req.body[key] !== undefined) updates[key] = req.body[key]; });
   updates.updatedBy = req.user._id;
+  if (updates.actions !== undefined && rejectForbiddenActions(updates.actions, res)) return;
   const rule = await CrmAutomationRule.findOneAndUpdate({ _id: req.params.id, tenant: req.platformTenant._id }, updates, { new: true, runValidators: true });
   if (!rule) return res.status(404).json({ status: 'fail', message: 'Règle introuvable.' });
   res.json({ status: 'success', data: { rule } });

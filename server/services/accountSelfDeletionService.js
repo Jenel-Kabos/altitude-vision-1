@@ -25,6 +25,8 @@ const OrgMembership = require('../models/OrgMembership');
 const OrgUnit = require('../models/OrgUnit');
 const { destroyFromCloudinary } = require('../config/cloudinary');
 const logger = require('../utils/logger');
+const { revokeAllMarketingConsent, purgeMarketingContactTraces } = require('./marketingConsentService');
+const { detachDeletedUserFromCrm } = require('./crmService');
 const {
   acquireAuthoritySentinelLock,
   assertCanRemoveViableOperator,
@@ -62,8 +64,6 @@ function buildAnonymousProfile(userId) {
     emailVerificationExpires: undefined,
     passwordResetToken: undefined,
     passwordResetExpires: undefined,
-    contratPdfUrl: undefined,
-    contratPdfAsset: undefined,
     isActive: false,
     status: 'Supprimé',
     isEmailVerified: false,
@@ -172,8 +172,27 @@ async function deleteMyAccount({ authenticatedUserId, reason = 'account_self_del
     // biens/documents restent liées à leurs enregistrements métier.
     const previousPhoto = user.photo;
 
+    // Coordonnées d'origine, capturées AVANT anonymisation pour purger les
+    // copies faites par le CRM et le journal marketing.
+    const originalEmail = user.email;
+    const originalPhone = user.phone;
+
     const anonymized = buildAnonymousProfile(userId);
     Object.assign(user, anonymized);
+
+    // MARKETING-CONSENT-1 — Données conservées vs effacées :
+    //   - contrat d'hébergement (PDF privé, engagements, IP de signature) :
+    //     CONSERVÉS lorsqu'un contrat a été accepté — preuve contractuelle,
+    //     durée de conservation à valider juridiquement (voir
+    //     docs/compliance/marketing-consent-and-retention.md). La référence
+    //     au PDF est gardée pour que le fichier reste traçable et purgeable,
+    //     au lieu d'être orphelin dans le stockage privé ;
+    //   - sans contrat accepté, l'IP d'inscription et les engagements n'ont
+    //     plus de finalité : effacés.
+    if (!user.contratAccepte) {
+      user.ipInscription = undefined;
+      user.certifications = undefined;
+    }
     // Invalide toutes les sessions JWT existantes.
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     user.passwordChangedAt = new Date();
@@ -182,6 +201,13 @@ async function deleteMyAccount({ authenticatedUserId, reason = 'account_self_del
     user.password = require('crypto').randomBytes(48).toString('hex');
     user.passwordConfirm = user.password;
     await user.save({ session, validateBeforeSave: false });
+
+    // MARKETING-CONSENT-1 — retrait de tout consentement marketing, puis
+    // détachement du CRM et purge des copies de coordonnées : le compte est
+    // immédiatement inéligible à toute campagne, y compris déjà approuvée.
+    await revokeAllMarketingConsent(userId, { source: 'account_deletion', session });
+    const crmCustomerIds = await detachDeletedUserFromCrm(userId, { originalEmail, originalPhone, session });
+    await purgeMarketingContactTraces({ userId: user._id, originalEmail, customerIds: crmCustomerIds, session });
 
     const revokedCount = await revokeAllActiveMemberships(userId, session, reason);
     await transitionOperatorForUserLifecycle({

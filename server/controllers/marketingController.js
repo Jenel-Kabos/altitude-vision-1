@@ -6,16 +6,25 @@ const segmentService = require('../services/marketingSegmentService');
 const templateService = require('../services/marketingTemplateService');
 const campaignService = require('../services/marketingCampaignService');
 const MarketingSend = require('../models/MarketingSend');
-const tenantId = (req) => req.platformTenant._id;
+const { summarizeEligibility } = require('../services/marketingConsentService');
+// L'identité commerciale est portée par PlatformOperator, jamais par un
+// tenant implicite. Les objets historiques tenant-scoped restent lisibles
+// uniquement par leurs identifiants explicites au niveau service.
+const tenantId = () => null;
 
 // ── Segments (Phase 3) ──────────────────────────────────────────────────
 exports.listSegments = asyncHandler(async (_req, res) => {
   res.json({ status: 'success', data: { segments: segmentService.listSegments() } });
 });
 
+// MARKETING-CONSENT-1 — `count` reste la taille brute du segment ;
+// `eligibility` (si `channel` est fourni) donne le nombre réellement
+// joignable après consentement/compte/désinscription, sans aucune identité.
 exports.previewSegment = asyncHandler(async (req, res) => {
-  const ids = await segmentService.resolveSegment(req.params.key, req.query, { tenantId: tenantId(req) });
-  res.json({ status: 'success', data: { segmentKey: req.params.key, count: ids.length, sampleIds: ids.slice(0, 20) } });
+  const { channel, ...params } = req.query;
+  const ids = await segmentService.resolveSegment(req.params.key, params, { tenantId: tenantId(req) });
+  const eligibility = channel ? await summarizeEligibility(ids, { campaignChannel: channel, tenantId: tenantId(req) }) : null;
+  res.json({ status: 'success', data: { segmentKey: req.params.key, count: ids.length, sampleIds: ids.slice(0, 20), eligibility } });
 });
 
 // ── Modèles (Phase 6) ───────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 // server/controllers/userController.js
 const accountSelfDeletionService = require('../services/accountSelfDeletionService');
+const marketingConsentService = require('../services/marketingConsentService');
 const User       = require('../models/User');
 const sendEmail  = require('../utils/email');
 const { destroyFromCloudinary, uploadToCloudinary } = require('../config/cloudinary');
@@ -715,10 +716,17 @@ exports.completeProfile = async (req, res) => {
             };
         }
 
-        const updated = await User.findByIdAndUpdate(req.user._id, updates, {
-            new: true, runValidators: false, select: '-password',
-        });
+        await User.findByIdAndUpdate(req.user._id, updates, { runValidators: false });
 
+        // MARKETING-CONSENT-1 — seules les cases explicitement cochées valent
+        // consentement (source 'profile_completion') ; jamais de retrait ni
+        // de réabonnement implicite à cette étape.
+        const profileConsent = marketingConsentService.normalizeConsentInput(req.body?.marketingConsent);
+        if (Object.keys(profileConsent).length) {
+            await marketingConsentService.applyConsentChanges(req.user._id, profileConsent, { source: 'profile_completion' });
+        }
+
+        const updated = await User.findById(req.user._id).select('-password');
         res.status(200).json({ status: 'success', data: { user: updated } });
     } catch (error) {
         console.error('❌ Erreur completeProfile:', error);

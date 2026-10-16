@@ -17,6 +17,7 @@ const MarketingTemplate = require('../models/MarketingTemplate');
 const MarketingSend = require('../models/MarketingSend');
 const { deliverToChannel } = require('./marketingCampaignService');
 const { renderTemplate } = require('./marketingTemplateService');
+const { resolveRecipient } = require('./marketingConsentService');
 
 // Résout le CrmCustomer concerné par un événement — réutilise exactement la
 // même clé d'identité (`identityKeys: 'user:<id>'`) que crmService.js
@@ -105,14 +106,28 @@ async function sendMarketingMessage(event, params = {}) {
   if (!params.templateFamily) return { status: 'skipped', reason: 'no_template_configured' };
   const template = await MarketingTemplate.findOne({ tenant: event.platformTenantId, family: params.templateFamily, status: 'active' });
   if (!template) return { status: 'skipped', reason: 'no_active_template' };
-  const customer = await CrmCustomer.findOne({ _id: customerId, tenant: event.platformTenantId }).select('emails identityKeys displayName firstName').lean();
+  const customer = await CrmCustomer.findOne({ _id: customerId, tenant: event.platformTenantId }).select('emails identityKeys displayName firstName status tenant').lean();
   if (!customer) return { status: 'skipped', reason: 'no_customer_match' };
 
+  // MARKETING-CONSENT-1 — même contrôle que les campagnes : compte actif,
+  // consentement du canal, absence de désinscription. Un workflow ne
+  // contourne jamais le consentement.
+  const channel = params.channel || template.channel;
+  const recipient = await resolveRecipient({ customer, campaignChannel: channel, tenantId: event.platformTenantId });
+  if (!recipient.eligible) {
+    await MarketingSend.create({
+      tenant: event.platformTenantId, workflowRuleId: params.ruleId || event.type, template: template._id, channel,
+      recipientCustomer: customer._id, recipientUser: recipient.userId || null, recipientEmail: null,
+      status: ['CONSENT_NOT_GRANTED', 'EMAIL_SUPPRESSED'].includes(recipient.reason) ? 'unsubscribed' : 'excluded', error: recipient.reason,
+    });
+    return { status: 'skipped', reason: recipient.reason };
+  }
+
   const rendered = renderTemplate(template, { prenom: customer.firstName || customer.displayName, nom: customer.displayName, ...(event.metadata || {}) });
-  const outcome = await deliverToChannel({ channel: params.channel || template.channel, customer, rendered, actor: { _id: resolveActor(event) } });
+  const outcome = await deliverToChannel({ channel, recipient, rendered, actor: { _id: resolveActor(event) } });
   await MarketingSend.create({
-    tenant: event.platformTenantId, workflowRuleId: params.ruleId || event.type, template: template._id, channel: params.channel || template.channel,
-    recipientCustomer: customer._id, recipientEmail: customer.emails?.[0] || null,
+    tenant: event.platformTenantId, workflowRuleId: params.ruleId || event.type, template: template._id, channel,
+    recipientCustomer: customer._id, recipientUser: recipient.user._id, recipientEmail: null,
     status: outcome.status, error: outcome.error || null,
   });
   return outcome.status === 'sent' ? { status: 'success', channel: template.channel } : { status: 'error', error: outcome.error };

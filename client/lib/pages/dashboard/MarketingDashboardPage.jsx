@@ -17,7 +17,7 @@ import {
   listCampaigns, createCampaign, approveCampaign, cancelCampaign, sendCampaign,
   listSends,
 } from '../../services/marketingService';
-import { useAuth } from '../../context/AuthContext';
+import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from '../../components/dashboard/DashboardUI';
 
 const TABS = [
@@ -242,7 +242,7 @@ function CampaignsTab({ canManage }) {
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{c.status}</span>
                 </td>
                 <td className="p-3 text-xs text-slate-600">
-                  {c.stats?.totalRecipients ?? 0} destinataires · {c.stats?.sentCount ?? 0} envoyés · {c.stats?.failedCount ?? 0} échecs
+                  {c.stats?.totalRecipients ?? 0} destinataires · {c.stats?.sentCount ?? 0} envoyés · {c.stats?.failedCount ?? 0} échecs · {c.stats?.excludedCount ?? 0} exclus (consentement/compte)
                 </td>
                 {canManage && (
                   <td className="p-3">
@@ -304,9 +304,19 @@ function SendsTab() {
 }
 
 export default function MarketingDashboardPage() {
-  const { user } = useAuth();
   const [tab, setTab] = useState('overview');
-  const canManage = user?.role === 'Admin' || user?.role === 'CommunityManager';
+  // LOT E — autorité exclusivement PlatformOperator (capacité active lue par
+  // le contexte runtime, jamais dérivée du rôle ni de `user.capabilities`),
+  // en Vue plateforme. Le serveur reste l'autorité finale.
+  const { can, scope } = usePlatformTenantRuntime();
+  const canManage = Boolean(can?.('platform.marketing.manage'));
+
+  if (!canManage) {
+    return <DashboardState type="error" title="Marketing commercial non autorisé" description="Cette fonction est réservée aux opérateurs habilités d’Altitude Vision." />;
+  }
+  if (scope?.mode !== 'platform') {
+    return <DashboardState type="error" title="Vue plateforme requise" description="Le marketing commercial d’Altitude Vision s’exerce sans organisation sélectionnée : revenez en Vue plateforme." />;
+  }
 
   return (
     <DashboardPage>

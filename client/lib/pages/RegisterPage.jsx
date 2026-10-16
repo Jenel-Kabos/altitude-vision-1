@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { contratHebergement } from "../data/contratHebergement";
 import { getPostAuthDestination } from '../navigation/postAuthDestination';
+import MarketingConsentCheckboxes from '../components/MarketingConsentCheckboxes';
+import { EMPTY_MARKETING_CONSENT } from '../constants/marketingConsent';
 
 const BLUE      = '#2E7BB5';
 const BLUE_DARK = '#1A5A8A';
@@ -68,6 +70,8 @@ const RegisterPage = () => {
     const [error,       setError]       = useState('');
     const [loading,     setLoading]     = useState(false);
     const [contratLu,   setContratLu]   = useState(false);
+    // MARKETING-CONSENT-1 — cases facultatives, jamais précochées.
+    const [marketingConsent, setMarketingConsent] = useState(EMPTY_MARKETING_CONSENT);
     const [certifications, setCertifications] = useState({
         contratAccepte:       false,
         informationsVraies:   false,
@@ -118,6 +122,7 @@ const RegisterPage = () => {
                 password:        form.password,
                 passwordConfirm: form.confirmPassword,
                 role:            form.role,
+                marketingConsent,
                 ...(isProprietaire && {
                     contratAccepte: true,
                     informationsVraies:   certifications.informationsVraies,
@@ -489,6 +494,8 @@ const RegisterPage = () => {
                         </motion.div>
                     )}
                     </AnimatePresence>
+
+                    <MarketingConsentCheckboxes value={marketingConsent} onChange={setMarketingConsent} disabled={loading} />
 
                     {/* Submit */}
                     <motion.button type="submit"

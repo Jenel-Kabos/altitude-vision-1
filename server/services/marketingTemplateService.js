@@ -4,6 +4,7 @@
 // un message marketing n'a jamais besoin de plus, et ça évite toute
 // injection de code côté template.
 const MarketingTemplate = require('../models/MarketingTemplate');
+const { assertPlatformMarketingAuthority, assertPlatformMarketingScope } = require('./marketingAuthorityService');
 
 class TemplateError extends Error {
   constructor(code, message, statusCode = 400) { super(message); this.name = 'TemplateError'; this.code = code; this.statusCode = statusCode; }
@@ -25,6 +26,8 @@ function renderTemplate(template, variables = {}) {
 // remplacée — jamais une édition en place d'un document déjà potentiellement
 // référencé par un MarketingSend passé (voir modèle, `previousVersion`).
 async function createTemplateVersion({ family, name, channel, subject, body, variables, actor, tenantId } = {}) {
+  await assertPlatformMarketingAuthority(actor);
+  assertPlatformMarketingScope(tenantId);
   if (!family || !name || !channel || !body) fail('TEMPLATE_FIELDS_REQUIRED', 'family, name, channel et body sont requis.', 422);
   const previous = await MarketingTemplate.findOne({ family, status: 'active', ...(tenantId ? { tenant: tenantId } : {}) }).sort({ version: -1 });
   const template = await MarketingTemplate.create({
@@ -38,8 +41,10 @@ async function createTemplateVersion({ family, name, channel, subject, body, var
 }
 
 async function activateTemplate(id, { actor, tenantId } = {}) {
+  await assertPlatformMarketingAuthority(actor);
   const template = await MarketingTemplate.findOne({ _id: id, ...(tenantId ? { tenant: tenantId } : {}) });
   if (!template) fail('TEMPLATE_NOT_FOUND', 'Modèle introuvable.', 404);
+  assertPlatformMarketingScope(tenantId || template.tenant);
   await MarketingTemplate.updateMany({ family: template.family, status: 'active', ...(tenantId ? { tenant: tenantId } : {}) }, { status: 'archived' });
   template.status = 'active';
   template.updatedBy = actor?._id || actor?.id || null;

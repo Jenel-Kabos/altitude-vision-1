@@ -10,7 +10,7 @@ const Property = require('../models/Property');
 const Conversation = require('../models/Conversation');
 const platformTenantService = require('../services/platformTenant/platformTenantService');
 const organizationService = require('../services/organizationService');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_OPERATOR_CAPABILITIES } = require('../constants/platformOperatorConstants');
 
 jest.setTimeout(180000);
@@ -25,7 +25,7 @@ async function bootstrap() {
   const admin = await User.create({ name: 'Admin Principal', email: 'admin-reset@example.test', password, passwordConfirm: password, role: 'Admin', isEmailVerified: true });
   const tenant = await platformTenantService.createTenant({ name: 'Altitude Vision', actor: admin, req: null });
   await organizationService.grantMembership({ userId: admin._id, orgUnitId: tenant.rootOrgUnit, roleInUnit: 'owner', actor: admin, metadata: { reason: 'DATA-RESET-1 test' }, req: null });
-  await grantOperator({ userId: admin._id, capabilities: PLATFORM_OPERATOR_CAPABILITIES, actor: admin, reason: 'DATA-RESET-1 test', req: null, allowSelfGrant: true });
+  await provisionPrivilegedOperator({ userId: admin._id, capabilities: PLATFORM_OPERATOR_CAPABILITIES, actor: admin, reason: 'DATA-RESET-1 test', req: null, allowSelfGrant: true });
   return { admin, tenant };
 }
 
