@@ -25,7 +25,11 @@ async function allocatePaymentToDocumentCore({ paymentId, documentId, amountMino
   if (payment.domain !== document.domain || String(payment.establishmentId) !== String(document.establishmentId)) fail('FINANCIAL_ESTABLISHMENT_MISMATCH', 'Paiement et facture appartiennent à des établissements différents.', 409);
   if (payment.currency !== document.currency) fail('FINANCIAL_CURRENCY_MISMATCH', 'Devises incompatibles.', 409);
   if (payment.status !== 'succeeded') fail('FINANCIAL_PAYMENT_NOT_ALLOCATABLE', 'Le paiement n’est pas confirmé.', 409);
-  if (document.status !== 'issued') fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'La facture doit être émise.', 409);
+  // F-U2.11 — exception étroite : échéance locative de SUIVI (bailleur sans
+  // organisation, aucune facture légale possible) — brouillon figé marqué
+  // `trackingObligation`. Toute autre facture doit être émise.
+  const trackingDue = document.status === 'draft' && document.domain === 'rental' && document.metadata?.trackingObligation === true;
+  if (document.status !== 'issued' && !trackingDue) fail('FINANCIAL_DOCUMENT_NOT_ISSUED', 'La facture doit être émise.', 409);
   if (payment.domain === 'hotel' && payment.metadata?.financialDocumentId && String(payment.metadata.financialDocumentId) !== String(documentId)) fail('FINANCIAL_ESTABLISHMENT_MISMATCH', 'Ce paiement hôtelier est rattaché à une autre facture.', 409);
   if (amountMinor > payment.availableAmountMinor) fail('FINANCIAL_PAYMENT_OVERALLOCATION', 'Le montant dépasse le montant disponible du paiement.', 409);
   if (amountMinor > document.balanceMinor) fail('FINANCIAL_DOCUMENT_OVERPAYMENT', 'Le montant dépasse le solde restant de la facture.', 409);
@@ -33,7 +37,7 @@ async function allocatePaymentToDocumentCore({ paymentId, documentId, amountMino
   if (!reservedPayment) fail('FINANCIAL_PAYMENT_OVERALLOCATION', 'Paiement déjà alloué par une opération concurrente.', 409);
   await financialCheckpoint(faultInjector, 'allocation.after_payment_reservation', { businessOperationKey });
   await financialCheckpoint(faultInjector, 'allocation.before_document_reservation', { businessOperationKey });
-  const reservedDocument = await FinancialDocument.findOneAndUpdate({ _id: documentId, status: 'issued', balanceMinor: { $gte: amountMinor } }, { $inc: { balanceMinor: -amountMinor, amountAllocatedMinor: amountMinor } }, { new: true, session });
+  const reservedDocument = await FinancialDocument.findOneAndUpdate({ _id: documentId, ...(trackingDue ? { status: 'draft', 'metadata.trackingObligation': true } : { status: 'issued' }), balanceMinor: { $gte: amountMinor } }, { $inc: { balanceMinor: -amountMinor, amountAllocatedMinor: amountMinor } }, { new: true, session });
   if (!reservedDocument) {
     if (!transactional) {
       try {

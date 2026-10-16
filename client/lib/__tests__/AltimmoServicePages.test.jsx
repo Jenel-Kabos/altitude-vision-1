@@ -31,6 +31,17 @@ describe('Pages de services Altimmo', () => {
     expect(screen.getByRole('link', { name: /Voir les tarifs/i })).toHaveAttribute('href', '#tarifs');
   });
 
+  test('F-U2.9 : gestion déléguée à 10 %, aucune mention à 7 %, quatre formules autonomes transparentes', () => {
+    const { container } = render(<LocationGestionPage />);
+    expect(container.textContent).not.toMatch(/\b7 ?%/);
+    expect(screen.getByText('Gestion déléguée')).toBeInTheDocument();
+    expect(screen.getByText('10 %')).toBeInTheDocument();
+    const formulas = screen.getByTestId('autonomous-formulas');
+    ['Gratuit', 'Standard', 'Entreprise', 'Grand portefeuille'].forEach((label) => expect(formulas).toHaveTextContent(label));
+    ['0 FCFA / mois', '5 000 FCFA / mois', '10 000 FCFA / mois', 'Sur devis'].forEach((price) => expect(formulas).toHaveTextContent(price));
+    expect(screen.getByText('Abonnement gratuit pour un bien. Frais de service de 1 % sur les loyers effectivement encaissés et confirmés.')).toBeInTheDocument();
+  });
+
   test('connecte les CTA Conseil aux stratégies et au contact immobilier', () => {
     render(<ConseilInvestissementPage />);
     expect(screen.getByRole('heading', { level: 1, name: 'Conseil en Investissement' })).toBeInTheDocument();

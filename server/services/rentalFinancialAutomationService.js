@@ -2,6 +2,7 @@ const Paiement = require('../models/Paiement');
 const Contrat = require('../models/Contrat');
 const RentalManagement = require('../models/RentalManagement');
 const { notify, notifyStaff } = require('./notificationService');
+const { activePenaltyEngine, ENGINES } = require('./finance/billing/rentPenaltyEngine');
 
 const positiveInteger = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);
@@ -105,9 +106,13 @@ const checkRentalContractsExpiring = async ({ now = new Date(), windowDays = con
   return result;
 };
 
+// F-U2.11 — les alertes de retard fondées sur l'échéancier historique
+// (`Paiement.jourEcheance`) appartiennent à l'ancien moteur : neutralisées
+// quand le moteur canonique (échéance le 5 du mois suivant) est actif.
 const runRentalFinancialAutomations = async (options = {}) => {
+  const legacyActive = activePenaltyEngine() === ENGINES.LEGACY;
   const [payments, contracts] = await Promise.all([
-    checkRentalPaymentOverdues(options),
+    legacyActive ? checkRentalPaymentOverdues(options) : Promise.resolve({ checked: 0, overdue: 0, partial: 0, notified: 0, ignored: 0, errors: 0, skipped: true }),
     checkRentalContractsExpiring(options),
   ]);
   return { payments, contracts };

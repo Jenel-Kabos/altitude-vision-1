@@ -144,10 +144,15 @@ const REGISTRY = Object.freeze({
     scope: PAYMENT_PROVIDER_SCOPE[PAYMENT_PROVIDERS.CARD_PSP],
     methods: PAYMENT_PROVIDER_METHODS[PAYMENT_PROVIDERS.CARD_PSP],
     integratedWithFinancialCore: false,
-    // Aucun PSP choisi (PAY-1 §44) : capacités déclarées par anticipation
-    // (hosted checkout / tokenization attendus), jamais un PAN/CVV stocké
-    // par ce registre ni par aucun code du dépôt.
-    capabilities: Object.freeze({ initiate: true, statusQuery: true, webhook: true, refund: true, reconcile: true, requiresManualValidation: false }),
+    // Aucun PSP choisi (PAY-1 §44) : jamais un PAN/CVV stocké par ce
+    // registre ni par aucun code du dépôt.
+    // F-U1 — `capabilities` décrit ce qui est RÉELLEMENT opérationnel : toutes
+    // les fonctions sont des stubs NOT_IMPLEMENTED, donc tout est à false.
+    // L'intention produit (hosted checkout / tokenization attendus) est
+    // conservée séparément dans `plannedCapabilities`, jamais lue comme une
+    // capacité active.
+    capabilities: Object.freeze({ initiate: false, statusQuery: false, webhook: false, refund: false, reconcile: false, requiresManualValidation: false }),
+    plannedCapabilities: Object.freeze({ initiate: true, statusQuery: true, webhook: true, refund: true, reconcile: true }),
     normalizeStatus: (raw) => normalizeStatus(PAYMENT_PROVIDERS.CARD_PSP, raw),
     initiatePayment: notImplemented(PAYMENT_PROVIDERS.CARD_PSP, 'initiatePayment'),
     getStatus: notImplemented(PAYMENT_PROVIDERS.CARD_PSP, 'getStatus'),
@@ -170,4 +175,12 @@ function supportsRefund(providerKey) {
   return getProvider(providerKey).capabilities.refund === true;
 }
 
-module.exports = { getProvider, listProviders, supportsRefund, normalizeStatus, assertFallbackAllowed, PAYMENT_PROVIDERS };
+// F-U1 — un provider n'est opérationnel pour le Financial Core que s'il y est
+// réellement branché ET sait initier un paiement. La simple présence d'un
+// adaptateur ou d'un indicateur ne suffit pas.
+function isOperationalForFinancialCore(providerKey) {
+  const entry = getProvider(providerKey);
+  return entry.integratedWithFinancialCore === true && entry.capabilities.initiate === true;
+}
+
+module.exports = { getProvider, listProviders, supportsRefund, isOperationalForFinancialCore, normalizeStatus, assertFallbackAllowed, PAYMENT_PROVIDERS };
