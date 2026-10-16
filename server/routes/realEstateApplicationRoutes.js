@@ -17,6 +17,7 @@ router.post('/', ctrl.create);
 router.get('/reservations/:id', requireTenantScopeForStaffOrPlatformOperator, ctrl.getReservation);
 router.post('/reservations/:id/cancel', requireTenantScopeForStaffOrPlatformOperator, ctrl.cancelReservation);
 router.post('/:id/attachments', realEstateApplicationUpload.array('attachments', 5), ctrl.uploadAttachments);
+router.get('/:id/contact-disclosure', requireTenantScopeForStaffOrPlatformOperator, ctrl.discloseContactDetails);
 router.get('/:id/attachments/:attachmentId', requireTenantScopeForStaffOrPlatformOperator, ctrl.downloadAttachment);
 router.delete('/:id/attachments/:attachmentId', ctrl.deleteAttachment);
 router.get('/:id', requireTenantScopeForStaffOrPlatformOperator, ctrl.getOne);

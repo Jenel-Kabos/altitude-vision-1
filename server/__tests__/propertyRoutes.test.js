@@ -81,6 +81,19 @@ jest.mock('../services/notificationService', () => ({
   notify: (...args) => mockNotify(...args),
   notifyMany: (...args) => mockNotifyMany(...args),
 }));
+// LOT A — la décision de publication passe par le service canonique de
+// révisions (CAS/transactions), certifié sur Mongo réel par
+// commercialPublicationService/propertyCommercialPublication. Ici, seules la
+// garde de route et la suite du contrôleur (notification, diffusion bornée)
+// sont testées : le service est simulé.
+jest.mock('../models/CommercialPublicationRevision', () => ({
+  findOne: jest.fn(() => ({ sort: jest.fn().mockResolvedValue(null) })),
+}));
+jest.mock('../services/commercialPublicationService', () => ({
+  ...jest.requireActual('../services/commercialPublicationService'),
+  createPendingRevision: jest.fn().mockResolvedValue({ _id: 'REVISION-1' }),
+  decideRevision: jest.fn().mockResolvedValue({ _id: 'REVISION-1', status: 'approved' }),
+}));
 jest.mock('../services/platformTenant/organizationAssetInvariantService', () => ({
   ...jest.requireActual('../services/platformTenant/organizationAssetInvariantService'),
   resolvePropertyCreationTenant: jest.fn().mockImplementation(async ({ contextualTenantId }) => contextualTenantId || null),
@@ -129,6 +142,23 @@ const fakeProp = {
   status:      'vente',
   statusAdmin: 'Validée',
   owner:       { name: 'Proprio', email: 'p@test.com' },
+};
+
+// LOT A — Altitude Vision = PlatformOperator actif, éligible à la Vue
+// plateforme, détenteur de platform.commercial.manage, sans tenant
+// sélectionné (contexte PLATFORM). Jamais un rôle User.
+const { resolveActiveOperator } = require('../services/platformOperator/platformOperatorService');
+const { resolveEffectiveTenantContext } = require('../services/platformTenant/tenantContextService');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
+const { decideRevision } = require('../services/commercialPublicationService');
+const asCommercialOperator = () => {
+  const operator = { status: 'active', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] };
+  resolveActiveOperator.mockResolvedValue(operator);
+  resolveEffectiveTenantContext.mockResolvedValue({ tenant: null, source: 'platform_operator_unscoped', operator });
+};
+const resetPlatformMocks = () => {
+  resolveActiveOperator.mockResolvedValue(null);
+  resolveEffectiveTenantContext.mockResolvedValue({ tenant: { _id: '607f1f77bcf86cd799439001', rootOrgUnit: '607f1f77bcf86cd799439001' }, source: 'single_membership' });
 };
 
 // Chaîne Mongoose complète dont APIFeatures a besoin
@@ -181,23 +211,34 @@ describe('GET /api/properties', () => {
 });
 
 describe('PATCH /api/properties/admin/:id/:action', () => {
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => { jest.clearAllMocks(); resetPlatformMocks(); });
 
-  test('borne le broadcast de publication aux utilisateurs du tenant validé', async () => {
+  test('LOT A — un Admin (rôle ou adhésion tenant) sans PlatformOperator ne peut pas valider', async () => {
     User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
     User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
-    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012', tenant: '607f1f77bcf86cd799439001' });
-    Property.findByIdAndUpdate = jest.fn().mockResolvedValue({
-      ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: true,
-      tenant: '607f1f77bcf86cd799439001',
-      address: { city: 'Brazzaville' },
-    });
+    Property.findById = jest.fn();
+    const res = await request(app)
+      .patch(`/api/properties/admin/${fakeProp._id}/validate`)
+      .set('Authorization', `Bearer ${makeToken('Admin')}`)
+      .set('X-Platform-Tenant-Id', '607f1f77bcf86cd799439001');
+    expect(res.statusCode).toBe(403);
+    expect(Property.findById).not.toHaveBeenCalled();
+    expect(decideRevision).not.toHaveBeenCalled();
+  });
+
+  test('borne le broadcast de publication aux utilisateurs du tenant validé', async () => {
+    asCommercialOperator();
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    Property.findById = jest.fn()
+      .mockResolvedValueOnce({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012', tenant: '607f1f77bcf86cd799439001' })
+      .mockResolvedValueOnce({ ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: true, tenant: '607f1f77bcf86cd799439001', address: { city: 'Brazzaville' } });
     const userQuery = { select: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([{ _id: '507f1f77bcf86cd799439011' }]) };
     User.find = jest.fn().mockReturnValue(userQuery);
 
     const res = await request(app)
       .patch(`/api/properties/admin/${fakeProp._id}/validate`)
-      .set('Authorization', `Bearer ${makeToken('Admin')}`);
+      .set('Authorization', `Bearer ${makeToken('Client')}`);
 
     expect(res.statusCode).toBe(200);
     expect(resolveTenantScope).toHaveBeenCalledWith('607f1f77bcf86cd799439001');
@@ -211,25 +252,22 @@ describe('PATCH /api/properties/admin/:id/:action', () => {
   });
 
   test('une annonce classique validée est publiée dans la même transition canonique', async () => {
-    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
+    asCommercialOperator();
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
     User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
-    Property.findById = jest.fn().mockResolvedValue({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012', status: 'vente', tenant: '607f1f77bcf86cd799439001' });
-    Property.findByIdAndUpdate = jest.fn().mockResolvedValue({
-      ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: true,
-      tenant: '607f1f77bcf86cd799439001',
-    });
-    User.find = jest.fn();
+    Property.findById = jest.fn()
+      .mockResolvedValueOnce({ _id: fakeProp._id, owner: '507f1f77bcf86cd799439012', status: 'vente', tenant: '607f1f77bcf86cd799439001' })
+      .mockResolvedValueOnce({ ...fakeProp, owner: '507f1f77bcf86cd799439012', isPublished: true, tenant: '607f1f77bcf86cd799439001' });
+    User.find = jest.fn().mockReturnValue({ select: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([]) });
 
     const res = await request(app)
       .patch(`/api/properties/admin/${fakeProp._id}/validate`)
-      .set('Authorization', `Bearer ${makeToken('Admin')}`);
+      .set('Authorization', `Bearer ${makeToken('Client')}`);
 
     expect(res.statusCode).toBe(200);
-    expect(Property.findByIdAndUpdate).toHaveBeenCalledWith(
-      fakeProp._id,
-      expect.objectContaining({ statusAdmin: 'Validée', isPublished: true }),
-      { new: true },
-    );
+    expect(decideRevision).toHaveBeenCalledWith(expect.objectContaining({ decision: 'approve', revisionId: 'REVISION-1' }));
+    const { adapter } = decideRevision.mock.calls[0][0];
+    expect(adapter.buildPromotionUpdate({}, { _id: 'REVISION-1' }).$set).toEqual(expect.objectContaining({ statusAdmin: 'Validée', isPublished: true }));
     expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining('visible sur la plateforme') }));
   });
 });
@@ -241,7 +279,17 @@ describe('PATCH /api/properties/admin/:id/:action', () => {
 // bien celui reçu par le frontend et qu'il reste borné au staff Admin.
 
 describe('GET /api/properties/status/pending', () => {
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => { jest.clearAllMocks(); resetPlatformMocks(); });
+
+  test('LOT A — 403 pour un Admin (rôle) sans PlatformOperator : la file est exclusivement plateforme', async () => {
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
+    User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
+    const res = await request(app)
+      .get('/api/properties/status/pending')
+      .set('Authorization', `Bearer ${makeToken('Admin')}`)
+      .set('X-Platform-Tenant-Id', '607f1f77bcf86cd799439001');
+    expect(res.statusCode).toBe(403);
+  });
 
   test('401 — sans token', async () => {
     const res = await request(app).get('/api/properties/status/pending');
@@ -257,8 +305,9 @@ describe('GET /api/properties/status/pending', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  test("200 (Admin) — renvoie le vrai soumissionnaire (owner) avec name/email/phone/role, jamais mot de passe ni tokens", async () => {
-    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
+  test("200 (opérateur commercial) — renvoie le vrai soumissionnaire (owner) avec name/email/phone/role, jamais mot de passe ni tokens", async () => {
+    asCommercialOperator();
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
     const submitter = {
       _id: '507f1f77bcf86cd799439012', name: 'TEST DATA SUBMITTER', email: 'submitter@example.test',
       photo: '', role: 'Proprietaire', phone: '+242060000010',
@@ -272,7 +321,7 @@ describe('GET /api/properties/status/pending', () => {
 
     const res = await request(app)
       .get('/api/properties/status/pending')
-      .set('Authorization', `Bearer ${makeToken('Admin')}`);
+      .set('Authorization', `Bearer ${makeToken('Client')}`);
 
     expect(res.statusCode).toBe(200);
     // Le champ de sélection du populate() est la seule protection structurelle
@@ -287,8 +336,9 @@ describe('GET /api/properties/status/pending', () => {
     expect(returned.tokenVersion).toBeUndefined();
   });
 
-  test('200 (Admin) — un bien en attente sans owner résolu ne fait pas planter la route', async () => {
-    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Admin')) });
+  test('200 (opérateur commercial) — un bien en attente sans owner résolu ne fait pas planter la route', async () => {
+    asCommercialOperator();
+    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser('Client')) });
     const pendingProperty = {
       _id: '507f191e810c19729de860ea', title: 'TEST DATA ORPHAN', statusAdmin: 'En attente',
       status: 'vente', owner: null,
@@ -297,7 +347,7 @@ describe('GET /api/properties/status/pending', () => {
 
     const res = await request(app)
       .get('/api/properties/status/pending')
-      .set('Authorization', `Bearer ${makeToken('Admin')}`);
+      .set('Authorization', `Bearer ${makeToken('Client')}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.data.properties[0].owner).toBeNull();

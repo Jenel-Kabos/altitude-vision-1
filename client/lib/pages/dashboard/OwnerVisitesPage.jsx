@@ -297,7 +297,7 @@ const OwnerVisitesPage = () => {
                           {visite.client?.name || 'Inconnu'}
                         </span>
                       </div>
-                      {visite.telephone && (
+                      {visite.projection?.contactDetailsVisible && visite.telephone && (
                         <div className="flex items-center gap-2">
                           <Phone size={13} style={{ color: GRAY }} />
                           <span className="text-xs text-gray-500" style={{ fontFamily: FONT }}>

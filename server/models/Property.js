@@ -204,6 +204,11 @@ const propertySchema = new mongoose.Schema(
     },
 
     isPublished: { type: Boolean, default: false },
+    // Lot A — snapshot public approuvé et verrou de concurrence. Champs
+    // additifs : les annonces legacy validées restent lisibles via fallback.
+    commercialPublicationVersion: { type: Number, default: 0, min: 0 },
+    approvedPublicSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
+    currentPublicationRevision: { type: mongoose.Schema.Types.ObjectId, ref: 'CommercialPublicationRevision', default: null },
     // Bien privé créé volontairement depuis la Gestion locative. Il peut
     // être complété (notamment en images) avant un futur workflow public.
     internalManagedOnly: { type: Boolean, default: false, index: true },

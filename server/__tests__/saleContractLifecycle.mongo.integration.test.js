@@ -15,7 +15,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Contrat = require('../models/Contrat');
@@ -316,7 +316,7 @@ describe('SCL — Sale contract lifecycle (SCL-2)', () => {
     const c = await makeSaleContrat(s.propertyA);
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'SCL-14', capabilities: ['platform.commercial.manage', 'platform.finance.manage'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'SCL-14', capabilities: ['platform.commercial.manage', 'platform.finance.manage'] });
     const res = await request(app).put(`/api/contrats/vente/${c._id}`).set(bearer(opUser, s.A.tenant)).send({ dateSignatureCompromis: new Date().toISOString() });
     expect([403, 404]).toContain(res.status);
   });

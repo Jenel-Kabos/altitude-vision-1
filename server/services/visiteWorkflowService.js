@@ -112,26 +112,41 @@ const maskPhone = (phone = '') => {
   return `${clean.slice(0, 3)}••••${clean.slice(-2)}`;
 };
 
-const serializeVisite = (doc, viewerRole) => {
+const serializeVisite = (doc, viewerRole, { contactAuthorized = false } = {}) => {
   const raw = doc.toObject ? doc.toObject() : { ...doc };
   const status = normalizeStatus(raw.status, raw.statut);
   const confirmed = [STATUS.CONFIRMED, STATUS.IN_PROGRESS, STATUS.COMPLETED, STATUS.CLIENT_ABSENT, STATUS.OWNER_ABSENT].includes(status);
-  const clientConsent = Boolean(raw.clientContactConsent && confirmed);
-  const ownerConsent = Boolean(raw.ownerContactConsent && confirmed);
   if (viewerRole === 'owner') {
-    raw.telephone = clientConsent ? raw.clientPhoneSnapshot || raw.telephone : maskPhone(raw.clientPhoneSnapshot || raw.telephone);
-    raw.clientWhatsAppSnapshot = clientConsent ? raw.clientWhatsAppSnapshot : '';
+    raw.telephone = contactAuthorized ? raw.clientPhoneSnapshot || raw.telephone : maskPhone(raw.clientPhoneSnapshot || raw.telephone);
+    raw.clientWhatsAppSnapshot = contactAuthorized ? raw.clientWhatsAppSnapshot : '';
+    delete raw.clientPhoneSnapshot;
+    delete raw.ownerPhoneSnapshot;
     if (raw.client) raw.client = { _id: raw.client._id || raw.client, name: raw.clientNameSnapshot || raw.client.name || 'Client Altimmo' };
   }
   if (viewerRole === 'client') {
     delete raw.ownerPhoneSnapshot;
-    if (!ownerConsent) delete raw.ownerContact;
+    if (!contactAuthorized) delete raw.ownerContact;
     if (!confirmed) {
       raw.meetingAddressSnapshot = '';
       raw.coordinatesSnapshot = null;
     }
   }
+  if (viewerRole === 'staff') {
+    raw.telephone = maskPhone(raw.clientPhoneSnapshot || raw.telephone);
+    if (raw.client) raw.client = { _id: raw.client._id || raw.client, name: raw.clientNameSnapshot || raw.client.name || 'Client Altimmo' };
+    delete raw.clientPhoneSnapshot;
+    delete raw.clientWhatsAppSnapshot;
+    delete raw.ownerPhoneSnapshot;
+    delete raw.ownerContact;
+    if (raw.property?.owner && typeof raw.property.owner === 'object') {
+      raw.property.owner = {
+        _id: raw.property.owner._id || raw.property.owner,
+        name: raw.property.owner.name || raw.property.owner.firstName || 'Propriétaire',
+      };
+    }
+  }
   raw.status = status;
+  raw.projection = { ...(raw.projection || {}), contactDetailsVisible: Boolean(contactAuthorized) };
   raw.displayStatus = LABELS[status];
   raw.allowedActions = actionsFor(status, viewerRole);
   // Heure de fin calculée (durée fixe) — jamais stockée, pour affichage dashboard.

@@ -41,7 +41,7 @@ const { requireTenantModule } = require('../middleware/tenantModuleGate');
 const { requireTenantMembershipRole } = require('../middleware/tenantMembershipRole');
 const { requireTenantMembershipRoleOrPlatformCapability } = require('../middleware/tenantMembershipRoleOrPlatformCapability');
 const { resolveTenantMembershipIfPresent } = require('../middleware/resolveTenantMembershipIfPresent');
-const { requirePlatformOperatorCapability, requirePlatformOperatorCapabilityWhenPresent } = require('../middleware/platformAuthority');
+const { requirePlatformOperatorCapability, requirePlatformOperatorCapabilityWhenPresent, requirePlatformScope } = require('../middleware/platformAuthority');
 
 // PLATFORM-SUPER-ADMIN OPTION-3 SLICE-2 (2026-09-22) — helpers réutilisables
 // pour composer autorité tenant OU capability plateforme sur le domaine
@@ -111,17 +111,15 @@ router.get('/my-properties', authController.protect, propertyController.getMyPro
 router.get(
   '/status/pending',
   authController.protect,
-  requireTenantScope,
-  requireTenantModule('immobilier'),
-  propertyModerationReadAuthority,
+  requirePlatformOperatorCapability('platform.commercial.manage'),
+  requirePlatformScope,
   propertyController.getPendingProperties,
 );
 router.get(
   '/status/pending-count',
   authController.protect,
-  requireTenantScope,
-  requireTenantModule('immobilier'),
-  propertyModerationReadAuthority,
+  requirePlatformOperatorCapability('platform.commercial.manage'),
+  requirePlatformScope,
   propertyController.getPendingPropertiesCount,
 );
 
@@ -160,9 +158,8 @@ router.post(
 router.patch(
   '/admin/:id/:action',
   authController.protect,
-  requireTenantScope,
-  requireTenantModule('immobilier'),
-  propertyModerationManageAuthority,
+  requirePlatformOperatorCapability('platform.commercial.manage'),
+  requirePlatformScope,
   propertyController.updatePropertyStatus,
 );
 router.delete(

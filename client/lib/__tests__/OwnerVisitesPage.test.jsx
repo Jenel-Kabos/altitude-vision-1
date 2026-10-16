@@ -26,9 +26,21 @@ describe('OwnerVisitesPage — TEST DATA', () => {
     }]);
     render(<OwnerVisitesPage />);
     expect(await screen.findByText('TEST DATA PROPERTY')).toBeInTheDocument();
-    expect(screen.getByText('+24••••67')).toBeInTheDocument();
+    // LOT B — sans autorisation de contact (projection serveur), aucun
+    // téléphone n'est rendu au propriétaire, même masqué.
+    expect(screen.queryByText('+24••••67')).not.toBeInTheDocument();
     expect(screen.getByText('Démarrer la visite')).toBeInTheDocument();
     expect(screen.queryByText('test@example.com')).not.toBeInTheDocument();
+  });
+
+  test('LOT B — le téléphone n\'est rendu que si le serveur déclare une autorisation de contact', async () => {
+    getOwnerVisites.mockResolvedValue([{
+      _id: 'TEST-DATA-VISIT', status: 'confirmee', displayStatus: 'Confirmée',
+      telephone: '+242060000067', projection: { contactDetailsVisible: true }, client: { name: 'TEST DATA CLIENT' },
+      property: { title: 'TEST DATA PROPERTY' }, allowedActions: [], createdAt: '2029-12-01T00:00:00.000Z',
+    }]);
+    render(<OwnerVisitesPage />);
+    expect(await screen.findByText('+242060000067')).toBeInTheDocument();
   });
 
   test('envoie uniquement une action autorisée et actualise la carte', async () => {

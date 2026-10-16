@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PropertyRegistry from '../pages/dashboard/PropertyRegistry';
-import { listPropertyRegistry, approvePropertyAdministration } from '../services/propertyService';
+import { listPropertyRegistry, approvePropertyAdministration, rejectPropertyAdministration } from '../services/propertyService';
 
 let runtime;
 vi.mock('../context/PlatformTenantRuntimeContext', () => ({ usePlatformTenantRuntime: () => runtime }));
@@ -155,13 +155,42 @@ describe('PropertyRegistry PA-03', () => {
     expect(within(card).queryByRole('button', { name: 'Valider Villa Tenant A' })).not.toBeInTheDocument();
     readOnlyView.unmount();
 
+    // LOT A — platform.properties.manage n'est plus une autorité de
+    // publication : seule platform.commercial.manage (Altitude Vision) l'est.
     runtime = { ...platformRuntime(), can: (capability) => ['platform.properties.read', 'platform.properties.manage'].includes(capability) };
+    const propertiesManageOnly = render(<PropertyRegistry />);
+    const managedCard = await screen.findByTestId('property-registry-a1');
+    expect(within(managedCard).queryByRole('button', { name: 'Valider Villa Tenant A' })).not.toBeInTheDocument();
+    propertiesManageOnly.unmount();
+
+    runtime = { ...platformRuntime(), can: (capability) => ['platform.properties.read', 'platform.commercial.manage'].includes(capability) };
     approvePropertyAdministration.mockResolvedValue({});
     const managed = render(<PropertyRegistry />);
     const approve = await screen.findByRole('button', { name: 'Valider Villa Tenant A' });
     fireEvent.click(approve);
     await waitFor(() => expect(approvePropertyAdministration).toHaveBeenCalledWith('a1', { platformScoped: true }));
     managed.unmount();
+  });
+
+  test('LOT A — un Admin tenant ne voit aucune action de publication sur son registre', async () => {
+    runtime = tenantRuntime('tenant-a');
+    render(<PropertyRegistry />);
+    await screen.findByTestId('property-registry-a1');
+    expect(screen.queryByRole('button', { name: 'Valider Villa Tenant A' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rejeter Villa Tenant A' })).not.toBeInTheDocument();
+  });
+
+  test('LOT A — un rejet exige un motif, transmis au serveur', async () => {
+    runtime = { ...platformRuntime(), can: (capability) => ['platform.properties.read', 'platform.commercial.manage'].includes(capability) };
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValueOnce('').mockReturnValueOnce('Annonce non conforme');
+    rejectPropertyAdministration.mockResolvedValue({});
+    render(<PropertyRegistry />);
+    const reject = await screen.findByRole('button', { name: 'Rejeter Villa Tenant A' });
+    fireEvent.click(reject);
+    expect(rejectPropertyAdministration).not.toHaveBeenCalled();
+    fireEvent.click(reject);
+    await waitFor(() => expect(rejectPropertyAdministration).toHaveBeenCalledWith('a1', { platformScoped: true, reason: 'Annonce non conforme' }));
+    prompt.mockRestore();
   });
 
   test.each([

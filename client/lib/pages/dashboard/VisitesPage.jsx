@@ -303,7 +303,7 @@ const VisitesPage = () => {
 
                       <p className="text-sm text-gray-600">
                         Client : <span className="font-semibold">{client.name || "—"}</span>
-                        {client.email && <span className="text-gray-400 ml-1">({client.email})</span>}
+                        {visite.projection?.contactDetailsVisible && client.email && <span className="text-gray-400 ml-1">({client.email})</span>}
                       </p>
 
                       <div className="flex flex-wrap gap-3 mt-2">
@@ -363,9 +363,9 @@ const VisitesPage = () => {
                               <div className="vp-info-row">
                                 <Phone className="w-3.5 h-3.5" />
                                 <span>Téléphone client :</span>
-                                <a href={`tel:${visite.telephone}`} className="vp-tel-link">
-                                  <strong>{visite.telephone}</strong>
-                                </a>
+                                {visite.projection?.contactDetailsVisible
+                                  ? <a href={`tel:${visite.telephone}`} className="vp-tel-link"><strong>{visite.telephone}</strong></a>
+                                  : <strong>{visite.telephone}</strong>}
                               </div>
                             )}
                             {visite.message && (
@@ -387,7 +387,7 @@ const VisitesPage = () => {
                               <User className="w-3.5 h-3.5" />
                               <span>{bien.owner.name}</span>
                             </div>
-                            {bien.owner.phone && (
+                            {visite.projection?.contactDetailsVisible && bien.owner.phone && (
                               <div className="vp-info-row">
                                 <Phone className="w-3.5 h-3.5" />
                                 <a href={`tel:${bien.owner.phone}`} className="vp-tel-link">
@@ -395,7 +395,7 @@ const VisitesPage = () => {
                                 </a>
                               </div>
                             )}
-                            {bien.owner.email && (
+                            {visite.projection?.contactDetailsVisible && bien.owner.email && (
                               <div className="vp-info-row">
                                 <Mail className="w-3.5 h-3.5" />
                                 <span>{bien.owner.email}</span>

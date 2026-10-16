@@ -14,12 +14,15 @@ const EMPTY_RESULT = { items: [], page: 1, limit: 20, total: 0, totalPages: 0 };
 const money = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XAF', maximumFractionDigits: 0 });
 
 export default function PropertyRegistry({ section = null }) {
-  const { tenantLoading, selectedTenantId, selectedTenant, can, isTenantAdmin, scope } = usePlatformTenantRuntime();
+  const { tenantLoading, selectedTenantId, selectedTenant, can, scope } = usePlatformTenantRuntime();
   const scopeMode = scope?.mode || (selectedTenantId ? 'tenant' : 'unresolved');
   const platformMode = scopeMode === 'platform';
   const unresolved = scopeMode === 'unresolved';
   const canReadPlatform = !platformMode || can('platform.properties.read');
-  const canManage = platformMode ? can('platform.properties.manage') : scopeMode === 'tenant' && isTenantAdmin;
+  // LOT A — la publication (validation/rejet) relève exclusivement
+  // d'Altitude Vision : PlatformOperator avec platform.commercial.manage, en
+  // Vue plateforme. Un Admin tenant ne modère jamais ses propres annonces.
+  const canManage = platformMode && can('platform.commercial.manage');
   const scopeKey = scope?.key || (selectedTenantId ? `tenant:${selectedTenantId}` : 'unresolved');
   const sequence = useRef(0);
   const [result, setResult] = useState(EMPTY_RESULT);
@@ -96,8 +99,14 @@ export default function PropertyRegistry({ section = null }) {
     setMutationId(property._id);
     setError(null);
     try {
-      const operation = action === 'approve' ? approvePropertyAdministration : rejectPropertyAdministration;
-      await operation(property._id, { platformScoped: platformMode });
+      if (action === 'approve') {
+        await approvePropertyAdministration(property._id, { platformScoped: platformMode });
+      } else {
+        // Un rejet exige un motif (décision tracée côté serveur).
+        const reason = (window.prompt('Motif du rejet (obligatoire)') || '').trim();
+        if (!reason) return;
+        await rejectPropertyAdministration(property._id, { platformScoped: platformMode, reason });
+      }
       refresh();
     } catch (requestError) {
       setError(requestError?.response?.status === 403 ? 'forbidden' : 'error');
