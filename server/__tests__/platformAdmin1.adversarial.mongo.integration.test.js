@@ -16,7 +16,7 @@ const propertyRoutes = require('../routes/propertyRoutes');
 const conversationRoutes = require('../routes/conversationRoutes');
 const reportingRoutes = require('../routes/reportingRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 
 jest.setTimeout(180000);
 
@@ -84,13 +84,13 @@ beforeAll(async () => {
     propertyData('Bien Tenant B', adminB._id, tenantB._id),
     propertyData('Bien propriétaire simple', proprietor._id),
   ]);
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorUser._id, actor: grantingAdmin, reason: 'Test PLATFORM-ADMIN-1',
     capabilities: ['platform.tenants.read', 'platform.tenants.manage', 'platform.properties.read', 'platform.reporting.read', 'platform.operators.manage'],
   });
-  await grantOperator({ userId: suspendedOperatorUser._id, actor: grantingAdmin, reason: 'Test', capabilities: ['platform.tenants.read'] });
+  await provisionPrivilegedOperator({ userId: suspendedOperatorUser._id, actor: grantingAdmin, reason: 'Test', capabilities: ['platform.tenants.read'] });
   await PlatformOperator.updateOne({ user: suspendedOperatorUser._id }, { status: 'suspended', suspendedBy: grantingAdmin._id, suspendedAt: new Date(), suspensionReason: 'Test' });
-  await grantOperator({ userId: revokedOperatorUser._id, actor: grantingAdmin, reason: 'Test', capabilities: ['platform.tenants.read'] });
+  await provisionPrivilegedOperator({ userId: revokedOperatorUser._id, actor: grantingAdmin, reason: 'Test', capabilities: ['platform.tenants.read'] });
   await PlatformOperator.updateOne({ user: revokedOperatorUser._id }, { status: 'revoked', revokedBy: grantingAdmin._id, revokedAt: new Date(), revokeReason: 'Test' });
 });
 
@@ -292,7 +292,7 @@ describe('Gestion des opérateurs — jamais d\'auto-promotion (mission §44-46)
   });
 
   test('capacité invalide rejetée par le service (aucune capacité fantaisiste acceptée)', async () => {
-    await expect(grantOperator({
+    await expect(provisionPrivilegedOperator({
       userId: staffA._id, actor: grantingAdmin, reason: 'Test capacité invalide', capabilities: ['platform.god_mode'],
     })).rejects.toThrow();
   });

@@ -42,12 +42,17 @@ const DASHBOARD_ROUTE_SCOPES = Object.freeze([
   ['/dashboard/hotel-reservations', DASHBOARD_SCOPE.GLOBAL_FIRST],
   ['/dashboard/visites', DASHBOARD_SCOPE.GLOBAL_FIRST],
   ['/dashboard/remboursements-hebergements', DASHBOARD_SCOPE.GLOBAL_FIRST],
+  // F-U2 — facturation : contexte organisation OU Altitude Vision, résolu par le serveur.
+  ['/dashboard/facturation', DASHBOARD_SCOPE.GLOBAL_FIRST],
   ['/dashboard/moderation', DASHBOARD_SCOPE.PLATFORM_ONLY],
   ['/dashboard/messages', DASHBOARD_SCOPE.PLATFORM_ONLY],
   ['/dashboard/contact-messages', DASHBOARD_SCOPE.PLATFORM_ONLY],
   ['/dashboard/conversations', DASHBOARD_SCOPE.PLATFORM_ONLY],
   ['/dashboard/users', DASHBOARD_SCOPE.PLATFORM_ONLY],
   ['/dashboard/activations-professionnelles', DASHBOARD_SCOPE.PLATFORM_ONLY],
+  // F-U1.I — vérification d'identité : vue plateforme uniquement (le serveur
+  // exige en plus l'habilitation nominative de vérificateur KYC).
+  ['/dashboard/kyc-verifications', DASHBOARD_SCOPE.PLATFORM_ONLY],
 ]);
 
 export const dashboardScopeForRoute = (pathname = '') => (

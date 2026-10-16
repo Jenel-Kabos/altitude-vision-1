@@ -12,7 +12,7 @@ const OrgUnit = require('../models/OrgUnit');
 const PlatformTenant = require('../models/PlatformTenant');
 const PlatformOperator = require('../models/PlatformOperator');
 const TenantApplication = require('../models/TenantApplication');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const {
   runDryRun,
   describeReadOnlyTarget,
@@ -291,7 +291,7 @@ describe('BACK — dry-run classification matrix', () => {
 
   test('BACK-10: PlatformOperator sans OrgMembership → aucun membership synthétisé', async () => {
     const op = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: op._id, actor: bA, reason: 'fx', capabilities: ['platform.users.manage'] });
+    await provisionPrivilegedOperator({ userId: op._id, actor: bA, reason: 'fx', capabilities: ['platform.users.manage'] });
 
     const uninstall = installWriteGuards();
     const report = await runDryRun();

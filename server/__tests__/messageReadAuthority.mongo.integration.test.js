@@ -17,7 +17,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
@@ -88,7 +88,7 @@ beforeEach(async () => {
   await addTenantMember({ tenant: fixtureB.tenant, user: staffMulti, bootstrap: fixtureB.bootstrap });
 
   poGlobal = await mkUser({ role: 'Admin' });
-  await grantOperator({ userId: poGlobal._id, actor: adminA, reason: 'HOTFIX-MESSAGING-MESSAGE-READ-AUTHORITY-1 test', capabilities: [] });
+  await provisionPrivilegedOperator({ userId: poGlobal._id, actor: adminA, reason: 'HOTFIX-MESSAGING-MESSAGE-READ-AUTHORITY-1 test', capabilities: [] });
 
   // Conversation privée générique (pas de tenant), entre deux clients sans aucun lien avec staffA/clientA.
   convPrivateBC = await Conversation.create({ participants: [clientB._id, clientC._id], isStaffInbox: false, lastMessage: 'SENTINEL-PRIVATE-BC' });

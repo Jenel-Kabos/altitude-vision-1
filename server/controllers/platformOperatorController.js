@@ -37,6 +37,18 @@ exports.reactivateOperator = asyncHandler(async (req, res) => {
   res.json({ status: 'success', data: { operator } });
 });
 
+// PLATFORM-ACCREDITATIONS-1 — habilitations déléguables (onglet Utilisateurs).
+exports.getDelegatedCapabilities = asyncHandler(async (req, res) => {
+  const profile = await service.getDelegatedCapabilityProfile({ userId: req.params.userId, actor: req.user });
+  res.json({ status: 'success', data: profile });
+});
+
+exports.changeDelegatedCapability = asyncHandler(async (req, res) => {
+  const { capability, action, reason } = req.body || {};
+  const operator = await service.changeDelegatedCapability({ userId: req.params.userId, capability, action, reason, actor: req.user, req });
+  res.json({ status: 'success', data: { operator } });
+});
+
 exports.revokeOperator = asyncHandler(async (req, res) => {
   const operator = await service.revokeOperator({ userId: req.params.userId, reason: req.body.reason, actor: req.user, req });
   res.json({ status: 'success', data: { operator } });

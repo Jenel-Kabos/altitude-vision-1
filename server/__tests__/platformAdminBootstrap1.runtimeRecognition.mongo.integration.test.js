@@ -1,5 +1,5 @@
 // PLATFORM-ADMIN-BOOTSTRAP-1 — preuve que l'identité PlatformOperator créée
-// par le script CLI (jamais directement via `grantOperator()` en mémoire de
+// par le script CLI (jamais directement via `provisionPrivilegedOperator()` en mémoire de
 // test comme le fait PLATFORM-ADMIN-CERT-1) est EXACTEMENT celle reconnue
 // par l'autorisation runtime HTTP. Quelques domaines représentatifs
 // suffisent (mission §23) — la matrice exhaustive vit déjà dans

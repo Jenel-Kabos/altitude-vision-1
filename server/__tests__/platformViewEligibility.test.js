@@ -20,8 +20,12 @@ describe('PA-04A — constantes Vue plateforme', () => {
     expect(Object.isFrozen(PLATFORM_VIEW_EXCLUDED_CAPABILITIES)).toBe(true);
   });
 
-  test('seule exclusion validée (H1) : platform.support.impersonation', () => {
-    expect(Object.keys(PLATFORM_VIEW_EXCLUDED_CAPABILITIES)).toEqual(['platform.support.impersonation']);
+  // P0 SUPPORT-INBOX — exclusion documentée de `platform.support.reply` :
+  // capacité d'agent accordée explicitement, sans retirer la Vue plateforme
+  // aux administrateurs existants.
+  test('exclusions validées : platform.support.impersonation (H1) et platform.support.reply (P0 SUPPORT-INBOX)', () => {
+    expect(Object.keys(PLATFORM_VIEW_EXCLUDED_CAPABILITIES)).toEqual(['platform.support.impersonation', 'platform.support.reply']);
+    expect(PLATFORM_VIEW_REQUIRED_CAPABILITIES).toContain('platform.support.read');
     expect(PLATFORM_VIEW_REQUIRED_CAPABILITIES).toContain('platform.operators.manage');
   });
 

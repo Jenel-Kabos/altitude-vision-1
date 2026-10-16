@@ -44,6 +44,9 @@ const PLATFORM_OPERATOR_CAPABILITIES = [
   // Lecture de la file support, distincte d'une éventuelle
   // capacité d'impersonation utilisée par des outils d'assistance.
   'platform.support.read',
+  // P0 SUPPORT-INBOX — réponse aux prospects dans la boîte de support
+  // Altitude Vision (distincte de la lecture).
+  'platform.support.reply',
   // Gouvernance de la capacité opérateur elle-même — distincte des autres :
   // seul un opérateur actif possédant CETTE capacité précise peut
   // accorder/suspendre/révoquer un autre opérateur (mission §44).
@@ -63,6 +66,8 @@ const PLATFORM_OPERATOR_STATUSES = ['active', 'suspended', 'revoked'];
 const PLATFORM_VIEW_EXCLUDED_CAPABILITIES = Object.freeze({
   'platform.support.impersonation':
     "Capacité break-glass de support (agir au nom d'un utilisateur) : l'exiger forcerait chaque administrateur plateforme à détenir le pouvoir le plus sensible du registre, contraire au moindre privilège (décision H1, PA-04).",
+  'platform.support.reply':
+    "Capacité d'agent de support (répondre aux prospects) ajoutée par le correctif P0 SUPPORT-INBOX : l'exiger retirerait la Vue plateforme à tous les administrateurs existants jusqu'à un nouvel octroi ; elle s'accorde explicitement, au moindre privilège.",
 });
 
 const PLATFORM_VIEW_REQUIRED_CAPABILITIES = Object.freeze(
@@ -95,10 +100,24 @@ const PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS = Object.freeze({
     'platform.tenant_applications.approve',
     'platform.tenant_applications.reject',
   ]),
-  support_inbox: Object.freeze(['platform.support.read']),
+  support_inbox: Object.freeze(['platform.support.read', 'platform.support.reply']),
 });
 
+// PLATFORM-ACCREDITATIONS-1 — capacités DÉLÉGUABLES une par une depuis
+// l'onglet Utilisateurs (Vue plateforme), par un opérateur actif détenant
+// `platform.operators.manage`. Liste FERMÉE : toute autre capacité (gouvernance
+// des opérateurs, impersonation, finance, etc.) reste hors de ce canal et ne
+// s'accorde que par la décision d'octroi complète existante. Toute nouvelle
+// entrée est une décision d'autorité explicite (testée).
+const PLATFORM_DELEGABLE_CAPABILITIES = Object.freeze([
+  'platform.support.read',
+  'platform.support.reply',
+  'platform.commercial.manage',
+  'platform.marketing.manage',
+]);
+
 module.exports = {
+  PLATFORM_DELEGABLE_CAPABILITIES,
   PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS,
   PLATFORM_WIDE_CONTEXT_SOURCE,
   PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE,

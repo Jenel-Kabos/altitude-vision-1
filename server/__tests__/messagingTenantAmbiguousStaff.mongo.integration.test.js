@@ -9,12 +9,20 @@
 // tenant déjà résolu → 404 (inchangé) ; PlatformOperator suit le même
 // contrat que le staff sur ce domaine (jamais de mode plateforme natif ici,
 // voir tenantContext.js).
+//
+// P0 SUPPORT-INBOX (révision) — les conversations de ce fichier sont des
+// conversations de la boîte de support (`isStaffInbox: true`). Elles
+// appartiennent exclusivement à Altitude Vision : un staff d'organisation n'y
+// accède plus, même sur son propre tenant (anciens cas 5, 6, 7, 9, 11, 15, 16
+// « succès » → refus). Les refus ambigus / cross-tenant restent figés ; seul un
+// PlatformOperator actif `platform.support.read` (lecture) /
+// `platform.support.reply` (réponse) y accède, quelle que soit la provenance.
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
@@ -42,6 +50,7 @@ let staffB;      // staff mono-tenant, scope B
 let staffMulti;  // staff membre de A ET B, aucune sélection par défaut
 let staffNoMembership; // staff sans aucune adhésion (cas "no membership")
 let poGlobal;    // PlatformOperator, aucun tenant sélectionné
+let supportAgent; // PlatformOperator support.read + support.reply
 let clientA;
 let clientB;
 let convA;
@@ -78,7 +87,10 @@ beforeEach(async () => {
   staffNoMembership = await mkUser();
 
   poGlobal = await mkUser({ role: 'Admin' });
-  await grantOperator({ userId: poGlobal._id, actor: fixtureA.bootstrap, reason: 'HF-FINAL-01 test', capabilities: [] });
+  await provisionPrivilegedOperator({ userId: poGlobal._id, actor: fixtureA.bootstrap, reason: 'HF-FINAL-01 test', capabilities: [] });
+
+  supportAgent = await mkUser({ role: 'Client' });
+  await provisionPrivilegedOperator({ userId: supportAgent._id, actor: fixtureA.bootstrap, reason: 'P0 SUPPORT-INBOX test', capabilities: ['platform.support.read', 'platform.support.reply'] });
 
   clientA = await mkUser({ role: 'Client' });
   clientB = await mkUser({ role: 'Client' });
@@ -98,25 +110,21 @@ describe('HF-FINAL-01 — GET /api/conversations/staff-inbox', () => {
     expect(res.status).toBe(403);
   });
 
-  test('5. staff multi + header A → A uniquement', async () => {
+  test('5. staff multi + header A → 403 (boîte de support réservée à Altitude Vision)', async () => {
     const res = await request(app).get('/api/conversations/staff-inbox').set(bearer(staffMulti, fixtureA.tenant._id));
-    expect(res.status).toBe(200);
-    const ids = res.body.data.conversations.map((c) => String(c._id));
-    expect(ids).toEqual([String(convA._id)]);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('SUPPORT_CAPABILITY_REQUIRED');
   });
 
-  test('6. staff multi + header B → B uniquement', async () => {
+  test('6. staff multi + header B → 403 (boîte de support réservée à Altitude Vision)', async () => {
     const res = await request(app).get('/api/conversations/staff-inbox').set(bearer(staffMulti, fixtureB.tenant._id));
-    expect(res.status).toBe(200);
-    const ids = res.body.data.conversations.map((c) => String(c._id));
-    expect(ids).toEqual([String(convB._id)]);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('SUPPORT_CAPABILITY_REQUIRED');
   });
 
-  test('staff A (mono-tenant) → A uniquement sans avoir besoin de sélectionner (comportement historique préservé)', async () => {
+  test('staff A (mono-tenant), même sur son propre tenant → 403', async () => {
     const res = await request(app).get('/api/conversations/staff-inbox').set(bearer(staffA));
-    expect(res.status).toBe(200);
-    const ids = res.body.data.conversations.map((c) => String(c._id));
-    expect(ids).toEqual([String(convA._id)]);
+    expect(res.status).toBe(403);
   });
 
   test('13. en-tête invalide (tenant sans adhésion) → refusé', async () => {
@@ -130,16 +138,29 @@ describe('HF-FINAL-01 — GET /api/conversations/staff-inbox', () => {
     expect(res.status).toBe(403);
   });
 
-  test('15. PlatformOperator scoped A → A uniquement', async () => {
+  test('15. PlatformOperator scoped A sans capacité support → 403', async () => {
     const res = await request(app).get('/api/conversations/staff-inbox').set(bearer(poGlobal, fixtureA.tenant._id));
-    expect(res.status).toBe(200);
-    expect(res.body.data.conversations.map((c) => String(c._id))).toEqual([String(convA._id)]);
+    expect(res.status).toBe(403);
   });
 
-  test('16. PlatformOperator scoped B → B uniquement', async () => {
+  test('16. PlatformOperator scoped B sans capacité support → 403', async () => {
     const res = await request(app).get('/api/conversations/staff-inbox').set(bearer(poGlobal, fixtureB.tenant._id));
-    expect(res.status).toBe(200);
-    expect(res.body.data.conversations.map((c) => String(c._id))).toEqual([String(convB._id)]);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('P0 SUPPORT-INBOX — agent support Altitude Vision', () => {
+  test('liste les conversations de toutes provenances, lit et répond', async () => {
+    const list = await request(app).get('/api/conversations/staff-inbox').set(bearer(supportAgent));
+    expect(list.status).toBe(200);
+    expect(list.body.data.conversations.map((c) => String(c._id)).sort()).toEqual([String(convA._id), String(convB._id)].sort());
+
+    const detail = await request(app).get(`/api/conversations/${convB._id}`).set(bearer(supportAgent));
+    expect(detail.status).toBe(200);
+
+    const reply = await request(app).post('/api/messages').set(bearer(supportAgent)).send({ conversationId: String(convB._id), content: 'Réponse Altitude Vision' });
+    expect(reply.status).toBe(201);
+    expect(await Message.countDocuments({ conversation: convB._id, receiver: clientB._id })).toBe(1);
   });
 });
 
@@ -149,26 +170,17 @@ describe('HF-FINAL-01 — GET /api/conversations/:conversationId (detail)', () =
     expect(res.status).toBe(403);
   });
 
-  test('7. staff A → detail A → OK', async () => {
+  test('7. staff A → detail A (son propre tenant) → 403', async () => {
     const res = await request(app).get(`/api/conversations/${convA._id}`).set(bearer(staffA));
-    expect(res.status).toBe(200);
-    expect(String(res.body.data.conversation._id)).toBe(String(convA._id));
+    expect(res.status).toBe(403);
+    expect(res.body.data).toBeUndefined();
   });
 
-  // NOTE — comportement PRÉ-EXISTANT, non modifié par ce hotfix : l'erreur
-  // levée par `assertResourceTenantOrUnattributed` (statusCode:404 sur
-  // l'objet Error) n'a pas de `.name` reconnu par `errorMiddleware.js`, qui
-  // ne lit jamais `err.statusCode` — seulement `res.statusCode` (déjà 200 à
-  // ce stade) et une liste de noms d'erreur explicites. Le refus est bien
-  // réel (aucune fuite cross-tenant, confirmé), mais le code HTTP observé
-  // est 500, pas 404. Documenté comme NEW_MESSAGING_FINDING_OUT_OF_SCOPE
-  // dans `_ROOT_CAUSE.md` — cause racine différente de HF-FINAL-01 (bug de
-  // sérialisation d'erreur, pas un contournement de frontière tenant), non
-  // corrigé ici conformément au mandat (correction minimale, un seul root
-  // cause par hotfix).
-  test('8. staff A → detail B → refusé (500 — comportement pré-existant hors périmètre, aucune fuite de données)', async () => {
+  // Le 500 historique (erreur d'attribution tenant non mappée) est corrigé :
+  // le refus est désormais un 4xx explicite, sans fuite de données.
+  test('8. staff A → detail B → refusé (4xx), aucune donnée', async () => {
     const res = await request(app).get(`/api/conversations/${convB._id}`).set(bearer(staffA));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(403);
     expect(res.body.data).toBeUndefined();
   });
 });
@@ -180,16 +192,15 @@ describe('HF-FINAL-01 — DELETE /api/conversations/:conversationId', () => {
     expect(await Conversation.findById(convB._id)).not.toBeNull();
   });
 
-  test('9. staff A → delete A → comportement historique (succès)', async () => {
+  test('9. staff A → delete A (son propre tenant) → 403, zéro suppression', async () => {
     const res = await request(app).delete(`/api/conversations/${convA._id}`).set(bearer(staffA));
-    expect(res.status).toBe(200);
-    expect(await Conversation.findById(convA._id)).toBeNull();
+    expect(res.status).toBe(403);
+    expect(await Conversation.findById(convA._id)).not.toBeNull();
   });
 
-  // Même remarque que le test 8 ci-dessus (detail) : 500 pré-existant hors périmètre, refus réel confirmé par l'assertion DB.
-  test('10. staff A → delete B → refusé (500, comportement pré-existant), zéro suppression', async () => {
+  test('10. staff A → delete B → refusé (4xx), zéro suppression', async () => {
     const res = await request(app).delete(`/api/conversations/${convB._id}`).set(bearer(staffA));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(403);
     expect(await Conversation.findById(convB._id)).not.toBeNull();
   });
 });
@@ -211,20 +222,15 @@ describe('HF-FINAL-01 — POST /api/messages (send)', () => {
     expect(reloadedB.lastMessage).toBe('SENTINEL-B');
   });
 
-  test('11. staff A → envoi dans A → comportement historique (succès)', async () => {
-    const res = await request(app).post('/api/messages').set(bearer(staffA)).send({ conversationId: String(convA._id), content: 'Réponse légitime A' });
-    expect(res.status).toBe(201);
-    expect(await Message.countDocuments({ conversation: convA._id })).toBe(1);
+  test('11. staff A → envoi dans A (son propre tenant) → 403, aucun message', async () => {
+    const res = await request(app).post('/api/messages').set(bearer(staffA)).send({ conversationId: String(convA._id), content: 'Réponse tenant interdite' });
+    expect(res.status).toBe(403);
+    expect(await Message.countDocuments({ conversation: convA._id })).toBe(0);
   });
 
-  // Même remarque que les tests 8/10 (detail/delete) : `assertResourceTenantOrUnattributed`
-  // appelée à l'intérieur de `sendMessage` (une fois le tenant du staff résolu par le
-  // garde routeur) porte le même défaut de sérialisation pré-existant (500 au lieu de
-  // 404/403) — hors périmètre de ce hotfix. Le refus réel (aucun message créé) est
-  // ce qui compte pour la sécurité, vérifié ci-dessous.
-  test('12. staff A → envoi dans B → refusé (500, comportement pré-existant), aucun message créé', async () => {
+  test('12. staff A → envoi dans B → refusé (4xx), aucun message créé', async () => {
     const res = await request(app).post('/api/messages').set(bearer(staffA)).send({ conversationId: String(convB._id), content: 'INJECTED-CROSS-TENANT' });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(403);
     expect(await Message.countDocuments({ conversation: convB._id })).toBe(0);
   });
 });

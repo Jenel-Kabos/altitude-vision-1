@@ -11,7 +11,7 @@ const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformTenant = require('../models/PlatformTenant');
 const PlatformOperator = require('../models/PlatformOperator');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { resolveTenantMembership } = require('../services/tenantMembershipService');
 
 jest.setTimeout(120000);
@@ -125,7 +125,7 @@ describe('MEM — resolveTenantMembership', () => {
 
   test('MEM-10: PlatformOperator seul ne devient pas implicitement member tenant', async () => {
     const op = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: op._id, actor: bootstrapA, reason: 'op fixture', capabilities: ['platform.support.read'] });
+    await provisionPrivilegedOperator({ userId: op._id, actor: bootstrapA, reason: 'op fixture', capabilities: ['platform.support.read'] });
     expect(await resolveTenantMembership(op._id, tenantA._id)).toBeNull();
   });
 

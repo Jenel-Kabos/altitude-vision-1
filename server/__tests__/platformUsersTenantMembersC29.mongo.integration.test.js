@@ -10,7 +10,7 @@ const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financial
 const { createTenantFixture, createTenantUser, addTenantMember } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
@@ -42,7 +42,7 @@ beforeAll(async () => {
   S.fA = await createTenantFixture({ label: 'C29U Tenant A', withAdminMembership: true });
   S.fB = await createTenantFixture({ label: 'C29U Tenant B', withAdminMembership: true });
   S.operator = await makeUser('Admin');
-  await grantOperator({ userId: S.operator._id, actor: S.fA.bootstrap, reason: 'C29U operator', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: S.operator._id, actor: S.fA.bootstrap, reason: 'C29U operator', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
   // Propriétaire plateforme, Admin métier de Tenant A.
   S.ownerAdmin = await makeUser('Proprietaire');
   await addTenantMember({ tenant: S.fA.tenant, user: S.ownerAdmin, bootstrap: S.fA.bootstrap, businessRole: 'Admin' });

@@ -13,7 +13,7 @@ const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformTenantFeature = require('../models/PlatformTenantFeature');
 const PlatformTenantSubscription = require('../models/PlatformTenantSubscription');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { protect } = require('../middleware/authMiddleware');
 const { attachTenantContext, requireTenantScope } = require('../middleware/tenantContext');
 const { requireTenantModule } = require('../middleware/tenantModuleGate');
@@ -164,7 +164,7 @@ describe('MODULE — adversarial identity tests (identity never changes the modu
   test('Active PlatformOperator with platform.users.manage does not grant a missing module', async () => {
     await stripModulesFromSubscription(tA._id);
     const op = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: op._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read', 'platform.users.read', 'platform.users.manage'] });
+    await provisionPrivilegedOperator({ userId: op._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read', 'platform.users.read', 'platform.users.manage'] });
     await addTenantMember({ tenant: tA, user: op, bootstrap: bA });
     await setRole(op._id, tA, 'Admin');
     const res = await request(app).get('/gated/location').set(bearer(op, tA._id));
@@ -189,7 +189,7 @@ describe('MODULE — adversarial identity tests (identity never changes the modu
     await addTenantMember({ tenant: tA, user: asOwner, bootstrap: bA });
     await setRole(asOwner._id, tA, 'GestionnaireImmobilier');
     const asOp = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: asOp._id, actor: bA, reason: 'fx-op', capabilities: ['platform.support.read', 'platform.users.read', 'platform.users.manage'] });
+    await provisionPrivilegedOperator({ userId: asOp._id, actor: bA, reason: 'fx-op', capabilities: ['platform.support.read', 'platform.users.read', 'platform.users.manage'] });
     await addTenantMember({ tenant: tA, user: asOp, bootstrap: bA });
     await setRole(asOp._id, tA, 'Admin');
 

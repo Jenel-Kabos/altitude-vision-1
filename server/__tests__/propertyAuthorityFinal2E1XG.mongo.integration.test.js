@@ -13,7 +13,7 @@ const OrgMembership = require('../models/OrgMembership');
 const Property = require('../models/Property');
 const PlatformTenantFeature = require('../models/PlatformTenantFeature');
 const PlatformTenantSubscription = require('../models/PlatformTenantSubscription');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const propertyRoutes = require('../routes/propertyRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants'); // PLATFORM-ADMIN-04A
@@ -110,9 +110,9 @@ beforeEach(async () => {
 
   globalAdmin = await makeUser({ role: 'Admin' });
   opNoCap = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opNoCap._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read'] });
+  await provisionPrivilegedOperator({ userId: opNoCap._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read'] });
   opWithCap = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opWithCap._id, actor: bA, reason: 'fx', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: opWithCap._id, actor: bA, reason: 'fx', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -300,9 +300,11 @@ describe('PROPERTY-TENANT-MUTATE — PUT/DELETE /:id tenant staff branch', () =>
 });
 
 describe('PROPERTY-TENANT-MOD — pending queue + admin validate/reject', () => {
-  test('PROPERTY-TENANT-MOD-01: Tenant Admin can list pending on their tenant', async () => {
+  // LOT A — la file de modération est exclusivement plateforme
+  // (platform.commercial.manage) : un Admin tenant n'y accède plus.
+  test('PROPERTY-TENANT-MOD-01: Tenant Admin cannot list the platform-only pending queue, even on their tenant', async () => {
     const res = await request(app).get('/api/properties/status/pending').set(bearer(admin, tA._id));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
 
   test('PROPERTY-TENANT-MOD-03: Tenant A Admin cannot validate/reject a Tenant B property', async () => {

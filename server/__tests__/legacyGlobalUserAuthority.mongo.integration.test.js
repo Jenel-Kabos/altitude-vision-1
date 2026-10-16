@@ -13,7 +13,7 @@ const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareF
 const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformOperator = require('../models/PlatformOperator');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const userRoutes = require('../routes/userRoutes');
 const memberRoutes = require('../routes/tenantMemberRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
@@ -73,7 +73,7 @@ beforeEach(async () => {
 
   // Operator sans capacité users.manage (support seul).
   opNoCap = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opNoCap._id, actor: bA, reason: 'fx-nocap', capabilities: ['platform.support.read'] });
+  await provisionPrivilegedOperator({ userId: opNoCap._id, actor: bA, reason: 'fx-nocap', capabilities: ['platform.support.read'] });
 
   // Operator PLEIN — support + users.read + users.manage. `platform.users.read`
   // est requis en amont par le garde de lecture legacy de `userRoutes.js`
@@ -81,11 +81,11 @@ beforeEach(async () => {
   // AUTORITÉ (`platform.users.manage`) — on donne donc les deux pour isoler
   // proprement le contrôle de mutation.
   opFull = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opFull._id, actor: bA, reason: 'fx-full', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: opFull._id, actor: bA, reason: 'fx-full', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
 
   // Operator possédant la capacité mais MARQUÉ SUSPENDU côté PlatformOperator.
   opInactive = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: opInactive._id, actor: bA, reason: 'fx-inactive', capabilities: ['platform.users.manage'] });
+  await provisionPrivilegedOperator({ userId: opInactive._id, actor: bA, reason: 'fx-inactive', capabilities: ['platform.users.manage'] });
   await PlatformOperator.updateOne({ user: opInactive._id }, { $set: { status: 'suspended' } });
 });
 

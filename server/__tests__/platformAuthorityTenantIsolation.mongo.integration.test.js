@@ -5,7 +5,7 @@ const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financial
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
 const Conversation = require('../models/Conversation');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const PlatformOperator = require('../models/PlatformOperator');
 const userRoutes = require('../routes/userRoutes');
 const adminRoutes = require('../routes/adminRoutes');
@@ -42,7 +42,7 @@ beforeAll(async () => {
     email: `platform-authority-${Date.now()}@example.test`,
     password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
   });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: platformOperator._id,
     actor: legacyAdmin,
     reason: 'RBAC tenant reset integration test',
@@ -87,7 +87,7 @@ describe('RBAC-TENANT-RESET-2 — platform users authority', () => {
       name: 'Read only operator', email: `readonly-${Date.now()}@example.test`,
       password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
     });
-    await grantOperator({ userId: readOnly._id, actor: legacyAdmin, reason: 'read only', capabilities: ['platform.users.read'] });
+    await provisionPrivilegedOperator({ userId: readOnly._id, actor: legacyAdmin, reason: 'read only', capabilities: ['platform.users.read'] });
     const res = await request(app).patch(`/api/users/${ownerA._id}/suspend`).set(bearer(readOnly));
     expect(res.status).toBe(403);
   });
@@ -97,7 +97,7 @@ describe('RBAC-TENANT-RESET-2 — platform users authority', () => {
       name: 'No users read operator', email: `noread-${Date.now()}@example.test`,
       password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
     });
-    await grantOperator({ userId: limited._id, actor: legacyAdmin, reason: 'no users read', capabilities: ['platform.users.manage'] });
+    await provisionPrivilegedOperator({ userId: limited._id, actor: legacyAdmin, reason: 'no users read', capabilities: ['platform.users.manage'] });
     const res = await request(app).get('/api/users').set(bearer(limited));
     expect(res.status).toBe(403);
   });
@@ -107,7 +107,7 @@ describe('RBAC-TENANT-RESET-2 — platform users authority', () => {
       name: 'Suspended operator', email: `suspended-${Date.now()}@example.test`,
       password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
     });
-    await grantOperator({ userId: suspended._id, actor: legacyAdmin, reason: 'suspended', capabilities: ['platform.users.read'] });
+    await provisionPrivilegedOperator({ userId: suspended._id, actor: legacyAdmin, reason: 'suspended', capabilities: ['platform.users.read'] });
     await PlatformOperator.updateOne({ user: suspended._id }, { $set: { status: 'suspended' } });
     const res = await request(app).get('/api/users').set(bearer(suspended));
     expect(res.status).toBe(403);
@@ -126,7 +126,7 @@ describe('RBAC-TENANT-RESET-2 — global support conversations', () => {
       name: 'Limited support operator', email: `limited-support-${Date.now()}@example.test`,
       password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
     });
-    await grantOperator({ userId: limited._id, actor: legacyAdmin, reason: 'limited', capabilities: ['platform.users.read'] });
+    await provisionPrivilegedOperator({ userId: limited._id, actor: legacyAdmin, reason: 'limited', capabilities: ['platform.users.read'] });
     const res = await request(app).get('/api/conversations/staff-inbox').set(bearer(limited));
     expect(res.status).toBe(403);
   });
@@ -136,7 +136,7 @@ describe('RBAC-TENANT-RESET-2 — global support conversations', () => {
       name: 'Impersonation only operator', email: `impersonation-only-${Date.now()}@example.test`,
       password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
     });
-    await grantOperator({ userId: impersonator._id, actor: legacyAdmin, reason: 'impersonation only', capabilities: ['platform.support.impersonation'] });
+    await provisionPrivilegedOperator({ userId: impersonator._id, actor: legacyAdmin, reason: 'impersonation only', capabilities: ['platform.support.impersonation'] });
     const res = await request(app).get('/api/conversations/staff-inbox').set(bearer(impersonator));
     expect(res.status).toBe(403);
   });

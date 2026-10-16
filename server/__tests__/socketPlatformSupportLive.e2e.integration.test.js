@@ -13,7 +13,7 @@ const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require
 const { createTenantFixture, createTenantUser } = require('./helpers/tenantAwareFixture');
 const User = require('../models/User');
 const PlatformOperator = require('../models/PlatformOperator');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { initSocket, PLATFORM_SUPPORT_ROOM, tenantStaffRoom, emitConversationEvent, getIO } = require('../socket');
 
 jest.setTimeout(120000);
@@ -86,14 +86,14 @@ beforeEach(async () => {
       name: label, email: `${label.replace(/\W+/g, '-').toLowerCase()}-${Date.now()}@example.test`,
       password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
     });
-    await grantOperator({ userId: u._id, actor: bootstrapA, reason: label, capabilities: caps });
+    await provisionPrivilegedOperator({ userId: u._id, actor: bootstrapA, reason: label, capabilities: caps });
     return u;
   };
   opWithSupport = await mkOperator('OpSupport', ['platform.support.read']);
   opNoSupport   = await mkOperator('OpNoSupport', ['platform.tenants.read']);
   // Membre du tenant Mila ET opérateur avec support.read → doit recevoir 1× seulement.
   dualMemberOp = (await createTenantUser({ tenant: tenantA, bootstrap: bootstrapA, overrides: { role: 'Admin' } })).user;
-  await grantOperator({ userId: dualMemberOp._id, actor: bootstrapA, reason: 'dual', capabilities: ['platform.support.read'] });
+  await provisionPrivilegedOperator({ userId: dualMemberOp._id, actor: bootstrapA, reason: 'dual', capabilities: ['platform.support.read'] });
 
   client = await User.create({
     name: 'Client', email: `client-${Date.now()}@example.test`,

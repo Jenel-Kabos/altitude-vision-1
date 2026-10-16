@@ -30,7 +30,8 @@ const PROFILE_DASHBOARDS = Object.freeze({
     modules: [
       { label: 'Altcom', description: 'Gérer services, portfolio et publications.', href: '/dashboard/altcom', capability: 'altcom.read' },
       { label: 'Mila Events', description: 'Préparer et publier les événements.', href: '/dashboard/events', capability: 'events.read' },
-      { label: 'Marketing', description: 'Accéder aux campagnes et contenus associés.', href: '/dashboard/altcom/marketing', capability: 'altcom.manage' },
+      // LOT E — campagnes réservées aux PlatformOperators Altitude Vision.
+      { label: 'Marketing', description: 'Accéder aux campagnes et contenus associés.', href: '/dashboard/altcom/marketing', capability: 'platform.marketing.manage' },
     ],
   },
 });

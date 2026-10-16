@@ -11,7 +11,7 @@ const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareF
 const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformTenant = require('../models/PlatformTenant');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const memberRoutes = require('../routes/tenantMemberRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
@@ -69,7 +69,7 @@ beforeEach(async () => {
   // PLATFORM-SUPER-ADMIN OPTION-3 : MEMAPI-17 vérifie qu'un PlatformOperator
   // SANS platform.users.manage reste refusé. La capability platform.support.read
   // seule ne peut pas administrer les membres — invariant capability-specific.
-  await grantOperator({ userId: opGlobal._id, actor: bA, reason: 'fixture', capabilities: ['platform.support.read'] });
+  await provisionPrivilegedOperator({ userId: opGlobal._id, actor: bA, reason: 'fixture', capabilities: ['platform.support.read'] });
 });
 
 describe('MEMAPI — listing', () => {

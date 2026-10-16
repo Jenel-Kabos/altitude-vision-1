@@ -82,8 +82,16 @@ const errorHandler = (err, req, res, next) => {
     message = err.message;
   }
 
-  if (['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError'].includes(err.name)) {
+  if (['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError', 'ContactAuthorizationError', 'CommercialPublicationError', 'MarketingAuthorityError', 'MarketingConsentError', 'CrmActionPolicyError'].includes(err.name)) {
     statusCode = err.statusCode || 400;
+    message = err.message;
+  }
+
+  // P0 SUPPORT-INBOX — refus d'attribution tenant (tenantResourceAttribution
+  // Service.assertResourceTenantOrUnattributed) : erreur générique portant
+  // un statut 404 et un code dédié, jusqu'ici convertie à tort en 500.
+  if (['TENANT_RESOURCE_NOT_FOUND', 'TENANT_ATTRIBUTION_AMBIGUOUS'].includes(err.code)) {
+    statusCode = err.statusCode || 404;
     message = err.message;
   }
 
@@ -101,10 +109,12 @@ const errorHandler = (err, req, res, next) => {
     message,
     ...(err.name === 'FinancialError' && { code: err.code }),
     ...(err.name === 'HotelAccessError' && { code: err.code }),
+    ...(err.name === 'ConversationAccessError' && { code: err.code }),
     ...(err.name === 'BusinessProfileError' && { code: err.code }),
     ...(err.name === 'OrganizationError' && { code: err.code }),
-    ...(['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError'].includes(err.name) && { code: err.code }),
+    ...(['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError', 'ContactAuthorizationError', 'CommercialPublicationError', 'MarketingAuthorityError', 'MarketingConsentError', 'CrmActionPolicyError'].includes(err.name) && { code: err.code }),
     ...(['AccountStatusError', 'AuthSessionError'].includes(err.name) && { code: err.code }),
+    ...(['TENANT_RESOURCE_NOT_FOUND', 'TENANT_ATTRIBUTION_AMBIGUOUS'].includes(err.code) && { code: err.code }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };

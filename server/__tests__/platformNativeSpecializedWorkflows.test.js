@@ -24,7 +24,8 @@ describe('PA-04A closure — registre des workflows spécialisés', () => {
   test('liste fermée : tenant_applications et support_inbox uniquement', () => {
     expect(Object.keys(PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS).sort()).toEqual(['support_inbox', 'tenant_applications']);
     expect(Object.isFrozen(PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS)).toBe(true);
-    expect([...PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS.support_inbox]).toEqual(['platform.support.read']);
+    // P0 SUPPORT-INBOX — lecture et réponse sont deux capacités distinctes.
+    expect([...PLATFORM_NATIVE_SPECIALIZED_WORKFLOWS.support_inbox]).toEqual(['platform.support.read', 'platform.support.reply']);
   });
 
   test('chaque capability déclarée existe dans le registre canonique', () => {

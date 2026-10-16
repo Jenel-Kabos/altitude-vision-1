@@ -58,7 +58,7 @@ const makeUser = (role, label) => {
     isEmailVerified: true,
   });
 };
-const grant = (user, actor, capabilities, reason = 'C2.0b fixture') => operatorService.grantOperator({ userId: user._id, actor, reason, capabilities });
+const grant = (user, actor, capabilities, reason = 'C2.0b fixture') => operatorService.provisionPrivilegedOperator({ userId: user._id, actor, reason, capabilities });
 const operatorOf = (user) => PlatformOperator.findOne({ user: user._id }).lean();
 const freshUser = (user) => User.findById(user._id).lean();
 const sortedCaps = (operator) => [...(operator?.capabilities || [])].sort();
@@ -261,14 +261,19 @@ describe('C2.0b — F10 / D13 : suspension, réactivation, révocation', () => {
     expect((await operatorOf(op)).status).toBe('suspended');
   });
 
-  test('A/G — active → suspended removes PLATFORM at once; authorized reactivation restores the exact previous capabilities (D13)', async () => {
-    const op = await makeUser('Admin', 'lifecycle');
-    const caps = [...FULL];
+  // PLATFORM-DELEGATION-POLICY-1 — D13 révisée : la réactivation HTTP restaure
+  // exactement les capacités d'un opérateur aux seules capacités DÉLÉGUABLES ;
+  // elle est REFUSÉE pour un administrateur critique (elle restaurerait
+  // `platform.operators.manage` et d'autres capacités non déléguables).
+  // Récupération d'un administrateur critique : provisionnement privilégié CLI.
+  test('A/G — active → suspended removes access at once; authorized reactivation restores the exact previous delegable capabilities (D13)', async () => {
+    const op = await makeUser('Client', 'lifecycle');
+    const caps = ['platform.support.read', 'platform.support.reply', 'platform.commercial.manage'];
     await grant(op, S.alpha, caps);
-    expect((await request(app).get('/api/platform-tenants').set(bearer(op))).status).toBe(200);
+    expect((await request(app).get('/api/conversations/staff-inbox').set(bearer(op))).status).toBe(200);
 
     expect((await request(app).patch(`/api/platform-operators/${op._id}/suspend`).set(bearer(S.alpha)).send({ reason: 'leave' })).status).toBe(200);
-    expect((await request(app).get('/api/platform-tenants').set(bearer(op))).status).toBe(403);
+    expect((await request(app).get('/api/conversations/staff-inbox').set(bearer(op))).status).toBe(403);
     expect(sortedCaps(await operatorOf(op))).toEqual([...caps].sort());
 
     const back = await request(app).patch(`/api/platform-operators/${op._id}/reactivate`).set(bearer(S.alpha)).send({ reason: 'back' });
@@ -276,7 +281,7 @@ describe('C2.0b — F10 / D13 : suspension, réactivation, révocation', () => {
     const operator = await operatorOf(op);
     expect(operator.status).toBe('active');
     expect(sortedCaps(operator)).toEqual([...caps].sort());
-    expect((await request(app).get('/api/platform-tenants').set(bearer(op))).status).toBe(200);
+    expect((await request(app).get('/api/conversations/staff-inbox').set(bearer(op))).status).toBe(200);
 
     const logs = await ActionLog.find({ 'cible.id': String(op._id), action: { $in: ['platform_operator.suspended', 'platform_operator.reactivated'] } }).lean();
     expect(logs.map((log) => log.action).sort()).toEqual(['platform_operator.reactivated', 'platform_operator.suspended']);
@@ -284,6 +289,23 @@ describe('C2.0b — F10 / D13 : suspension, réactivation, révocation', () => {
       expect(String(log.auteur.id)).toBe(String(S.alpha._id));
       expect(['leave', 'back']).toContain(log.metadata.reason);
     });
+  });
+
+  test('A/G — critical administrator: suspension removes PLATFORM at once; HTTP reactivation refused (capabilities preserved, recovery via privileged CLI provisioning)', async () => {
+    const op = await makeUser('Admin', 'lifecycle-critical');
+    const caps = [...FULL];
+    await grant(op, S.alpha, caps);
+    expect((await request(app).get('/api/platform-tenants').set(bearer(op))).status).toBe(200);
+    expect((await request(app).patch(`/api/platform-operators/${op._id}/suspend`).set(bearer(S.alpha)).send({ reason: 'leave' })).status).toBe(200);
+    expect((await request(app).get('/api/platform-tenants').set(bearer(op))).status).toBe(403);
+
+    const back = await request(app).patch(`/api/platform-operators/${op._id}/reactivate`).set(bearer(S.alpha)).send({ reason: 'back' });
+    expect(back.status).toBe(409);
+    expect(back.body.code).toBe('PLATFORM_OPERATOR_PRIVILEGED_REACTIVATION_FORBIDDEN');
+    const operator = await operatorOf(op);
+    expect(operator.status).toBe('suspended');
+    expect(sortedCaps(operator)).toEqual([...caps].sort());
+    expect(await ActionLog.countDocuments({ 'cible.id': String(op._id), action: 'platform_operator.reactivated' })).toBe(0);
   });
 
   test('reactivating an already active operator is an idempotent no-op (no mutation, no audit entry)', async () => {

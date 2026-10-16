@@ -1,12 +1,14 @@
 // __tests__/conversationStaffInboxTenant.test.js
-// HOTFIX-MSG-STAFF-INBOX-1 — non-régression : une conversation client→staff
-// créée sans `propertyId` (chemin « Contacter l'agence » générique,
-// `resolveConversationTenantId` retourne `null` faute de ressource à
-// attribuer) doit rester visible et ouvrable dans la staff-inbox pour un
-// staff dont le tenant EST résolu (`activeTenantId(req)` truthy) — bug réel
-// reproduit et corrigé (voir HOTFIX_MSG_STAFF_INBOX1_ETAT_INITIAL.md /
-// HOTFIX_MSG_STAFF_INBOX1_REPORT.md). Isolation cross-tenant pour les
-// conversations RÉELLEMENT attribuées (bien fourni) doit rester intacte.
+// HOTFIX-MSG-STAFF-INBOX-1, révisé par le correctif P0 SUPPORT-INBOX.
+//
+// Ancienne règle (abrogée) : le staff d'une organisation cliente voyait les
+// conversations de la boîte de support attribuées à son tenant ou sans tenant.
+// Nouvelle règle : la boîte de support commerciale appartient exclusivement à
+// Altitude Vision. Seul un PlatformOperator actif détenant
+// `platform.support.read` (relu à chaque requête) la liste ou l'ouvre, quelle
+// que soit la provenance (tenant X, autre tenant, `tenant: null`). Aucun rôle
+// d'organisation (Admin, Collaborateur, CommunityManager) n'y donne accès,
+// même pour un prospect portant sur un bien de sa propre organisation.
 
 jest.mock('../models/User');
 jest.mock('../models/Conversation');
@@ -47,6 +49,7 @@ const jwt          = require('jsonwebtoken');
 const { app }      = require('../server');
 const User         = require('../models/User');
 const Conversation = require('../models/Conversation');
+const PlatformOperator = require('../models/PlatformOperator');
 
 const makeToken = (id) => jwt.sign({ id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
@@ -105,97 +108,121 @@ function mockConversationFindChain(results) {
   return chain;
 }
 
-describe('GET /api/conversations/staff-inbox — HOTFIX-MSG-STAFF-INBOX-1', () => {
-  afterEach(() => jest.clearAllMocks());
+const AGENT_ID = '507f1f77bcf86cd799439055';
+const agentUser = {
+  _id: AGENT_ID, name: 'Agent AV', email: 'agent@example.invalid',
+  role: 'Client', isActive: true, status: 'Actif', tokenVersion: 0,
+};
+const orgMember = (role) => ({ ...staffUser, role });
 
-  test('une conversation client→staff sans tenant attribué (propertyId absent) apparaît dans la staff-inbox', async () => {
-    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(staffUser) });
-    User.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
-    mockConversationFindChain([genericConversation()]);
+// Capacité support : seul AGENT_ID en détient une (opérateur actif).
+function grantSupportTo(userId) {
+  jest.spyOn(PlatformOperator, 'exists').mockImplementation(async (query) =>
+    (String(query?.user) === String(userId) && query?.status === 'active' ? { _id: 'op-1' } : null));
+}
+
+function asUser(user) {
+  User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(user) });
+  User.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
+}
+
+describe('GET /api/conversations/staff-inbox — boîte de support Altitude Vision (P0 SUPPORT-INBOX)', () => {
+  beforeEach(() => grantSupportTo(AGENT_ID));
+  afterEach(() => jest.restoreAllMocks());
+
+  test.each(['Admin', 'Collaborateur', 'CommunityManager'])(
+    '403 pour un membre d’organisation (%s), même si un prospect porte sur son tenant',
+    async (role) => {
+      asUser(orgMember(role));
+      const sameTenant = otherTenantConversation();
+      sameTenant.tenant = TENANT_ID;
+      mockConversationFindChain([sameTenant, genericConversation()]);
+
+      const res = await request(app)
+        .get('/api/conversations/staff-inbox')
+        .set('Authorization', `Bearer ${makeToken(STAFF_ID)}`);
+
+      expect(res.statusCode).toBe(403);
+      expect(res.body.code).toBe('SUPPORT_CAPABILITY_REQUIRED');
+      expect(Conversation.find).not.toHaveBeenCalled();
+    },
+  );
+
+  test('un agent support liste toutes les conversations, quelle que soit la provenance (tenant X, autre tenant, tenant:null)', async () => {
+    asUser(agentUser);
+    const sameTenant = otherTenantConversation();
+    sameTenant.tenant = TENANT_ID;
+    sameTenant._id = 'conv-same-tenant-1';
+    mockConversationFindChain([genericConversation(), otherTenantConversation(), sameTenant]);
 
     const res = await request(app)
       .get('/api/conversations/staff-inbox')
-      .set('Authorization', `Bearer ${makeToken(STAFF_ID)}`);
+      .set('Authorization', `Bearer ${makeToken(AGENT_ID)}`);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.results).toBe(1);
-    expect(res.body.data.conversations[0]._id).toBe('conv-generic-1');
-  });
-
-  test('une conversation réellement attribuée à un AUTRE tenant reste exclue (isolation cross-tenant intacte)', async () => {
-    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(staffUser) });
-    User.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
-    mockConversationFindChain([otherTenantConversation()]);
-
-    const res = await request(app)
-      .get('/api/conversations/staff-inbox')
-      .set('Authorization', `Bearer ${makeToken(STAFF_ID)}`);
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body.results).toBe(0);
-    expect(res.body.data.conversations).toEqual([]);
-  });
-
-  test('une conversation attribuée au MÊME tenant que le staff reste visible (non-régression)', async () => {
-    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(staffUser) });
-    User.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
-    const conv = otherTenantConversation();
-    conv.tenant = TENANT_ID;
-    conv._id = 'conv-same-tenant-1';
-    mockConversationFindChain([conv]);
-
-    const res = await request(app)
-      .get('/api/conversations/staff-inbox')
-      .set('Authorization', `Bearer ${makeToken(STAFF_ID)}`);
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body.results).toBe(1);
-    expect(res.body.data.conversations[0]._id).toBe('conv-same-tenant-1');
+    expect(res.body.results).toBe(3);
+    expect(Conversation.find).toHaveBeenCalledWith({ isStaffInbox: true, isArchived: { $ne: true } });
   });
 });
 
-describe('GET /api/conversations/:conversationId — staff peut ouvrir une conversation sans tenant attribué', () => {
-  afterEach(() => jest.clearAllMocks());
+describe('GET /api/conversations/:conversationId — conversation de la boîte de support', () => {
+  beforeEach(() => grantSupportTo(AGENT_ID));
+  afterEach(() => jest.restoreAllMocks());
 
-  test('200 (jamais 403/404) pour le staff sur une conversation générique tenant:null', async () => {
-    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(staffUser) });
-    User.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
-    const conv = genericConversation();
+  const mockFindById = (conv, tenant) => {
     conv.lean = jest.fn().mockResolvedValue({
-      _id: conv._id, tenant: null, isStaffInbox: true, participants: conv.participants,
+      _id: conv._id, tenant, isStaffInbox: true, participants: conv.participants,
     });
     Conversation.findById = jest.fn().mockReturnValue(conv);
+  };
+
+  test('403 pour un membre d’organisation sur une conversation tenant:null', async () => {
+    asUser(staffUser);
+    const conv = genericConversation();
+    mockFindById(conv, null);
 
     const res = await request(app)
       .get(`/api/conversations/${conv._id}`)
       .set('Authorization', `Bearer ${makeToken(STAFF_ID)}`);
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('403 pour un membre d’organisation sur une conversation attribuée à son propre tenant', async () => {
+    asUser(staffUser);
+    const conv = otherTenantConversation();
+    conv.tenant = TENANT_ID;
+    mockFindById(conv, TENANT_ID);
+
+    const res = await request(app)
+      .get(`/api/conversations/${conv._id}`)
+      .set('Authorization', `Bearer ${makeToken(STAFF_ID)}`);
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('jamais 200 pour un membre d’organisation sur une conversation d’un AUTRE tenant', async () => {
+    asUser(staffUser);
+    const conv = otherTenantConversation();
+    mockFindById(conv, OTHER_TENANT_ID);
+
+    const res = await request(app)
+      .get(`/api/conversations/${conv._id}`)
+      .set('Authorization', `Bearer ${makeToken(STAFF_ID)}`);
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  test('200 pour un agent support sur une conversation tenant:null', async () => {
+    asUser(agentUser);
+    const conv = genericConversation();
+    mockFindById(conv, null);
+
+    const res = await request(app)
+      .get(`/api/conversations/${conv._id}`)
+      .set('Authorization', `Bearer ${makeToken(AGENT_ID)}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.data.conversation._id).toBe(conv._id);
-  });
-
-  test('jamais 200 pour le staff sur une conversation attribuée à un AUTRE tenant (isolation inchangée)', async () => {
-    // Note : `assertResourceTenantOrUnattributed` (comme `assertResourceTenant`
-    // avant elle, comportement PRÉ-EXISTANT et non touché par ce hotfix) lève
-    // une erreur générique sans `.name` reconnu par errorMiddleware.js pour ce
-    // cas précis — elle retombe donc sur le défaut 500 plutôt que 403/404. Ce
-    // hotfix ne change rien à ce point (même écart présent avant et après,
-    // vérifié par lecture directe : `assertResourceTenant` levait déjà une
-    // erreur sans `.name`) — seule l'assertion pertinente ici est qu'un accès
-    // cross-tenant reste refusé (jamais 200), pas le code HTTP exact du refus.
-    User.findById = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(staffUser) });
-    User.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
-    const conv = otherTenantConversation();
-    conv.lean = jest.fn().mockResolvedValue({
-      _id: conv._id, tenant: OTHER_TENANT_ID, isStaffInbox: true, participants: conv.participants,
-    });
-    Conversation.findById = jest.fn().mockReturnValue(conv);
-
-    const res = await request(app)
-      .get(`/api/conversations/${conv._id}`)
-      .set('Authorization', `Bearer ${makeToken(STAFF_ID)}`);
-
-    expect(res.statusCode).not.toBe(200);
-    expect([403, 404, 500]).toContain(res.statusCode);
   });
 });

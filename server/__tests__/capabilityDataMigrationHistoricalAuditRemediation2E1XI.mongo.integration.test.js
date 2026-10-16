@@ -3,7 +3,7 @@
 // ActionLog backfill. Certifie que le script écrit UN ActionLog canonique
 // et NE modifie JAMAIS le PlatformOperator/User/OrgMembership.
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const PlatformOperator = require('../models/PlatformOperator');
 const ActionLog = require('../models/ActionLog');
@@ -26,7 +26,7 @@ const makeUser = (over = {}) => {
 async function makeOperator({ userRole = 'Admin', status = 'active', capabilities = [TARGET_CAPABILITY] } = {}) {
   const user = await makeUser({ role: userRole });
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: user._id, actor: granter, reason: 'REMED fixture', capabilities });
+  await provisionPrivilegedOperator({ userId: user._id, actor: granter, reason: 'REMED fixture', capabilities });
   if (status !== 'active') {
     await PlatformOperator.updateOne({ user: user._id }, { $set: { status } });
   }

@@ -5,7 +5,7 @@
 // L'incident historique du 2026-09-17 (`module='PlatformAuthority'`
 // rejeté par l'enum) est régressé ici.
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const PlatformOperator = require('../models/PlatformOperator');
 const ActionLog = require('../models/ActionLog');
@@ -29,12 +29,12 @@ const makeUser = (over = {}) => {
 async function makeOperator({ userRole = 'Admin', status = 'active', capabilities = ['platform.finance.manage'] } = {}) {
   const user = await makeUser({ role: userRole });
   const granter = await makeUser({ role: 'Admin' });
-  await grantOperator({ userId: user._id, actor: granter, reason: 'AUDIT-FIX fixture', capabilities });
+  await provisionPrivilegedOperator({ userId: user._id, actor: granter, reason: 'AUDIT-FIX fixture', capabilities });
   if (status !== 'active') {
     await PlatformOperator.updateOne({ user: user._id }, { $set: { status } });
   }
   const op = await PlatformOperator.findOne({ user: user._id });
-  // ActionLogs produced by the fixture `grantOperator` itself must not
+  // ActionLogs produced by the fixture `provisionPrivilegedOperator` itself must not
   // pollute assertions on the CLI's own audit entry. We clear the
   // collection after fixture set-up so every assertion targets only
   // the entries produced by `applyGrant`.

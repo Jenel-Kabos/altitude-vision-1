@@ -20,7 +20,7 @@ const contratRoutes = require('../routes/contratRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const organizationService = require('../services/organizationService');
 const platformTenantService = require('../services/platformTenant/platformTenantService');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 
 jest.setTimeout(180000);
 
@@ -123,7 +123,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
     const a = await buildTenant('A5');
     const propertyA = await buildProperty(a.owner, 'Disponible', a.tenant);
     const operator = await User.create({ name: 'PO Global', email: `fca101-po-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-01 certification', capabilities: [] });
+    await provisionPrivilegedOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-01 certification', capabilities: [] });
     const res = await request(app).post('/api/contrats').set(bearer(operator, a.tenant._id)).send(createBody(propertyA));
     expect(res.status).toBe(403);
   });
@@ -132,7 +132,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-01) — POST /api/contr
     const a = await buildTenant('A6');
     const propertyA = await buildProperty(a.owner, 'Disponible', a.tenant);
     const operator = await User.create({ name: 'PO Commercial', email: `fca101-po-commercial-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-01 platform.commercial.manage', capabilities: ['platform.commercial.manage'] });
+    await provisionPrivilegedOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-01 platform.commercial.manage', capabilities: ['platform.commercial.manage'] });
     const res = await request(app).post('/api/contrats').set(bearer(operator, a.tenant._id)).send(createBody(propertyA));
     expect(res.status).toBe(201);
   });

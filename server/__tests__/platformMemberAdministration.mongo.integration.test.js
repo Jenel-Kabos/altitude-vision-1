@@ -16,7 +16,7 @@ const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareF
 const User = require('../models/User');
 const OrgMembership = require('../models/OrgMembership');
 const PlatformOperator = require('../models/PlatformOperator');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const memberRoutes = require('../routes/tenantMemberRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
@@ -81,7 +81,7 @@ beforeEach(async () => {
   candidateA = await makeUser({ role: 'Collaborateur' });
   candidateB = await makeUser({ role: 'Collaborateur' });
 
-  // Platform operator scaffolding — grantOperator forbids self-grant, so we
+  // Platform operator scaffolding — provisionPrivilegedOperator forbids self-grant, so we
   // use a separate grantor account with platform.operators.manage.
   platformGrantor = await makeUser({ role: 'Admin' });
   await PlatformOperator.create({
@@ -91,28 +91,28 @@ beforeEach(async () => {
   });
 
   operatorManage = await makeUser({ role: 'Admin' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorManage._id, actor: platformGrantor,
     capabilities: ['platform.users.manage', 'platform.tenants.read'],
     reason: 'PMEM operator with users.manage',
   });
 
   operatorReadOnly = await makeUser({ role: 'Admin' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorReadOnly._id, actor: platformGrantor,
     capabilities: ['platform.users.read'],
     reason: 'PMEM operator with users.read only',
   });
 
   operatorNoCap = await makeUser({ role: 'Admin' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorNoCap._id, actor: platformGrantor,
     capabilities: ['platform.tenants.read'],
     reason: 'PMEM operator without users.* capability',
   });
 
   operatorSuspended = await makeUser({ role: 'Admin' });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorSuspended._id, actor: platformGrantor,
     capabilities: ['platform.users.manage'],
     reason: 'PMEM operator to be suspended',

@@ -11,6 +11,7 @@ import {
   CreditCard, Calendar, Landmark, KeyRound, Palmtree, LayoutGrid,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
 import { getConversationsUnreadCount } from '../../services/unreadCountService';
 import UnreadMessagesBadge from '../messaging/UnreadMessagesBadge';
 import NotificationBell from '../notifications/NotificationBell';
@@ -365,6 +366,7 @@ const Header = () => {
   const headerPadding  = isMobile ? '0 16px' : isTablet ? '0 28px' : isXL ? '0 80px' : '0 48px';
 
   const isAdmin = STAFF_ROLES.includes(user?.role);
+  const { can: canPlatform } = usePlatformTenantRuntime();
   // USER-ARCH-UX-1 — reflète le profil métier effectif (immobilier ET/OU
   // établissement), plus seulement le rôle brut 'Proprietaire' : l'entrée
   // "Espace Propriétaire" doit rester visible pour tout utilisateur portant
@@ -372,7 +374,9 @@ const Header = () => {
   // ou profil accordé explicitement).
   const isOwner = user?.role === 'Proprietaire' || isProprietaireImmobilier || isExploitantEtablissement;
   // Le staff a sa propre boîte partagée ; les autres utilisateurs ont leur messagerie perso
-  const msgUrl  = isAdmin ? '/dashboard/conversations' : '/messages';
+  // P0 SUPPORT-INBOX — la boîte de support est réservée aux agents Altitude
+  // Vision (`platform.support.read`) ; le staff d'organisation garde /messages.
+  const msgUrl  = canPlatform('platform.support.read') ? '/dashboard/conversations' : '/messages';
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);

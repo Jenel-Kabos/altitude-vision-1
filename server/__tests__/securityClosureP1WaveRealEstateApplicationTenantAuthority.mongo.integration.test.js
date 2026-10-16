@@ -12,6 +12,9 @@ const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Application = require('../models/RealEstateApplication');
+const PlatformOperator = require('../models/PlatformOperator');
+const ApplicationDisclosureEvent = require('../models/ApplicationDisclosureEvent');
+const { grantAuthorization, revokeAuthorization } = require('../services/contactAuthorizationService');
 const realEstateApplicationRoutes = require('../routes/realEstateApplicationRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
 const organizationService = require('../services/organizationService');
@@ -96,16 +99,18 @@ describe('SECURITY-CLOSURE-P1-WAVE-1 (P1-D) — GET /api/real-estate-application
   });
 
   test('5. Le propriétaire (owner) reste autorisé sur son propre dossier, sans tenant', async () => {
-    // NB : `getOne` peuple `applicant` (populate), ce qui rend la comparaison
-    // `String(application.applicant)` pré-existante toujours fausse pour le
-    // candidat lui-même (bug pré-existant, sans rapport avec RA-08/le tenant,
-    // non corrigé ici — hors périmètre de ce lot). `application.owner` n'est
-    // lui jamais peuplé dans `getOne`, donc ce test couvre correctement
-    // l'accès légitime non-staff préservé par ce correctif.
     const a = await buildTenantFixture('H');
     const ownerUser = await User.findById(a.property.owner);
     const res = await request(app).get(`/api/real-estate-applications/${a.application._id}`).set(bearer(ownerUser));
     expect(res.status).toBe(200);
+  });
+
+  test('5b. le candidat conserve sa vue privée sur son propre dossier après populate', async () => {
+    const a = await buildTenantFixture('H2');
+    const res = await request(app).get(`/api/real-estate-applications/${a.application._id}`).set(bearer(a.applicant));
+    expect(res.status).toBe(200);
+    expect(res.body.data.application.projection.audience).toBe('applicant_self');
+    expect(res.body.data.application.applicant.email).toBe(a.applicant.email);
   });
 
   test('6. Staff multi-tenant sans en-tête → fail-closed', async () => {
@@ -116,5 +121,46 @@ describe('SECURITY-CLOSURE-P1-WAVE-1 (P1-D) — GET /api/real-estate-application
     await organizationService.grantMembership({ userId: staffMulti._id, orgUnitId: b.tenant.rootOrgUnit, actor: b.admin });
     const res = await request(app).get('/api/real-estate-applications').set(bearer(staffMulti));
     expect(res.status).toBe(403);
+  });
+
+  test('7. un PlatformOperator au rôle Client ne peut pas divulguer un autre tenant que celui sélectionné', async () => {
+    const a = await buildTenantFixture('K');
+    const b = await buildTenantFixture('L');
+    const operator = await User.create({ name: 'Operator Client', email: `p1d-operator-client-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
+    await PlatformOperator.create({ user: operator._id, capabilities: ['platform.commercial.manage'], grantedBy: a.admin._id, grantReason: 'TEST DATA tenant isolation' });
+    const res = await request(app)
+      .get(`/api/real-estate-applications/${b.application._id}/contact-disclosure`)
+      .query({ reason: 'Qualification du dossier' })
+      .set(bearer(operator, a.tenant._id));
+    expect(res.status).not.toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain(b.applicant.email);
+  });
+
+  test('8. une révocation concurrente pendant l’audit bloque la remise des coordonnées', async () => {
+    const a = await buildTenantFixture('M');
+    const platformActor = await User.create({ name: 'Platform Actor', email: `p1d-platform-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+    await PlatformOperator.create({ user: platformActor._id, capabilities: ['platform.commercial.manage'], grantedBy: platformActor._id, grantReason: 'TEST DATA concurrent revoke' });
+    const authorization = await grantAuthorization({
+      clientId: a.applicant._id, representativeId: a.property.owner, propertyId: a.property._id,
+      dossierType: 'RealEstateApplication', dossierId: a.application._id, tenantId: a.tenant._id,
+      scopes: ['contact_details_disclosure'], actor: platformActor, reason: 'TEST DATA initial grant',
+    });
+    const originalCreate = ApplicationDisclosureEvent.create.bind(ApplicationDisclosureEvent);
+    const createSpy = jest.spyOn(ApplicationDisclosureEvent, 'create').mockImplementation(async (payload) => {
+      const event = await originalCreate(payload);
+      await revokeAuthorization({ authorizationId: authorization._id, actor: platformActor, reason: 'TEST DATA concurrent revoke' });
+      return event;
+    });
+    try {
+      const owner = await User.findById(a.property.owner);
+      const res = await request(app)
+        .get(`/api/real-estate-applications/${a.application._id}/contact-disclosure`)
+        .query({ reason: 'Décision du propriétaire' })
+        .set(bearer(owner));
+      expect(res.status).toBe(403);
+      expect(JSON.stringify(res.body)).not.toContain(a.applicant.email);
+    } finally {
+      createSpy.mockRestore();
+    }
   });
 });

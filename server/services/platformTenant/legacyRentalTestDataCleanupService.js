@@ -9,6 +9,14 @@ const CLASSIFICATION = Object.freeze({
 const PARTY_COLLECTIONS = Object.freeze({ Locataire: 'locataires', Proprietaire: 'proprietaires' });
 const id = (value) => String(value?._id || value);
 const oid = (value) => (value instanceof mongoose.Types.ObjectId ? value : new mongoose.Types.ObjectId(String(value)));
+// Équivalent de `Object.groupBy` (Node ≥ 21), absent de Node 20 — runtime
+// déclaré par `engines` et la CI. Mêmes garanties : objet sans prototype,
+// clés dans l'ordre de première apparition.
+const groupBy = (items, keyOf) => items.reduce((groups, item) => {
+  const key = keyOf(item);
+  (groups[key] ||= []).push(item);
+  return groups;
+}, Object.create(null));
 const canonicalize = (value) => {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
@@ -104,7 +112,7 @@ async function applyLegacyRentalTestDataCleanup({ db, manifest, manifestHash }) 
         fail('LEGACY_CLEANUP_STATE_CHANGED', 'La population legacy ou ses dépendances ont changé.');
       }
 
-      const dependenciesByCollection = Object.groupBy(manifest.dependencies || [], ({ collection }) => collection);
+      const dependenciesByCollection = groupBy(manifest.dependencies || [], ({ collection }) => collection);
       let dependenciesDeleted = 0;
       for (const [collection, items] of Object.entries(dependenciesByCollection)) {
         const ids = items.map(({ id: itemId }) => oid(itemId));
@@ -120,7 +128,7 @@ async function applyLegacyRentalTestDataCleanup({ db, manifest, manifestHash }) 
         dependenciesDeleted += result.deletedCount;
       }
 
-      const candidateGroups = Object.groupBy(manifest.candidates || [], ({ collection }) => collection);
+      const candidateGroups = groupBy(manifest.candidates || [], ({ collection }) => collection);
       const deleted = {};
       for (const [collection, items] of Object.entries(candidateGroups)) {
         const result = await db.collection(collection).deleteMany({

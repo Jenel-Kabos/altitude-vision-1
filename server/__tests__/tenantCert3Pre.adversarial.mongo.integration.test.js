@@ -18,6 +18,8 @@ const Accommodation = require('../models/Accommodation');
 const AccommodationReservation = require('../models/AccommodationReservation');
 const CrmCustomer = require('../models/CrmCustomer');
 const RentalManagement = require('../models/RentalManagement');
+const PlatformOperator = require('../models/PlatformOperator');
+const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const platformTenantRoutes = require('../routes/platformTenantRoutes');
 const accommodationRoutes = require('../routes/accommodationRoutes');
 const accommodationReservationRoutes = require('../routes/accommodationReservationRoutes');
@@ -49,6 +51,7 @@ let ownerB;
 let adminA;
 let adminB;
 let platformOperator; // Admin sans aucune appartenance tenant
+let commercialOperator;
 
 beforeAll(async () => {
   await startFinancialMongo();
@@ -65,6 +68,8 @@ beforeAll(async () => {
     name: 'Platform Operator', email: `platform-operator-${Date.now()}@example.test`,
     password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true,
   });
+  commercialOperator = await User.create({ name: 'Commercial Operator', email: `commercial-operator-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
+  await PlatformOperator.create({ user: commercialOperator._id, capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES], grantedBy: commercialOperator._id, grantReason: 'TEST DATA commercial moderation' });
 });
 afterEach(async () => Promise.all([
   Property.deleteMany({}), Accommodation.deleteMany({}), AccommodationReservation.deleteMany({}),
@@ -208,13 +213,24 @@ describe('Accommodation — staff/Admin tenant-bound ne doit jamais agir sur un 
     expect(fresh.publicationStatus).toBe('soumis');
   });
 
-  test('B→B : staff du Tenant B accède au traitement (reject, ne nécessite pas la complétude "validate") d\'un Accommodation soumis du Tenant B → 200 (contrôle positif)', async () => {
+  test('B→B : le staff du Tenant B ne peut plus auto-rejeter son hébergement', async () => {
     const { accommodation } = await makeAccommodation(ownerB);
     accommodation.publicationStatus = 'soumis'; await accommodation.save();
     // PA-04C1 — autorité staff = adhésion canonique avec rôle métier (PA-01).
     const { user: managerB } = await createTenantUser({ tenant: tenantB, bootstrap: adminB, overrides: { role: 'GestionnaireImmobilier' }, businessRole: 'GestionnaireImmobilier' });
     const res = await request(app).patch(`/api/accommodations/${accommodation._id}/reject`).set(bearer(managerB)).send({ reason: 'Fixture de test incomplète, action de contrôle uniquement.' });
+    expect(res.status).toBe(403);
+    expect((await Accommodation.findById(accommodation._id)).publicationStatus).toBe('soumis');
+  });
+
+  test('un opérateur commercial plateforme peut rejeter un hébergement soumis sans changer son tenant', async () => {
+    const { accommodation } = await makeAccommodation(ownerB);
+    accommodation.publicationStatus = 'soumis'; await accommodation.save();
+    const res = await request(app).patch(`/api/accommodations/${accommodation._id}/reject`).set(bearer(commercialOperator)).send({ reason: 'Fixture commerciale incomplète.' });
     expect(res.status).toBe(200);
+    const fresh = await Accommodation.findById(accommodation._id);
+    expect(fresh.publicationStatus).toBe('rejete');
+    expect(String(fresh.tenant)).toBe(String(tenantB._id));
   });
 
   test('A→B : Admin du Tenant A lit les tarifs (listRates) d\'un Accommodation du Tenant B → refus', async () => {

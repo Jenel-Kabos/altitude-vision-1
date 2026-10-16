@@ -16,12 +16,14 @@ const User = require('../../models/User');
 const mongoose = require('mongoose');
 const { PLATFORM_OPERATOR_CAPABILITIES, PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../../constants/platformOperatorConstants');
 const { logAction, buildAuteur } = require('../actionLogService');
+const delegationPolicy = require('./capabilityDelegationPolicy');
 
 class PlatformOperatorError extends Error {
   constructor(code, message, statusCode = 400) { super(message); this.name = 'PlatformOperatorError'; this.code = code; this.statusCode = statusCode; }
 }
 const fail = (code, message, statusCode) => { throw new PlatformOperatorError(code, message, statusCode); };
 const VIABILITY_CAPABILITY = 'platform.operators.manage';
+const INELIGIBLE_ACCOUNT_STATUSES = ['Suspendu', 'Banni', 'Supprimé'];
 
 async function runInAuthorityTransaction(fn) {
   let session = null;
@@ -229,12 +231,22 @@ function isPlatformViewEligible(operator) {
   return PLATFORM_VIEW_REQUIRED_CAPABILITIES.every((capability) => granted.has(capability));
 }
 
+// PLATFORM-DELEGATION-POLICY-1 — PROVISIONNEMENT PRIVILÉGIÉ (ancien
+// `grantOperator`, comportement inchangé) : peut attribuer n'importe quelle
+// capacité du registre, y compris les capacités critiques. Réservé aux
+// scripts CLI gardés (bootstrap initial, récupération d'accès, reset de
+// données) et aux fixtures de test ; JAMAIS appelé par une route, un
+// contrôleur, un middleware ou un autre service (garde statique
+// platformOperatorPrivilegedProvisioningBoundary.test.js). Toute opération
+// HTTP passe par `grantOperator` ci-dessous, soumis à la politique de
+// délégation.
+//
 // GRANT — ne fait JAMAIS de promotion automatique : `actor` et `reason` sont
 // obligatoires, l'utilisateur cible doit exister et ne pas être `isTechnical`
 // (jamais un compte technique GL-ARCH-1.1). Idempotent : si un document
 // révoqué/suspendu existe déjà pour cet utilisateur, il est réactivé (jamais
 // dupliqué) — mais UNIQUEMENT via cet appel explicite, jamais implicitement.
-async function grantOperator({ userId, capabilities = [], actor, reason, req, allowSelfGrant = false }) {
+async function provisionPrivilegedOperator({ userId, capabilities = [], actor, reason, req, allowSelfGrant = false }) {
   if (!actor) fail('PLATFORM_OPERATOR_ACTOR_REQUIRED', 'Un acteur authentifié est requis.', 401);
   if (!userId) fail('PLATFORM_OPERATOR_USER_REQUIRED', 'Utilisateur cible requis.', 422);
   if (!reason || !reason.trim()) fail('PLATFORM_OPERATOR_REASON_REQUIRED', 'Un motif est requis.', 422);
@@ -308,6 +320,67 @@ async function grantOperator({ userId, capabilities = [], actor, reason, req, al
   return saved;
 }
 
+// PLATFORM-DELEGATION-POLICY-1 — OCTROI ORDINAIRE (route
+// `POST /api/platform-operators`). Soumis à la politique centrale :
+//   - capacités demandées toutes déléguables (sinon 403, aucune écriture) ;
+//   - jamais sur soi-même, aucun drapeau d'auto-octroi ;
+//   - bénéficiaire actif et non technique ;
+//   - jamais sur un opérateur privilégié non révoqué (le remplacement de son
+//     ensemble retirerait implicitement ses capacités critiques) ;
+//   - un ré-octroi après révocation repart de l'ensemble déléguable demandé,
+//     jamais des anciennes capacités.
+async function grantOperator({ userId, capabilities = [], actor, reason, req }) {
+  if (!actor) fail('PLATFORM_OPERATOR_ACTOR_REQUIRED', 'Un acteur authentifié est requis.', 401);
+  if (!userId) fail('PLATFORM_OPERATOR_USER_REQUIRED', 'Utilisateur cible requis.', 422);
+  if (typeof reason !== 'string' || !reason.trim()) fail('PLATFORM_OPERATOR_REASON_REQUIRED', 'Un motif est requis.', 422);
+  if (String(userId) === String(actor._id || actor.id)) {
+    fail('PLATFORM_OPERATOR_SELF_ACTION_FORBIDDEN', 'Un opérateur ne peut pas modifier ses propres capacités.', 403);
+  }
+  delegationPolicy.assertDelegableCapabilities(capabilities);
+
+  const targetUser = await User.findOne({ _id: userId, isTechnical: { $ne: true } }).select('_id isActive status').lean();
+  if (!targetUser) fail('PLATFORM_OPERATOR_USER_NOT_FOUND', 'Utilisateur cible introuvable.', 404);
+  if (targetUser.isActive === false || INELIGIBLE_ACCOUNT_STATUSES.includes(targetUser.status)) {
+    fail('PLATFORM_CAPABILITY_BENEFICIARY_INELIGIBLE', "Le compte bénéficiaire n'est pas actif.", 409);
+  }
+
+  let before;
+  let saved;
+  try {
+    saved = await runInAuthorityTransaction(async (session) => {
+      await acquireAuthoritySentinelLock(session);
+      const existingQuery = PlatformOperator.findOne({ user: userId });
+      if (session) existingQuery.session(session);
+      const existing = await existingQuery;
+      delegationPolicy.assertOrdinaryTargetNotPrivileged(existing);
+      before = existing ? { status: existing.status, capabilities: existing.capabilities } : null;
+
+      const doc = existing || new PlatformOperator({ user: userId });
+      doc.status = 'active';
+      doc.capabilities = [...new Set(capabilities)];
+      doc.grantedBy = actor._id || actor.id;
+      doc.grantedAt = new Date();
+      doc.grantReason = reason.trim();
+      doc.suspendedBy = null;
+      doc.suspendedAt = null;
+      doc.suspensionReason = null;
+      doc.revokedBy = null;
+      doc.revokedAt = null;
+      doc.revokeReason = null;
+      await doc.save({ session });
+      return doc.toObject();
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      fail('PLATFORM_OPERATOR_CONCURRENT_GRANT', 'Un octroi concurrent pour cet utilisateur vient d\'aboutir ailleurs ; relancez l\'opération pour observer l\'état final.', 409);
+    }
+    throw error;
+  }
+
+  await audit('granted', { actor, targetUserId: userId, reason: reason.trim(), before, after: { status: saved.status, capabilities: saved.capabilities }, req });
+  return saved;
+}
+
 // SUSPEND — réversible (reactivateOperator), pour un besoin temporaire
 // (ex. congé, investigation) sans perdre l'historique de capacités.
 async function suspendOperator({ userId, actor, reason, req }) {
@@ -354,6 +427,9 @@ async function reactivateOperator({ userId, actor, reason, req }) {
     if (!doc) fail('PLATFORM_OPERATOR_NOT_FOUND', 'Aucun opérateur trouvé pour cet utilisateur.', 404);
     if (doc.status === 'revoked') fail('PLATFORM_OPERATOR_REVOKED', 'Cet opérateur a été révoqué ; une nouvelle attribution est requise.', 409);
     if (doc.status === 'active') return doc.toObject();
+    // PLATFORM-DELEGATION-POLICY-1 — la réactivation ordinaire ne restaure
+    // jamais une capacité non déléguable (attribution indirecte).
+    delegationPolicy.assertOrdinaryReactivationAllowed(doc);
     before = { status: doc.status };
     doc.status = 'active';
     doc.suspendedBy = null;
@@ -396,6 +472,103 @@ async function revokeOperator({ userId, actor, reason, req }) {
   return saved;
 }
 
+// PLATFORM-ACCREDITATIONS-1 — fiche d'habilitations d'un utilisateur pour
+// l'onglet Utilisateurs. La liste déléguable vient du serveur (jamais
+// recalculée côté client). Garde : route (`platform.operators.manage` +
+// scope PLATFORM), comme toutes les fonctions de ce service.
+async function getDelegatedCapabilityProfile({ userId, actor }) {
+  const user = await User.findOne({ _id: userId, isTechnical: { $ne: true } }).select('_id name email role isActive status').lean();
+  if (!user) fail('PLATFORM_OPERATOR_USER_NOT_FOUND', 'Utilisateur cible introuvable.', 404);
+  const operator = await PlatformOperator.findOne({ user: userId }).select('status capabilities grantedAt suspendedAt revokedAt').lean();
+  return {
+    user: { _id: String(user._id), name: user.name, email: user.email, role: user.role, isActive: user.isActive !== false, status: user.status },
+    operator: operator ? { status: operator.status, capabilities: operator.capabilities || [] } : null,
+    delegableCapabilities: [...delegationPolicy.DELEGABLE_CAPABILITIES],
+    self: String(userId) === String(actor?._id || actor?.id),
+  };
+}
+
+// PLATFORM-ACCREDITATIONS-1 — accorde ou retire UNE capacité déléguable.
+// Défense en profondeur indépendante de la route : acteur et motif requis,
+// jamais sur soi-même, liste fermée, bénéficiaire actif et non technique pour
+// un octroi, opérateur suspendu/révoqué jamais réhabilité par ce canal, et
+// administrateur critique (`platform.operators.manage`) jamais privé d'une
+// capacité requise par la Vue plateforme. Même verrou sentinelle et même
+// transaction que les autres transitions ; audit après commit, uniquement
+// lorsqu'une modification a réellement eu lieu.
+async function changeDelegatedCapability({ userId, capability, action, actor, reason, req }) {
+  if (!actor) fail('PLATFORM_OPERATOR_ACTOR_REQUIRED', 'Un acteur authentifié est requis.', 401);
+  if (!userId) fail('PLATFORM_OPERATOR_USER_REQUIRED', 'Utilisateur cible requis.', 422);
+  if (!['grant', 'revoke'].includes(action)) fail('PLATFORM_CAPABILITY_ACTION_INVALID', 'Action invalide : grant ou revoke attendu.', 422);
+  if (typeof reason !== 'string' || !reason.trim()) fail('PLATFORM_OPERATOR_REASON_REQUIRED', 'Un motif est requis.', 422);
+  if (String(userId) === String(actor._id || actor.id)) {
+    fail('PLATFORM_OPERATOR_SELF_ACTION_FORBIDDEN', 'Un opérateur ne peut pas modifier ses propres capacités.', 403);
+  }
+  if (!delegationPolicy.isDelegableCapability(capability)) {
+    fail('PLATFORM_CAPABILITY_NOT_DELEGABLE', "Cette capacité ne peut pas être déléguée depuis l'onglet Utilisateurs.", 403);
+  }
+
+  const targetUser = await User.findOne({ _id: userId, isTechnical: { $ne: true } }).select('_id isActive status').lean();
+  if (!targetUser) fail('PLATFORM_OPERATOR_USER_NOT_FOUND', 'Utilisateur cible introuvable.', 404);
+  if (action === 'grant' && (targetUser.isActive === false || INELIGIBLE_ACCOUNT_STATUSES.includes(targetUser.status))) {
+    fail('PLATFORM_CAPABILITY_BENEFICIARY_INELIGIBLE', "Le compte bénéficiaire n'est pas actif.", 409);
+  }
+
+  let before = null;
+  let changed = false;
+  const saved = await runInAuthorityTransaction(async (session) => {
+    await acquireAuthoritySentinelLock(session);
+    const query = PlatformOperator.findOne({ user: userId });
+    if (session) query.session(session);
+    const existing = await query;
+    if (existing && existing.status !== 'active') {
+      fail(
+        existing.status === 'revoked' ? 'PLATFORM_OPERATOR_REVOKED' : 'PLATFORM_OPERATOR_SUSPENDED',
+        'Cet opérateur est suspendu ou révoqué : sa situation doit être régularisée avant toute nouvelle habilitation.',
+        409,
+      );
+    }
+    const current = existing?.capabilities || [];
+    before = { status: existing?.status || null, capabilities: [...current] };
+
+    if (action === 'grant') {
+      if (current.includes(capability)) return existing.toObject();
+      const doc = existing || new PlatformOperator({
+        user: userId, status: 'active', grantedBy: actor._id || actor.id, grantedAt: new Date(), grantReason: reason.trim(),
+      });
+      doc.capabilities = [...current, capability];
+      await doc.save({ session });
+      changed = true;
+      return doc.toObject();
+    }
+
+    if (!existing || !current.includes(capability)) return existing ? existing.toObject() : null;
+    if (current.includes(VIABILITY_CAPABILITY) && PLATFORM_VIEW_REQUIRED_CAPABILITIES.includes(capability)) {
+      fail(
+        'PLATFORM_CRITICAL_ADMIN_PROTECTED',
+        "Retrait refusé : cette capacité est requise pour la Vue plateforme d'un administrateur critique (platform.operators.manage).",
+        409,
+      );
+    }
+    existing.capabilities = current.filter((cap) => cap !== capability);
+    await existing.save({ session });
+    changed = true;
+    return existing.toObject();
+  });
+
+  if (changed) {
+    await audit(action === 'grant' ? 'capability_granted' : 'capability_revoked', {
+      actor,
+      targetUserId: userId,
+      reason: reason.trim(),
+      before,
+      after: { capability, status: saved.status, capabilities: saved.capabilities },
+      req,
+    });
+  }
+  return saved;
+}
+
 async function listOperators() {
   return PlatformOperator.find().sort({ createdAt: -1 }).populate('user', 'name email role').lean();
 }
@@ -422,10 +595,13 @@ module.exports = {
   isPlatformViewEligible,
   resolveActiveOperatorsByCapability,
   grantOperator,
+  provisionPrivilegedOperator,
   suspendOperator,
   reactivateOperator,
   revokeOperator,
   listOperators,
+  getDelegatedCapabilityProfile,
+  changeDelegatedCapability,
   countViableOperators,
   assertCanRemoveViableOperator,
   acquireAuthoritySentinelLock,

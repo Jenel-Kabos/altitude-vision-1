@@ -10,10 +10,11 @@ const jwt = require('jsonwebtoken');
 const { startFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture } = require('./helpers/tenantAwareFixture');
 const Hotel = require('../models/Hotel');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 const User = require('../models/User');
 const Property = require('../models/Property');
+const CommercialPublicationRevision = require('../models/CommercialPublicationRevision');
 const { errorHandler } = require('../middleware/errorMiddleware');
 
 jest.setTimeout(240000);
@@ -46,6 +47,7 @@ const tenantOf = async (property) => {
   return stored.tenant ? String(stored.tenant) : null;
 };
 const id = (doc) => (doc ? String(doc._id) : null);
+const pendingFor = (property) => CommercialPublicationRevision.findOne({ resourceType: 'Property', resource: property._id, status: 'pending' }).lean();
 
 const S = {};
 beforeAll(async () => {
@@ -56,7 +58,7 @@ beforeAll(async () => {
   S.adminA = fixtureA.bootstrap; S.adminB = fixtureB.bootstrap;
   S.owner = await makeUser('Proprietaire', 'unaffiliated-owner');
   S.platformAdmin = await makeUser('Admin', 'platform-admin');
-  await grantOperator({ userId: S.platformAdmin._id, actor: S.adminA, reason: 'PA04B0 eligible operator', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: S.platformAdmin._id, actor: S.adminA, reason: 'PA04B0 eligible operator', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
 });
 afterAll(stopFinancialMongo);
 
@@ -68,7 +70,8 @@ describe('PA-04B0 — propriétaire non affilié (tenant:null)', () => {
       .send({ description: 'Description mise à jour par le propriétaire, assez longue.', tenant: id(S.tenantA) });
     expect(res.status).toBe(200);
     expect(await tenantOf(property)).toBeNull();
-    expect((await Property.findById(property._id).lean()).description).toMatch(/mise à jour par le propriétaire/);
+    expect((await Property.findById(property._id).lean()).description).not.toMatch(/mise à jour par le propriétaire/);
+    expect((await pendingFor(property)).proposedSnapshot.description).toMatch(/mise à jour par le propriétaire/);
   });
 
   test('Case E — tenant forgé (ObjectId aléatoire) : tenant reste null', async () => {
@@ -97,7 +100,8 @@ describe('PA-04B0 — propriétaire non affilié (tenant:null)', () => {
     const res = await request(app).put(`/api/properties/${property._id}`).set(bearer(S.owner))
       .send({ title: 'Titre modifié par le propriétaire', price: 260000 });
     expect(res.status).toBe(200);
-    expect(res.body.data.property.title).toBe('Titre modifié par le propriétaire');
+    expect(res.body.data.property.title).not.toBe('Titre modifié par le propriétaire');
+    expect((await pendingFor(property)).proposedSnapshot).toMatchObject({ title: 'Titre modifié par le propriétaire', price: 260000 });
     expect(await tenantOf(property)).toBeNull();
   });
 });
@@ -120,8 +124,8 @@ describe('PA-04B0 — contrat mobile (payloads exacts de altimmo-app, PUT /prope
     });
     expect(edit.status).toBe(200);
     const stored = await Property.findById(property._id).lean();
-    expect(stored.title).toBe('Édition mobile');
-    expect(stored.cautionMultiplicateur).toBe(3);
+    expect(stored.title).not.toBe('Édition mobile');
+    expect((await pendingFor(property)).proposedSnapshot).toMatchObject({ title: 'Édition mobile', cautionMultiplicateur: 2 });
     expect(stored.tenant).toBeNull();
   });
 
@@ -160,7 +164,8 @@ describe('PA-04B0 — staff Tenant A', () => {
     const res = await request(app).put(`/api/properties/${property._id}`).set(bearer(S.adminA, S.tenantA))
       .send({ title: 'Titre modifié par le staff Tenant A', price: 300000 });
     expect(res.status).toBe(200);
-    expect(res.body.data.property.title).toBe('Titre modifié par le staff Tenant A');
+    expect(res.body.data.property.title).not.toBe('Titre modifié par le staff Tenant A');
+    expect((await pendingFor(property)).proposedSnapshot).toMatchObject({ title: 'Titre modifié par le staff Tenant A', price: 300000 });
     expect(await tenantOf(property)).toBe(id(S.tenantA));
   });
 
@@ -194,16 +199,15 @@ describe('PA-04B0 — mutations PLATFORM existantes : provenance conservée', ()
     const owner = tenant() ? S.adminA : S.owner;
     const property = await makeProperty({ owner, tenant: tenant(), status: 'vente', statusAdmin: 'En attente' });
     const before = await tenantOf(property);
-    expect((await request(app).patch(`/api/admin/properties/${property._id}/approve`).set(bearer(S.platformAdmin)).send({ tenant: id(S.tenantB) })).status).toBe(200);
-    expect((await request(app).patch(`/api/admin/properties/${property._id}/reject`).set(bearer(S.platformAdmin)).send({ tenant: id(S.tenantB) })).status).toBe(200);
+    expect((await request(app).patch(`/api/admin/properties/${property._id}/approve`).set(bearer(S.platformAdmin)).send({ tenant: id(S.tenantB), reason: 'TEST DATA vérifiée' })).status).toBe(200);
     expect((await request(app).patch(`/api/properties/${property._id}/recommande`).set(bearer(S.platformAdmin)).send({ recommande: true, tenant: id(S.tenantB) })).status).toBe(200);
     expect(await tenantOf(property)).toBe(before);
   });
 
-  test('modération tenant (/properties/admin/:id/:action) par le staff Tenant A : tenant inchangé', async () => {
+  test('modération commerciale refusée au staff Tenant A : tenant inchangé', async () => {
     const property = await makeProperty({ owner: S.adminA, tenant: S.tenantA, status: 'vente', statusAdmin: 'En attente' });
     const res = await request(app).patch(`/api/properties/admin/${property._id}/validate`).set(bearer(S.adminA, S.tenantA)).send({ tenant: id(S.tenantB) });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
     expect(await tenantOf(property)).toBe(id(S.tenantA));
   });
 });

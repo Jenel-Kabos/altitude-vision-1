@@ -137,11 +137,23 @@ describe('TENANT-SCOPE-AUDIT-2A — propertyController moderation (TENANT-strict
     const owner = (await createTenantUser({ tenant: fixture.tenant, bootstrap: fixture.bootstrap, overrides: { role: 'Proprietaire' } })).user;
     const property = await createPropertyFor(owner, { tenant: fixture.tenant._id });
 
-    const res = await request(app)
+    // LOT A — la modération d'un bien rattaché à un tenant relève
+    // exclusivement d'Altitude Vision : l'Admin fondateur du tenant est
+    // refusé ; un PlatformOperator commercial (contexte PLATFORM) valide sans
+    // changer l'attribution tenant du bien.
+    const denied = await request(app)
       .patch(`/api/properties/admin/${property._id}/validate`)
       .set(bearer(fixture.bootstrap));
+    expect(denied.status).toBe(403);
 
+    const commercial = await User.create({ name: 'Audit2a Commercial', email: `audit2a-commercial-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Client', isEmailVerified: true });
+    const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
+    await require('../models/PlatformOperator').create({ user: commercial._id, status: 'active', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES], grantedBy: fixture.bootstrap._id, grantReason: 'LOT A commercial moderation' });
+    const res = await request(app)
+      .patch(`/api/properties/admin/${property._id}/validate`)
+      .set(bearer(commercial));
     expect(res.status).toBe(200);
+    expect(String((await Property.findById(property._id).lean()).tenant)).toBe(String(fixture.tenant._id));
   });
 });
 

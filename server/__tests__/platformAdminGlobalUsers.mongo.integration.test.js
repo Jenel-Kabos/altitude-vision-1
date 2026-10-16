@@ -9,7 +9,7 @@ const OrgMembership = require('../models/OrgMembership');
 const PlatformOperator = require('../models/PlatformOperator');
 const userRoutes = require('../routes/userRoutes');
 const { errorHandler } = require('../middleware/errorMiddleware');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
 
 jest.setTimeout(180000);
@@ -92,18 +92,18 @@ beforeAll(async () => {
   // PLATFORM-ADMIN-04A — le registre global relève de la Vue plateforme :
   // lecteur et gestionnaire globaux sont des administrateurs éligibles ;
   // `partialReader` (users.read seul) n'entre plus en Vue plateforme.
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: reader._id,
     actor: fixtureA.bootstrap,
     reason: 'PLATFORM-ADMIN-02 reader',
     capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES],
   });
-  await grantOperator({ userId: manager._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 manager', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
-  await grantOperator({ userId: partialReader._id, actor: fixtureA.bootstrap, reason: 'PA04A partial reader', capabilities: ['platform.users.read'] });
-  await grantOperator({ userId: wrongCapability._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 wrong capability', capabilities: ['platform.properties.read'] });
-  await grantOperator({ userId: inactiveReader._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 inactive reader', capabilities: ['platform.users.read'] });
+  await provisionPrivilegedOperator({ userId: manager._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 manager', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+  await provisionPrivilegedOperator({ userId: partialReader._id, actor: fixtureA.bootstrap, reason: 'PA04A partial reader', capabilities: ['platform.users.read'] });
+  await provisionPrivilegedOperator({ userId: wrongCapability._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 wrong capability', capabilities: ['platform.properties.read'] });
+  await provisionPrivilegedOperator({ userId: inactiveReader._id, actor: fixtureA.bootstrap, reason: 'PLATFORM-ADMIN-02 inactive reader', capabilities: ['platform.users.read'] });
   await PlatformOperator.updateOne({ user: inactiveReader._id }, { $set: { status: 'suspended' } });
-  await grantOperator({
+  await provisionPrivilegedOperator({
     userId: operatorUser._id,
     actor: fixtureA.bootstrap,
     reason: 'PLATFORM-ADMIN-02 operator population',
@@ -163,7 +163,7 @@ describe('PLATFORM-ADMIN-02 — authority and lifecycle invariants', () => {
     // `reader` reste éligible pour les tests de registre qui suivent.
     await PlatformOperator.updateMany({ user: { $nin: [manager._id, reader._id] } }, { $pull: { capabilities: 'platform.operators.manage' } });
     const finalViable = await makeUser({ label: 'Final Viable' });
-    await grantOperator({ userId: finalViable._id, actor: manager, reason: 'final viable fixture', capabilities: ['platform.operators.manage'] });
+    await provisionPrivilegedOperator({ userId: finalViable._id, actor: manager, reason: 'final viable fixture', capabilities: ['platform.operators.manage'] });
 
     const allowed = await request(app).patch(`/api/users/${finalViable._id}/suspend`).set(bearer(manager));
     expect(allowed.status).toBe(200);
@@ -187,7 +187,7 @@ describe('PLATFORM-ADMIN-02 — authority and lifecycle invariants', () => {
 
   test('hard deletion preserves every identity with PlatformOperator history', async () => {
     const formerOperator = await makeUser({ label: 'Former Operator' });
-    await grantOperator({ userId: formerOperator._id, actor: manager, reason: 'operator history fixture', capabilities: ['platform.properties.read'] });
+    await provisionPrivilegedOperator({ userId: formerOperator._id, actor: manager, reason: 'operator history fixture', capabilities: ['platform.properties.read'] });
     await PlatformOperator.updateOne({ user: formerOperator._id }, { $set: { status: 'revoked' } });
 
     const res = await request(app).delete(`/api/users/${formerOperator._id}`).set(bearer(manager));
