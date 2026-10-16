@@ -283,9 +283,9 @@ describe('QUOTA — no identity bypass', () => {
 
   test('QUOTA-12: PlatformOperator without tenant membership cannot even reach onboarding (module+role gate refuses)', async () => {
     await setSubscriptionPlan(tA._id, 'essentiel', { maxManagedProperties: 1 });
-    const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+    const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
     const op = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: op._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read'] });
+    await provisionPrivilegedOperator({ userId: op._id, actor: bA, reason: 'fx', capabilities: ['platform.support.read'] });
     const property = await seedProperty({ owner: ownerP, tenant: tA });
     const res = await onboard(op, tA, property._id);
     expect(res.status).toBe(403);
