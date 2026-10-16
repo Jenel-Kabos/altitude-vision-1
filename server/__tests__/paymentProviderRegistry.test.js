@@ -1,7 +1,7 @@
 // PAY-3 — tests du registre de providers (architecture provider-agnostic).
 // Aucun appel externe : tout est pur, en mémoire.
 const {
-  getProvider, listProviders, supportsRefund, normalizeStatus,
+  getProvider, listProviders, supportsRefund, isOperationalForFinancialCore, normalizeStatus,
   assertFallbackAllowed, PAYMENT_PROVIDERS,
 } = require('../services/finance/paymentProviderRegistry');
 const { FINANCIAL_PAYMENT_STATUSES, FINANCIAL_PAYMENT_METHODS } = require('../constants/financialConstants');
@@ -43,10 +43,21 @@ describe('paymentProviderRegistry — providers automatiques non implémentés (
     expect(manual.capabilities.initiate).toBe(false);
   });
 
-  test('seul card_psp déclare supportsRefund — aucun provider n’implémente refundPayment sans le déclarer', () => {
-    expect(supportsRefund(PAYMENT_PROVIDERS.CARD_PSP)).toBe(true);
-    expect(supportsRefund(PAYMENT_PROVIDERS.MTN_DIRECT)).toBe(false);
-    expect(supportsRefund(PAYMENT_PROVIDERS.MANUAL)).toBe(false);
+  test('F-U1 — aucun provider ne déclare supportsRefund tant que refundPayment n’est qu’un stub', () => {
+    for (const { provider } of listProviders()) expect(supportsRefund(provider)).toBe(false);
+  });
+
+  test('F-U1 — card_psp : capacités réelles à false, intention séparée dans plannedCapabilities', () => {
+    const card = getProvider(PAYMENT_PROVIDERS.CARD_PSP);
+    expect(Object.values(card.capabilities).every((value) => value === false)).toBe(true);
+    expect(card.plannedCapabilities.refund).toBe(true);
+    expect(() => card.refundPayment()).toThrow(expect.objectContaining({ code: 'FINANCIAL_PROVIDER_NOT_IMPLEMENTED' }));
+  });
+
+  test('F-U1 — opérationnel pour le Financial Core = branché ET initiable (stubs exclus)', () => {
+    expect(isOperationalForFinancialCore(PAYMENT_PROVIDERS.MTN_DIRECT)).toBe(true);
+    [PAYMENT_PROVIDERS.CARD_PSP, PAYMENT_PROVIDERS.AIRTEL_DIRECT, PAYMENT_PROVIDERS.YABETOO, PAYMENT_PROVIDERS.MANUAL]
+      .forEach((provider) => expect(isOperationalForFinancialCore(provider)).toBe(false));
   });
 });
 

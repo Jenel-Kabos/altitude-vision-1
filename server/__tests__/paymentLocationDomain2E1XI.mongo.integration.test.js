@@ -14,7 +14,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { startFinancialMongo, clearFinancialMongo, stopFinancialMongo } = require('./helpers/financialMongoEnvironment');
 const { createTenantFixture, addTenantMember } = require('./helpers/tenantAwareFixture');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Contrat = require('../models/Contrat');
@@ -148,7 +148,7 @@ describe('PAY-AUTH — canonical tenant authority replaces legacy capability', (
     const fA = await tenant('A');
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'PAY-AUTH-02', capabilities: ['platform.finance.read'] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'PAY-AUTH-02', capabilities: ['platform.finance.read'] });
     const res = await request(app).get('/api/paiements/location').set(bearer(opUser, fA.tenant));
     expect(res.status).toBe(403);
   });
@@ -244,7 +244,7 @@ describe('PAY-PEN — penalty separation', () => {
   test('PAY-PEN-06 (PlatformOperator + platform.finance.manage → global /calculer-penalites allowed)', async () => {
     const opUser = await makeUser({ role: 'Admin' });
     const granter = await makeUser({ role: 'Admin' });
-    await grantOperator({ userId: opUser._id, actor: granter, reason: 'PAY-PEN-06', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
+    await provisionPrivilegedOperator({ userId: opUser._id, actor: granter, reason: 'PAY-PEN-06', capabilities: /* PLATFORM-ADMIN-04A — portée globale : opérateur éligible */ [...PLATFORM_VIEW_REQUIRED_CAPABILITIES] });
     const res = await request(app).post('/api/paiements/calculer-penalites').set(bearer(opUser));
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveProperty('verifies');
