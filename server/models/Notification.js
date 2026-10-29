@@ -46,6 +46,10 @@ const NOTIFICATION_TYPES = [
   'contrat_updated',      // locataire + propriétaire : contrat modifié
   'loyer_paye',           // propriétaire : loyer encaissé
   'loyer_en_retard',      // locataire : loyer en retard (alerte cron)
+  // F-U2.10 — échéances, retards, signalements et recouvrement (in-app/push uniquement).
+  'rent_invoice_available', 'rent_due_soon', 'rent_overdue', 'rent_penalty_estimated',
+  'rent_difficulty_received', 'rent_difficulty_to_review', 'rent_formal_notice_to_prepare',
+  'rent_formal_notice_suspended', 'rent_payment_confirmed', 'rent_debt_settled',
   'rental_ready_to_publish',
   'rental_listing_submitted',
   'rental_listing_published',

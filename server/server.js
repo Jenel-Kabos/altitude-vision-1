@@ -241,6 +241,8 @@ const maintenanceRoutes      = require('./routes/maintenanceRoutes');
 const salePropertyRoutes     = require('./routes/salePropertyRoutes');
 const rentalPropertyRoutes   = require('./routes/rentalPropertyRoutes');
 const financialRoutes        = require('./routes/financialRoutes');
+const contractualFinanceRoutes = require('./routes/contractualFinanceRoutes'); // F-U1.G
+const billingRoutes = require('./routes/billingRoutes'); // F-U2
 const paymentProviderRoutes  = require('./routes/paymentProviderRoutes');
 const dashboardAnalyticsRoutes = require('./routes/dashboardAnalyticsRoutes');
 const accommodationReservationRoutes = require('./routes/accommodationReservationRoutes');
@@ -322,6 +324,8 @@ app.use('/api/altimmo', altimmoSearchRoutes);
 app.use('/api/hotel-reservations', hotelReservationRoutes);
 // 💰 Noyau financier F1 — routes staff protégées, sans fournisseur réel.
 app.use('/api/financial', financialRoutes);
+app.use('/api/v1/contractual-finance', contractualFinanceRoutes); // F-U1.G
+app.use('/api/v1/billing', billingRoutes); // F-U2
 app.use('/api/payments/providers', paymentProviderRoutes);
 app.use('/api/dashboard-analytics', dashboardAnalyticsRoutes);
 app.use('/api/accommodation-reservations', accommodationReservationRoutes);
