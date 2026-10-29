@@ -3,7 +3,6 @@ const crypto = require('crypto');
 const { Server } = require('socket.io');
 const { createAdapter } = require('@socket.io/redis-adapter');
 const Redis = require('ioredis');
-const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('./models/User');
 const Conversation = require('./models/Conversation');
@@ -14,6 +13,7 @@ const {
   PLATFORM_VIEW_FORBIDDEN_CONTEXT_SOURCE,
 } = require('./constants/platformOperatorConstants');
 const logger = require('./utils/logger');
+const { verifySessionToken } = require('./utils/jwtSession');
 
 // MESSAGING-PLATFORM-INBOX-AGGREGATION-1C — room canonique pour les
 // PlatformOperator porteurs de `platform.support.read`. Réutilisée par
@@ -146,12 +146,12 @@ const initSocket = (httpServer, corsOptions) => {
       const token = socket.handshake.auth?.token;
       if (!token) return next(new Error('Authentification requise'));
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = verifySessionToken(token);
       const user = await User.findById(decoded.id).select('-password');
 
       if (!user) return next(new Error('Utilisateur introuvable'));
 
-      if (decoded.tokenVersion !== undefined && decoded.tokenVersion < user.tokenVersion) {
+      if (decoded.tokenVersion < user.tokenVersion) {
         return next(new Error('Session expirée, veuillez vous reconnecter'));
       }
 
@@ -162,6 +162,7 @@ const initSocket = (httpServer, corsOptions) => {
       socket.userId = user._id.toString();
       socket.user = user;
       socket.authTokenVersion = decoded.tokenVersion;
+      socket.authExpiresAt = decoded.exp;
       const requestedTenantId = socket.handshake.auth?.platformTenantId
         || socket.handshake.headers?.['x-platform-tenant-id']
         || socket.handshake.headers?.['x-tenant-id']
@@ -200,6 +201,7 @@ const initSocket = (httpServer, corsOptions) => {
       socket.data.userId = socket.userId;
       socket.data.platformTenantId = socket.platformTenantId;
       socket.data.authTokenVersion = socket.authTokenVersion;
+      socket.data.authExpiresAt = socket.authExpiresAt;
       next();
     } catch {
       next(new Error('Token invalide ou expiré'));
@@ -207,6 +209,29 @@ const initSocket = (httpServer, corsOptions) => {
   });
 
   _io.on('connection', (socket) => {
+    // Réautorise chaque événement entrant : expiration, révocation et statut
+    // du compte restent effectifs pendant toute la durée du socket.
+    socket.use(async (_packet, next) => {
+      try {
+        const freshUser = await User.findById(socket.userId).select('-password');
+        const now = Math.floor(Date.now() / 1000);
+        const sessionValid = freshUser
+          && freshUser.isActive
+          && !['Suspendu', 'Banni'].includes(freshUser.status)
+          && socket.authTokenVersion >= freshUser.tokenVersion
+          && now < socket.authExpiresAt;
+        if (!sessionValid) {
+          socket.disconnect(true);
+          return next(new Error('Session expirée, veuillez vous reconnecter'));
+        }
+        socket.user = freshUser;
+        return next();
+      } catch (error) {
+        socket.disconnect(true);
+        return next(error);
+      }
+    });
+
     // Incrémenter le compteur (un utilisateur peut avoir plusieurs sockets)
     onlineUsers.set(socket.userId, (onlineUsers.get(socket.userId) || 0) + 1);
 
@@ -235,8 +260,10 @@ const initSocket = (httpServer, corsOptions) => {
       }
       try {
         const freshUser = await User.findById(socket.userId).select('-password');
+        const now = Math.floor(Date.now() / 1000);
         const sessionValid = freshUser && freshUser.isActive && !['Suspendu', 'Banni'].includes(freshUser.status)
-          && (socket.authTokenVersion === undefined || socket.authTokenVersion >= freshUser.tokenVersion);
+          && socket.authTokenVersion >= freshUser.tokenVersion
+          && now < socket.authExpiresAt;
         if (!sessionValid || !await canAccessHotel(freshUser, id, socket.platformTenantId)) {
           acknowledge?.({ ok: false, error: 'Accès refusé' });
           return;
@@ -420,8 +447,10 @@ async function emitHotelEvent(hotelId, payload = {}) {
   for (const socket of sockets) {
     const userId = socket.data.userId;
     const freshUser = userId ? await User.findById(userId).select('-password') : null;
+    const now = Math.floor(Date.now() / 1000);
     const sessionValid = freshUser && freshUser.isActive && !['Suspendu', 'Banni'].includes(freshUser.status)
-      && (socket.data.authTokenVersion === undefined || socket.data.authTokenVersion >= freshUser.tokenVersion);
+      && socket.data.authTokenVersion >= freshUser.tokenVersion
+      && now < socket.data.authExpiresAt;
     const allowed = sessionValid && await canAccessHotel(freshUser, hotelId, socket.data.platformTenantId).catch(() => false);
     if (!allowed) {
       await socket.leave(room);

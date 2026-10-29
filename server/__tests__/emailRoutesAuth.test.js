@@ -30,6 +30,7 @@ const jwt     = require('jsonwebtoken');
 const { app } = require('../server');
 const Email   = require('../models/Email');
 const User    = require('../models/User');
+const STAFF_ID = '507f1f77bcf86cd799439012';
 
 const FAKE_EMAIL_DOC = { _id: 'e1', email: 'contact@altitudevision.agency', isActive: true, emailsSent: 0 };
 
@@ -37,7 +38,7 @@ const signToken = (userId, role) => jwt.sign({ id: userId, role, tokenVersion: 0
 
 const mockAuthenticatedUser = (role) => {
   User.findById = jest.fn().mockReturnValue({
-    select: jest.fn().mockResolvedValue({ _id: 'staff-1', id: 'staff-1', role, tokenVersion: 0, isActive: true, status: 'Actif' }),
+    select: jest.fn().mockResolvedValue({ _id: STAFF_ID, id: STAFF_ID, role, tokenVersion: 0, isActive: true, status: 'Actif' }),
   });
   User.findByIdAndUpdate = jest.fn().mockReturnValue({ catch: jest.fn() });
 };
@@ -105,7 +106,7 @@ describe('emailRoutes — accès staff authentifié (ROLES_DOCS) préservé apr�
     '%s authentifié : GET /api/emails toujours 200, comportement historique intact',
     async (role) => {
       mockAuthenticatedUser(role);
-      const res = await request(app).get('/api/emails').set('Authorization', `Bearer ${signToken('staff-1', role)}`);
+      const res = await request(app).get('/api/emails').set('Authorization', `Bearer ${signToken(STAFF_ID, role)}`);
       expect(res.statusCode).toBe(200);
       expect(Email.find).toHaveBeenCalled();
     }
@@ -115,7 +116,7 @@ describe('emailRoutes — accès staff authentifié (ROLES_DOCS) préservé apr�
     '%s authentifié mais hors ROLES_DOCS : GET /api/emails → 403',
     async (role) => {
       mockAuthenticatedUser(role);
-      const res = await request(app).get('/api/emails').set('Authorization', `Bearer ${signToken('staff-1', role)}`);
+      const res = await request(app).get('/api/emails').set('Authorization', `Bearer ${signToken(STAFF_ID, role)}`);
       expect(res.statusCode).toBe(403);
       expect(Email.find).not.toHaveBeenCalled();
     }
@@ -123,7 +124,7 @@ describe('emailRoutes — accès staff authentifié (ROLES_DOCS) préservé apr�
 
   test('Admin authentifié : POST /api/emails (création) fonctionne comme avant', async () => {
     mockAuthenticatedUser('Admin');
-    const res = await request(app).post('/api/emails').set('Authorization', `Bearer ${signToken('staff-1', 'Admin')}`).send({ email: 'x@y.com', displayName: 'X' });
+    const res = await request(app).post('/api/emails').set('Authorization', `Bearer ${signToken(STAFF_ID, 'Admin')}`).send({ email: 'x@y.com', displayName: 'X' });
     expect(res.statusCode).toBe(201);
     expect(Email.create).toHaveBeenCalled();
   });

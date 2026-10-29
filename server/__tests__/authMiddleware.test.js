@@ -6,10 +6,11 @@ jest.mock('../models/Property');
 const User     = require('../models/User');
 const Property = require('../models/Property');
 const { protect, optionalAuth, restrictTo, adminOnly, checkPropertyOwnership } = require('../middleware/authMiddleware');
+const USER_ID = '507f1f77bcf86cd799439011';
 
 // ── Helpers ──────────────────────────────────────────────────
 const makeToken = (payload = {}) =>
-  jwt.sign({ id: 'user123', tokenVersion: 0, ...payload }, process.env.JWT_SECRET);
+  jwt.sign({ id: USER_ID, tokenVersion: 0, ...payload }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
 const makeReq = (token) => ({
   headers: { authorization: token ? `Bearer ${token}` : undefined },
@@ -56,7 +57,7 @@ describe('protect', () => {
 
   it('renvoie 401 si tokenVersion est obsolète', async () => {
     User.findById.mockReturnValue({
-      select: jest.fn().mockResolvedValue({ _id: 'user123', tokenVersion: 5, status: 'Actif', isActive: true }),
+      select: jest.fn().mockResolvedValue({ _id: USER_ID, tokenVersion: 5, status: 'Actif', isActive: true }),
     });
     const res  = makeRes();
     const next = await runMiddleware(protect, makeReq(makeToken({ tokenVersion: 2 })), res);
@@ -65,9 +66,21 @@ describe('protect', () => {
     expect(res.status).toHaveBeenCalledWith(401);
   });
 
+  it.each([
+    ['absente', jwt.sign({ id: USER_ID }, process.env.JWT_SECRET, { expiresIn: '1h' })],
+    ['invalide', jwt.sign({ id: USER_ID, tokenVersion: '0' }, process.env.JWT_SECRET, { expiresIn: '1h' })],
+    ['algorithme non autorisé', jwt.sign({ id: USER_ID, tokenVersion: 0 }, process.env.JWT_SECRET, { algorithm: 'HS384', expiresIn: '1h' })],
+  ])('renvoie 401 avant la base si la session JWT est %s', async (_label, token) => {
+    const res = makeRes();
+    const next = await runMiddleware(protect, makeReq(token), res);
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(User.findById).not.toHaveBeenCalled();
+  });
+
   it('renvoie 403 si compte Suspendu', async () => {
     User.findById.mockReturnValue({
-      select: jest.fn().mockResolvedValue({ _id: 'user123', tokenVersion: 0, status: 'Suspendu', isActive: true }),
+      select: jest.fn().mockResolvedValue({ _id: USER_ID, tokenVersion: 0, status: 'Suspendu', isActive: true }),
     });
     const res  = makeRes();
     const next = await runMiddleware(protect, makeReq(makeToken()), res);
@@ -78,7 +91,7 @@ describe('protect', () => {
 
   it('renvoie 403 si isActive est false', async () => {
     User.findById.mockReturnValue({
-      select: jest.fn().mockResolvedValue({ _id: 'user123', tokenVersion: 0, status: 'Actif', isActive: false }),
+      select: jest.fn().mockResolvedValue({ _id: USER_ID, tokenVersion: 0, status: 'Actif', isActive: false }),
     });
     const res  = makeRes();
     const next = await runMiddleware(protect, makeReq(makeToken()), res);
@@ -87,7 +100,7 @@ describe('protect', () => {
   });
 
   it('appelle next() sans erreur et injecte req.user pour un token valide', async () => {
-    const fakeUser = { _id: 'user123', tokenVersion: 0, status: 'Actif', isActive: true };
+    const fakeUser = { _id: USER_ID, tokenVersion: 0, status: 'Actif', isActive: true };
     User.findById.mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser) });
     User.findByIdAndUpdate.mockResolvedValue(null); // lastActivityAt — non-blocking
     const req  = makeReq(makeToken());
@@ -107,7 +120,7 @@ describe('optionalAuth', () => {
     [{ tokenVersion: 0, status: 'Suspendu', isActive: true }, {}],
     [{ tokenVersion: 0, status: 'Banni', isActive: false }, {}],
   ])('continue anonymement si la session est révoquée ou le compte désactivé', async (fakeUser, payload) => {
-    User.findById.mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: 'user123', ...fakeUser }) });
+    User.findById.mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: USER_ID, ...fakeUser }) });
     const req = makeReq(makeToken(payload));
     const next = await runMiddleware(optionalAuth, req, makeRes());
     expect(next).toHaveBeenCalledWith();
@@ -115,12 +128,21 @@ describe('optionalAuth', () => {
   });
 
   it('attache un compte actif avec une session courante', async () => {
-    const fakeUser = { _id: 'user123', tokenVersion: 0, status: 'Actif', isActive: true };
+    const fakeUser = { _id: USER_ID, tokenVersion: 0, status: 'Actif', isActive: true };
     User.findById.mockReturnValue({ select: jest.fn().mockResolvedValue(fakeUser) });
     const req = makeReq(makeToken());
     const next = await runMiddleware(optionalAuth, req, makeRes());
     expect(next).toHaveBeenCalledWith();
     expect(req.user).toBe(fakeUser);
+  });
+
+  it('continue anonymement sans consulter la base si tokenVersion est absente', async () => {
+    const token = jwt.sign({ id: USER_ID }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const req = makeReq(token);
+    const next = await runMiddleware(optionalAuth, req, makeRes());
+    expect(next).toHaveBeenCalledWith();
+    expect(req.user).toBeNull();
+    expect(User.findById).not.toHaveBeenCalled();
   });
 });
 

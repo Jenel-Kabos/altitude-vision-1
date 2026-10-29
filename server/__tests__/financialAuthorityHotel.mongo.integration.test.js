@@ -26,7 +26,7 @@ beforeEach(async () => {
   await HotelReservation.collection.insertOne({ _id: reservationId, hotel: hotel._id, tenant: f.tenant._id, guest: { firstName: 'Guest' }, status: 'checked_in' });
   doc = await FinancialDocument.create({ tenant: f.tenant._id, domain: 'hotel', establishmentType: 'Hotel', establishmentId: hotel._id, documentType: 'invoice', documentNumber: `FA-${id()}`, status: 'issued', currency: 'XAF', subjectType: 'HotelReservation', subjectId: reservationId, totalMinor: 100000, balanceMinor: 100000, businessOperationKey: `doc-${id()}`, createdBy: user._id });
 });
-const headers = (who = user, tenant = f.tenant) => ({ Authorization: `Bearer ${jwt.sign({ id: who._id, tokenVersion: 0 }, process.env.JWT_SECRET)}`, 'X-Platform-Tenant-Id': String(tenant._id), 'Idempotency-Key': `FA-${id()}` });
+const headers = (who = user, tenant = f.tenant) => ({ Authorization: `Bearer ${jwt.sign({ id: who._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' })}`, 'X-Platform-Tenant-Id': String(tenant._id), 'Idempotency-Key': `FA-${id()}` });
 const body = () => ({ financialDocumentId: String(doc._id), reservationId: String(reservationId), amountMinor: 40000, method: 'cash' });
 
 test('FA-04 F2.2-01 active tenant membership records payment through real route', async () => {

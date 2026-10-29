@@ -37,8 +37,42 @@ const connect = (user, tenant) => new Promise((resolve, reject) => {
   client.once('connect', () => resolve(client));
   client.once('connect_error', reject);
 });
+const rejectConnection = (token, tenant) => new Promise((resolve, reject) => {
+  const client = clientIo(baseUrl, { transports: ['websocket'], auth: { token, platformTenantId: String(tenant._id) }, forceNew: true, reconnection: false });
+  clients.push(client);
+  client.once('connect', () => reject(new Error('connexion socket acceptée à tort')));
+  client.once('connect_error', (error) => resolve(error));
+});
 const join = (client, conversationId) => new Promise((resolve) => client.emit('join-room', String(conversationId), resolve));
 const joinHotel = (client, hotelId) => new Promise((resolve) => client.emit('establishment:join', { type: 'hotel', id: String(hotelId) }, resolve));
+
+test('handshake Socket.IO refuse tokenVersion absente/invalide et HS384', async () => {
+  const bootstrap = await User.create({ name: 'Bootstrap Socket JWT', email: `socket-jwt-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin' });
+  const { tenant } = await createTenantFixture({ label: 'Socket JWT', bootstrap });
+  const { user } = await createTenantUser({ tenant, bootstrap, overrides: { role: 'Client', email: `socket-jwt-user-${Date.now()}@example.test` } });
+  // Témoin positif : le même utilisateur/tenant se connecte avec un jeton conforme.
+  await expect(connect(user, tenant)).resolves.toBeDefined();
+  const tokens = [
+    jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' }),
+    jwt.sign({ id: user._id, tokenVersion: '0' }, process.env.JWT_SECRET, { expiresIn: '1h' }),
+    jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { algorithm: 'HS384', expiresIn: '1h' }),
+  ];
+  for (const token of tokens) await expect(rejectConnection(token, tenant)).resolves.toBeInstanceOf(Error);
+});
+
+test('Socket.IO déconnecte une session dès que son exp est atteint', async () => {
+  const bootstrap = await User.create({ name: 'Bootstrap Socket Exp', email: `socket-exp-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin' });
+  const { tenant } = await createTenantFixture({ label: 'Socket Exp', bootstrap });
+  const { user } = await createTenantUser({ tenant, bootstrap, overrides: { role: 'Client', email: `socket-exp-user-${Date.now()}@example.test` } });
+  const token = jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1s' });
+  const client = clientIo(baseUrl, { transports: ['websocket'], auth: { token, platformTenantId: String(tenant._id) }, forceNew: true, reconnection: false });
+  clients.push(client);
+  await new Promise((resolve, reject) => { client.once('connect', resolve); client.once('connect_error', reject); });
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  client.emit('join-room', String(new (require('mongoose').Types.ObjectId)()));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(client.connected).toBe(false);
+});
 
 test('B rejoint/reçoit B ; staff A connaissant l’ObjectId ne rejoint et ne reçoit jamais B', async () => {
   const bootstrap = await User.create({ name: 'Bootstrap Socket', email: `socket-bootstrap-${Date.now()}@example.test`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin' });

@@ -143,7 +143,7 @@ describe.each(Object.keys(endpoint))('%s — frontière tenant avant effets de b
 test('un Admin sans tenant échoue fermé avant lecture de la réservation', async () => {
   const outsider = await User.create({ name: 'No tenant', email: 'reservation-no-tenant@example.test', password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
   const reservation = await makeReservation(tenantA, accommodationA, adminA, 'cancelled');
-  const res = await request(app).post(`/api/accommodation-reservations/${reservation._id}/cancel`).set({ Authorization: `Bearer ${jwt.sign({ id: outsider._id, tokenVersion: 0 }, process.env.JWT_SECRET)}` });
+  const res = await request(app).post(`/api/accommodation-reservations/${reservation._id}/cancel`).set({ Authorization: `Bearer ${jwt.sign({ id: outsider._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' })}` });
   expect(res.status).toBe(403); expect((await Reservation.findById(reservation._id)).status).toBe('confirmed');
 });
 

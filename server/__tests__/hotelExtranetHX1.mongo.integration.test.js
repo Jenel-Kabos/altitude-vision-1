@@ -228,7 +228,7 @@ describe('PATCH /:hotelId/inventory/days — endpoint HTTP (PHASE-HX1)', () => {
     const { hotel } = await makeHotel();
     const category = await makeCategory(hotel);
     const { manager: intruder } = await makeHotel();
-    const forgedToken = jwt.sign({ id: intruder, tokenVersion: 0, platformTenant: 'not-a-real-tenant' }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    const forgedToken = jwt.sign({ id: intruder._id, tokenVersion: 0, platformTenant: 'not-a-real-tenant' }, process.env.JWT_SECRET, { expiresIn: '1d' });
     const response = await request(app)
       .patch(`/api/hotels/${hotel._id}/inventory/days`)
       .set('Authorization', `Bearer ${forgedToken}`)

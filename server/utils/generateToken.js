@@ -1,5 +1,5 @@
 // server/utils/generateToken.js
-const jwt = require('jsonwebtoken');
+const { signSessionToken } = require('./jwtSession');
 
 /**
  * Génère un token JWT pour un utilisateur donné, incluant la version du token pour la gestion des sessions.
@@ -11,12 +11,12 @@ const jwt = require('jsonwebtoken');
 const generateToken = (userId, tokenVersion) => { // 🚨 MODIFIÉ : Ajout de tokenVersion
     if (!process.env.JWT_SECRET || !process.env.JWT_EXPIRES_IN) {
         throw new Error(
-            'Les variables d'environnement JWT_SECRET ou JWT_EXPIRES_IN doivent être définies dans le fichier .env'
+            "Les variables d'environnement JWT_SECRET ou JWT_EXPIRES_IN doivent être définies dans le fichier .env"
         );
     }
 
     // 🚨 MODIFIÉ : Ajout de tokenVersion dans le payload du JWT
-    return jwt.sign({ id: userId, tokenVersion }, process.env.JWT_SECRET, {
+    return signSessionToken({ id: String(userId), tokenVersion }, {
         expiresIn: process.env.JWT_EXPIRES_IN,
     });
 };

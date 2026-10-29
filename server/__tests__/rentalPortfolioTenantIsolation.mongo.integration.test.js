@@ -28,7 +28,7 @@ const property = (tenant, overrides = {}) => Property.create({
 });
 const get = (user = a.bootstrap, tenant = a.tenant, status = 'location') => {
   const req = request(app).get(`/api/property-asset/portfolio/dashboard?status=${status}`)
-    .set('Authorization', `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET)}`);
+    .set('Authorization', `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' })}`);
   return tenant ? req.set('X-Platform-Tenant-Id', String(tenant._id)) : req;
 };
 const dashboard = async (...args) => { const res = await get(...args); expect(res.status).toBe(200); return res.body.data.dashboard; };

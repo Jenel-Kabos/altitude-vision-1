@@ -38,7 +38,7 @@ describe('POST /api/auth/google verification contract', () => {
         jest.clearAllMocks();
         PendingRegistration.findOne.mockResolvedValue(null);
         User.findOne.mockResolvedValue({
-            _id: 'user-id',
+            _id: '507f1f77bcf86cd799439013',
             tokenVersion: 0,
             name: 'OAuth Test',
             email: verifiedPayload.email,
@@ -100,7 +100,7 @@ describe('POST /api/auth/google verification contract', () => {
         verifyIdToken.mockResolvedValue({ getPayload: () => verifiedPayload });
         User.findOne.mockResolvedValue(null);
         const createdUser = {
-            _id: 'created-user-id', tokenVersion: 0, role: 'Client',
+            _id: '507f1f77bcf86cd799439014', tokenVersion: 0, role: 'Client',
             name: verifiedPayload.name, email: verifiedPayload.email,
             isEmailVerified: true, save: jest.fn().mockResolvedValue(undefined),
         };
@@ -148,7 +148,7 @@ describe('POST /api/auth/google verification contract', () => {
     test('a repeated signup sees the existing account and cannot create a duplicate', async () => {
         verifyIdToken.mockResolvedValue({ getPayload: () => verifiedPayload });
         const createdUser = {
-            _id: 'created-user-id', tokenVersion: 0, role: 'Client',
+            _id: '507f1f77bcf86cd799439014', tokenVersion: 0, role: 'Client',
             name: verifiedPayload.name, email: verifiedPayload.email,
             isEmailVerified: true, save: jest.fn().mockResolvedValue(undefined),
         };

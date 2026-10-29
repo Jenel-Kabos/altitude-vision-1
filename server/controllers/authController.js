@@ -1,7 +1,6 @@
 // server/controllers/authController.js
 const crypto    = require('crypto');
 const bcrypt    = require('bcryptjs');
-const jwt       = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const User                  = require('../models/User');
 const PendingRegistration   = require('../models/PendingRegistration');
@@ -19,6 +18,7 @@ const { protect: mwProtect, optionalAuth: mwOptionalAuth, restrictTo: mwRestrict
 // d'appliquer ses propres autorisations indépendamment de ce que le client
 // affirme détenir (voir server/docs/RBAC3_SECURITY_MATRIX.md).
 const { getEffectiveCapabilities } = require('../utils/iamArchitecture');
+const { signSessionToken } = require('../utils/jwtSession');
 
 const PUBLIC_SIGNUP_ROLES = new Set(['Client', 'Proprietaire']);
 const isAccountEnabled = (user) => Boolean(user?.isActive && (user.status === undefined || user.status === 'Actif'));
@@ -53,7 +53,7 @@ const verifyGoogleToken = async (idToken) => {
 // 🔑 UTILITAIRES JWT
 // ======================================================
 const signToken = (id, tokenVersion) =>
-    jwt.sign({ id, tokenVersion }, process.env.JWT_SECRET, {
+    signSessionToken({ id: String(id), tokenVersion }, {
         expiresIn: process.env.JWT_EXPIRES_IN || '90d',
     });
 

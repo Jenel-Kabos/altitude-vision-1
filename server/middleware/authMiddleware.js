@@ -1,11 +1,11 @@
 // ======================================================
 // 🧩 MIDDLEWARE D'AUTHENTIFICATION ET D'AUTORISATION
 // ======================================================
-const jwt = require('jsonwebtoken');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const logger = require('../utils/logger');
+const { verifySessionToken } = require('../utils/jwtSession');
 
 // ======================================================
 // 🔒 MIDDLEWARE : AUTHENTIFICATION OBLIGATOIRE
@@ -24,7 +24,7 @@ const protect = asyncHandler(async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    decoded = verifySessionToken(token);
   } catch (error) {
     res.status(401);
     throw new Error('Non autorisé : token invalide ou expiré.');
@@ -38,7 +38,7 @@ const protect = asyncHandler(async (req, res, next) => {
   }
 
   // Invalidation par tokenVersion (logout global, reset password)
-  if (decoded.tokenVersion !== undefined && decoded.tokenVersion < user.tokenVersion) {
+  if (decoded.tokenVersion < user.tokenVersion) {
     res.status(401);
     throw Object.assign(new Error('Session expirée, veuillez vous reconnecter.'), { name: 'AuthSessionError', code: 'SESSION_REVOKED' });
   }
@@ -81,11 +81,11 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = verifySessionToken(token);
 
       const user = await User.findById(decoded.id).select('-password');
 
-      const tokenRevoked = user && decoded.tokenVersion !== undefined && decoded.tokenVersion < user.tokenVersion;
+      const tokenRevoked = user && decoded.tokenVersion < user.tokenVersion;
       const passwordChanged = user && typeof user.changedPasswordAfter === 'function' && user.changedPasswordAfter(decoded.iat);
       const accountDisabled = user && (user.status === 'Suspendu' || user.status === 'Banni' || user.status === 'Supprimé' || !user.isActive);
 
