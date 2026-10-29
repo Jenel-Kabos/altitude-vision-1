@@ -7,7 +7,6 @@ const authController = require('../controllers/authController');
 const { attachTenantContext, requireTenantScopeForStaffOrPlatformOperator, isPlatformWideRequest, isPlatformViewForbiddenRequest } = require('../middleware/tenantContext');
 const { requirePlatformNativeCapability } = require('../middleware/platformAuthority');
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
-const { restrictTo } = require('../middleware/authMiddleware');
 const {
   getConversationById,
   getConversations,
@@ -91,7 +90,7 @@ router.get('/count/unread', requireStaffConversationScope, getUnreadCount);
 // affectées par HF-FINAL-01 — voir ENDPOINT_MATRIX.md).
 
 // Boîte partagée staff (Admin + tous sous-rôles collaborateurs)
-router.get('/staff-inbox', restrictTo(...ALL_STAFF), requireStaffConversationScope, getStaffInbox);
+router.get('/staff-inbox', requireStaffConversationScope, getStaffInbox);
 
 // Ma propre conversation staff-inbox (côté client/propriétaire)
 router.get('/my-inbox', getMyInbox);

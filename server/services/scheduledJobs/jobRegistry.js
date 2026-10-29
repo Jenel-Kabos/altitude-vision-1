@@ -5,8 +5,6 @@ const { processAccommodationReservationReminders } = require('../accommodationRe
 const { processAccommodationReservationExpiry } = require('../accommodationReservationExpiryService');
 const { verifierPaiementsEnRetard } = require('../alerteService');
 const { runRentalFinancialAutomations } = require('../rentalFinancialAutomationService');
-const { runRentCollectionCycle } = require('../finance/billing/rentCollectionService');
-const { activePenaltyEngine, ENGINES } = require('../finance/billing/rentPenaltyEngine');
 const { processVisitAutomation } = require('../visiteAutomationService');
 const { processReservationExpiry } = require('../hotelReservationExpiryService');
 const { expireReservations, sendExpirationReminders } = require('../realEstateApplicationService');
@@ -30,16 +28,6 @@ async function rentalHandler() {
   return { processed: penalties.verifies, failed: alerts.payments.errors + alerts.contracts.errors, penalties, alerts };
 }
 
-// F-U2.11 — cycle locatif canonique (pénalité au 6, dossier au 25). Inscrit
-// mais inerte tant que RENT_PENALTY_ENGINE ≠ CANONICAL : l'activation est une
-// décision de déploiement distincte. Jamais d'envoi de mise en demeure.
-async function rentalCollectionHandler({ now = new Date() } = {}) {
-  const engine = activePenaltyEngine();
-  if (engine !== ENGINES.CANONICAL) return { processed: 0, skipped: 1, engine };
-  const result = await runRentCollectionCycle({ now });
-  return { processed: result.checked, failed: result.errors, engine, ...result };
-}
-
 async function realEstateHandler() {
   const expired = await expireReservations();
   const reminders = await sendExpirationReminders();
@@ -52,7 +40,6 @@ const JOB_REGISTRY = Object.freeze([
   { name: 'accommodation-reminders', schedule: '*/15 * * * *', leaseDurationMs: 14 * 60 * 1000, heartbeatMs: 60 * 1000, handler: processAccommodationReservationReminders },
   { name: 'accommodation-reservation-expiry', schedule: '*/5 * * * *', leaseDurationMs: 4 * 60 * 1000, heartbeatMs: 30 * 1000, handler: processAccommodationReservationExpiry },
   { name: 'rental-penalties-alerts', schedule: '0 6 * * *', timezone: BUSINESS_TIME_ZONE, leaseDurationMs: 30 * 60 * 1000, heartbeatMs: 60 * 1000, handler: rentalHandler },
-  { name: 'rental-collection-cycle', schedule: '30 6 * * *', timezone: BUSINESS_TIME_ZONE, leaseDurationMs: 30 * 60 * 1000, heartbeatMs: 60 * 1000, handler: () => rentalCollectionHandler() },
   { name: 'visit-automation', schedule: '*/5 * * * *', leaseDurationMs: 4 * 60 * 1000, heartbeatMs: 30 * 1000, handler: () => processVisitAutomation() },
   { name: 'hotel-reservation-expiry', schedule: '*/5 * * * *', leaseDurationMs: 4 * 60 * 1000, heartbeatMs: 30 * 1000, handler: () => processReservationExpiry() },
   { name: 'real-estate-expiry', schedule: '*/5 * * * *', leaseDurationMs: 4 * 60 * 1000, heartbeatMs: 30 * 1000, handler: realEstateHandler },
@@ -60,4 +47,4 @@ const JOB_REGISTRY = Object.freeze([
 
 const getJob = (name) => JOB_REGISTRY.find((job) => job.name === name);
 
-module.exports = { BUSINESS_TIME_ZONE, JOB_REGISTRY, getJob, facebookHandler, rentalHandler, rentalCollectionHandler, realEstateHandler };
+module.exports = { BUSINESS_TIME_ZONE, JOB_REGISTRY, getJob, facebookHandler, rentalHandler, realEstateHandler };

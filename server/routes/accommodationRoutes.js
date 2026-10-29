@@ -8,7 +8,7 @@ const {
   requireTenantScopeForStaffAllowPlatformWide,
   attachTenantScopeIfResolvable,
 } = require('../middleware/tenantContext');
-const { requirePlatformOperatorCapabilityWhenPresent } = require('../middleware/platformAuthority');
+const { requirePlatformOperatorCapability, requirePlatformOperatorCapabilityWhenPresent, requirePlatformScope } = require('../middleware/platformAuthority');
 
 const router = express.Router();
 const reservationCtrl = require('../controllers/accommodationReservationController');
@@ -26,7 +26,7 @@ router.use(attachTenantScopeIfResolvable);
 router.post('/admin', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScope, upload.array('images', 10), ctrl.createFull);
 router.put('/admin/:propertyId', auth.restrictTo(...ROLES_ALTIMMO), upload.array('images', 10), ctrl.updateFull);
 router.get('/admin/list', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, requirePlatformOperatorCapabilityWhenPresent('platform.accommodations.read'), ctrl.listAdmin);
-router.get('/status/pending', auth.restrictTo(...ROLES_ALTIMMO), requireTenantScopeForStaffAllowPlatformWide, requirePlatformOperatorCapabilityWhenPresent('platform.accommodations.read'), ctrl.pending);
+router.get('/status/pending', requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, ctrl.pending);
 
 // Mobile — publication atomique et idempotente (correctif robustesse 2026-07,
 // Property + Accommodation + RatePlan + soumission en une transaction). Mêmes
@@ -55,6 +55,6 @@ router.delete('/:id/availability-blocks/:blockId', requireTenantScopeForStaffAll
 // Staff — même convention que GET/PATCH /api/properties/:id/:action
 // (validate|reject|suspend|unsuspend) — placée en dernier pour ne jamais
 // capturer les routes propriétaire ci-dessus (:action est générique).
-router.patch('/:id/:action', auth.restrictTo(...ROLES_ALTIMMO), ctrl.reviewDecision);
+router.patch('/:id/:action', requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, ctrl.reviewDecision);
 
 module.exports = router;

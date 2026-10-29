@@ -1091,12 +1091,13 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   // toute ressource attribuée à un AUTRE tenant. La règle "unresolved =
   // allow" du helper canonique reste utile ailleurs, mais la modération
   // exige une attribution positive.
-  if (!target.tenant || !req.platformTenant?._id
-      || String(target.tenant) !== String(req.platformTenant._id)) {
+  const platformModeration = req.isPlatformOperatorContext === true;
+  if (!platformModeration && (!target.tenant || !req.platformTenant?._id
+      || String(target.tenant) !== String(req.platformTenant._id))) {
     res.status(403);
     throw new Error('Cette propriété n\'appartient pas au tenant sélectionné.');
   }
-  const tenant = req.platformTenant;
+  const tenant = req.platformTenant || (target.tenant ? { _id: target.tenant } : null);
 
   // Pour les annonces Property classiques (vente/location), la file de
   // modération est l'unique transition staff disponible : valider publie et

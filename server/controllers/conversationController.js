@@ -6,7 +6,7 @@ const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const { ALL_STAFF } = require('../utils/roles');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
-const { assertConversationAccess } = require('../services/messagingAuthorizationService');
+const { assertConversationAccess, hasSupportCapability, SUPPORT_READ } = require('../services/messagingAuthorizationService');
 
 const activeTenantId = (req) => req.platformTenant?._id;
 // POST-E2E-1 — un client sans tenant propre voit UNIQUEMENT ses propres
@@ -611,8 +611,8 @@ exports.getMyInbox = asyncHandler(async (req, res) => {
  */
 exports.getStaffInbox = async (req, res) => {
   try {
-    if (!ALL_STAFF.includes(req.user.role)) {
-      return res.status(403).json({ status: 'fail', message: 'Accès réservé au staff.' });
+    if (!(await hasSupportCapability(req.user, SUPPORT_READ))) {
+      return res.status(403).json({ status: 'fail', code: 'SUPPORT_CAPABILITY_REQUIRED', message: 'Boîte de support réservée aux agents Altitude Vision habilités.' });
     }
 
     const candidates = await Conversation.find({ $and: [tenantConversationFilter(req), { isStaffInbox: true, isArchived: { $ne: true } }] })

@@ -13,8 +13,17 @@
 // inventée pour ce hotfix.
 const { ALL_STAFF } = require('../utils/roles');
 const { assertResourceTenantOrUnattributed } = require('./platformTenant/tenantResourceAttributionService');
+const PlatformOperator = require('../models/PlatformOperator');
 
 const activeTenantId = (req) => req.platformTenant?._id;
+const SUPPORT_READ = 'platform.support.read';
+const SUPPORT_REPLY = 'platform.support.reply';
+
+async function hasSupportCapability(actor, capability) {
+  const userId = actor?._id || actor?.id || actor;
+  if (!userId || ![SUPPORT_READ, SUPPORT_REPLY].includes(capability)) return false;
+  return Boolean(await PlatformOperator.exists({ user: userId, status: 'active', capabilities: capability }));
+}
 
 /**
  * Autorité Messaging canonique sur une conversation précise : tenant résolu
@@ -49,4 +58,4 @@ async function assertConversationAccess(req, conversation) {
   }
 }
 
-module.exports = { assertConversationAccess };
+module.exports = { assertConversationAccess, hasSupportCapability, SUPPORT_READ, SUPPORT_REPLY };
