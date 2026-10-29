@@ -250,7 +250,7 @@ describe('F-U2.10 — signalement par le locataire', () => {
     const mine = await lease(); const theirs = await lease({ user: otherTenantUser }); const settled = await lease();
     const myDoc = await issuedRent(mine.leaseId); const theirDoc = await issuedRent(theirs.leaseId); const paidDoc = await issuedRent(settled.leaseId);
     await pay(paidDoc, 150000, wat('2026-05-01T10:00:00'));
-    const token = jwt.sign({ id: tenantUser._id, tokenVersion: 0 }, process.env.JWT_SECRET);
+    const token = jwt.sign({ id: tenantUser._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const before = Date.now();
     const res = await request(app).post(`/tenant-portal/rent-dues/${myDoc._id}/difficulty-report`).set('Authorization', `Bearer ${token}`).send({ reason: 'x', declaredAt: '2026-05-01T00:00:00Z', admissibleForSuspension: true });
     expect(res.status).toBe(201);
@@ -371,10 +371,10 @@ describe('F-U2.10 — séparation financière, sécurité, isolement', () => {
     const report = await collection.reportPaymentDifficulty({ userId: tenantUser._id, documentId: document._id, now: wat('2026-05-10T10:00:00') });
     await collection.runRentCollectionCycle({ now: wat('2026-05-25T06:00:00') });
     const kase = await CollectionCase.findOne({ rentDocument: document._id }).lean();
-    const adminToken = jwt.sign({ id: adminA.user._id, tokenVersion: 0 }, process.env.JWT_SECRET);
+    const adminToken = jwt.sign({ id: adminA.user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const send = await request(app).post(`/billing/collection-cases/${kase._id}/send`).set('Authorization', `Bearer ${adminToken}`).set('X-Platform-Tenant-Id', String(A.tenant._id));
     expect(send.status).toBe(409);
-    const tenantToken = jwt.sign({ id: tenantUser._id, tokenVersion: 0 }, process.env.JWT_SECRET);
+    const tenantToken = jwt.sign({ id: tenantUser._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const decide = await request(app).post(`/billing/difficulty-reports/${report._id}/decision`).set('Authorization', `Bearer ${tenantToken}`).send({ decision: 'close', reason: 'je ne dois rien' });
     expect([403, 404]).toContain(decide.status);
     expect((await Report.findById(report._id).lean()).status).toBe('submitted');

@@ -395,7 +395,7 @@ describe('F-U2 — sécurité et tableaux de bord', () => {
   });
 
   test('HTTP : tableau propriétaire, génération avec tenant du corps ignoré, en-têtes no-store', async () => {
-    const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET)}`;
+    const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' })}`;
     const { leaseId, propertyId } = await lease();
     await delegatedMandate({ propertyId });
     const generated = await request(app).post('/billing/rent-invoices').set('Authorization', token(adminA.user)).set('X-Platform-Tenant-Id', String(A.tenant._id)).send({ leaseId: String(leaseId), period: '2026-02', tenant: String(B.tenant._id) });

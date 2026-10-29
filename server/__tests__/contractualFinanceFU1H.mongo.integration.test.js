@@ -61,7 +61,7 @@ async function operator(capabilities) {
 // Attestation de fixture : identité distincte par défaut, ou partagée via `key`.
 const attest = (user, key = `id-${user._id}`) => HumanIdentityAttestation.create({ user: user._id || user, identityKey: key, documentKind: 'NATIONAL_ID', evidenceRef: 'doc://cni', verifiedBy: oid(), verifiedAt: new Date() });
 const caps = async (actor) => (await resolveContractualAuthority(actor)).capabilities;
-const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET)}`;
+const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' })}`;
 const propose = (actor, userId, capability = CAP.FINANCIAL_APPROVE, extra = {}) => grants.proposeGrant({ actor, userId, capability, justification: 'Besoin métier', validUntil: future(), idempotencyKey: `k-${oid()}`, ...extra });
 
 beforeEach(async () => {

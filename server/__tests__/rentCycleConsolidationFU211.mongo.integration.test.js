@@ -47,7 +47,7 @@ const app = express(); app.use(express.json()); app.use('/billing', billingRoute
 jest.setTimeout(300000);
 const oid = () => new mongoose.Types.ObjectId();
 const wat = (iso) => new Date(`${iso}+01:00`);
-const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET)}`;
+const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' })}`;
 const engine = (value) => { if (value == null) delete process.env.RENT_PENALTY_ENGINE; else process.env.RENT_PENALTY_ENGINE = value; };
 let seq = 0;
 let A; let adminA; let owner; let otherOwner; let tenantUser; let platformOp;

@@ -56,7 +56,7 @@ const app = express(); app.use(express.json()); app.use('/billing', billingRoute
 jest.setTimeout(300000);
 const oid = () => new mongoose.Types.ObjectId();
 const wat = (iso) => new Date(`${iso}+01:00`);
-const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET)}`;
+const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' })}`;
 const EARLY = wat('2026-01-05T00:00:00'); // « maintenant » des créations de politiques
 let seq = 0;
 let A; let B; let adminA; let secretaireA; let adminB; let owner; let otherOwner; let tenantUser; let otherTenantUser; let platformOp;
