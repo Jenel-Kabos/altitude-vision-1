@@ -64,7 +64,7 @@ async function property(tenant, ownerId) {
 }
 const ticket = (propertyId) => RentalMaintenanceTicket.create({ property: propertyId, category: 'plomberie', description: 'Fuite' });
 const ownerActor = (user, tenant = null) => ({ _id: user._id, role: user.role, platformTenant: tenant });
-const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET)}`;
+const token = (user) => `Bearer ${jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' })}`;
 
 beforeEach(async () => {
   await clearFinancialMongo();

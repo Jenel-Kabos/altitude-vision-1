@@ -483,7 +483,7 @@ describe('F-U2.9 — tarifs officiels, droits, émetteur, isolement', () => {
   });
 
   test('HTTP : grille publique ; génération refusée à un Admin d’organisation ; tenant:null sans contexte PLATFORM ≠ plateforme', async () => {
-    const token = (user) => jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET);
+    const token = (user) => jwt.sign({ id: user._id, tokenVersion: 0 }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const pricing = await request(app).get('/billing/autonomous/pricing').set('Authorization', `Bearer ${token(owner)}`);
     expect(pricing.status).toBe(200);
     expect(pricing.body.data.formulas.map((f) => f.code)).toEqual(['GRATUIT', 'STANDARD', 'ENTREPRISE', 'GRAND_PORTEFEUILLE']);
