@@ -125,11 +125,13 @@ describe('SECURITY-CLOSURE-P0-WAVE-1 (P0-A) — acteurs SANS autorité (doivent 
 });
 
 describe('SECURITY-CLOSURE-P0-WAVE-1 (P0-A) — acteurs AVEC autorité (préservés, comportement historique)', () => {
-  test('4. Conversation client-client héritée sans autorisation → lecture seule', async () => {
+  // GIT-INTEGRATION-03A — décision de la direction : la messagerie générale
+  // reste libre ; une conversation héritée SANS lien commercial (bien,
+  // dossier, canal) n'est plus mise en lecture seule sur la base des rôles.
+  test('4. Conversation client-client héritée sans contexte commercial → messagerie générale préservée', async () => {
     const res = await sendMsg(convPrivateBC, clientB);
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe('CONTACT_AUTHORIZATION_REQUIRED');
-    expect(await Message.countDocuments({ conversation: convPrivateBC._id })).toBe(0);
+    expect(res.status).toBe(201);
+    expect(await Message.countDocuments({ conversation: convPrivateBC._id })).toBe(1);
   });
 
   test('5. Staff A de tenant sans autorité plateforme ne contourne pas la médiation', async () => {
@@ -172,11 +174,17 @@ describe('SECURITY-CLOSURE-P0-WAVE-1 (P0-A) — side effects sur envoi non autor
     expect(await Message.countDocuments({ conversation: convTenantB._id })).toBe(0);
   });
 
-  test('12. receiverId direct ne suffit plus à créer une relation commerciale', async () => {
-    const res = await request(app).post('/api/messages').set(bearer(clientB)).send({ receiverId: String(clientC._id), content: 'DIRECT' });
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe('COMMERCIAL_CONTEXT_REQUIRED');
-    expect(await Message.countDocuments({ sender: clientB._id, receiver: clientC._id })).toBe(0);
+  // GIT-INTEGRATION-03A — un message direct sans contexte reste général ;
+  // un receiverId ne permet jamais de contourner une conversation commerciale
+  // existante de la même paire.
+  test('12. receiverId direct : général sans contexte ; ne contourne jamais une conversation commerciale existante', async () => {
+    const general = await request(app).post('/api/messages').set(bearer(clientA)).send({ receiverId: String(clientC._id), content: 'GENERAL' });
+    expect(general.status).toBe(201);
+    await Conversation.create({ participants: [clientB._id, proprietaireA._id], relatedProperty: new (require('mongoose').Types.ObjectId)(), isStaffInbox: false });
+    const bypass = await request(app).post('/api/messages').set(bearer(clientB)).send({ receiverId: String(proprietaireA._id), content: 'DIRECT' });
+    expect(bypass.status).toBe(403);
+    expect(bypass.body.code).toBe('CONTACT_AUTHORIZATION_REQUIRED');
+    expect(await Message.countDocuments({ sender: clientB._id, receiver: proprietaireA._id })).toBe(0);
   });
 });
 

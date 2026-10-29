@@ -878,8 +878,8 @@ const PropertyDetailPage = () => {
 
   const soumettreRdv = async () => {
     if (rdvSubmittingRef.current) return;
-    if (!rdvDate || !rdvHeure || !rdvTel.trim() || !rdvConsent) {
-      toast.error("Renseignez le créneau, le téléphone et confirmez votre accord de contact.");
+    if (!rdvDate || !rdvHeure) {
+      toast.error("Renseignez le créneau souhaité.");
       return;
     }
     rdvSubmittingRef.current = true;
@@ -887,7 +887,7 @@ const PropertyDetailPage = () => {
     try {
       const convRes = await api.post('/conversations/start', {
         propertyId: property._id,
-        message: `Demande de visite le ${new Date(rdvDate).toLocaleDateString('fr-FR')} à ${rdvHeure}. Tél: ${rdvTel}${rdvMessage ? '. ' + rdvMessage : ''}`,
+        message: `Demande de visite le ${new Date(rdvDate).toLocaleDateString('fr-FR')} à ${rdvHeure}${rdvMessage ? '. ' + rdvMessage : ''}`,
       });
       await api.post('/visites', {
         propertyId: property._id,
@@ -1651,7 +1651,7 @@ const PropertyDetailPage = () => {
                     </div>
                   </div>
                   <div className="pdp-rdv-field">
-                    <label htmlFor="visit-phone">Téléphone *</label>
+                     <label htmlFor="visit-phone">Téléphone (optionnel, réservé à Altimmo)</label>
                     <input id="visit-phone" type="tel" value={rdvTel}
                       onChange={e => setRdvTel(e.target.value)}
                       placeholder="+242 06 XXX XX XX" />
@@ -1683,7 +1683,7 @@ const PropertyDetailPage = () => {
                   <CheckCircle size={32} strokeWidth={1.5} style={{ color: '#3B6D11' }} />
                 </div>
                 <h3>Demande envoyée !</h3>
-                <p>Notre équipe vous contactera au <strong>{rdvTel}</strong> pour confirmer votre rendez-vous.</p>
+                 <p>Notre équipe vous contactera via vos coordonnées de compte pour confirmer votre rendez-vous.</p>
                 <div className="pdp-rdv-recap">
                   <div className="pdp-rdv-recap-row">
                     <Calendar size={15} style={{ color: '#C8960C', flexShrink: 0 }} />

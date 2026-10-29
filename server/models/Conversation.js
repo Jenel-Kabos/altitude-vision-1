@@ -33,6 +33,12 @@ const conversationSchema = new mongoose.Schema({
         ref: 'Event',
         default: null,
     },
+    // GIT-INTEGRATION-03A — contexte commercial explicite (porté de 2b6bdaa4) :
+    // champs optionnels, aucune migration ; une conversation sans ces champs ni
+    // bien rattaché reste une conversation générale.
+    relatedDossierType: { type: String, enum: ['RealEstateApplication', 'Visite', 'HotelReservation', 'AccommodationReservation', 'Other'], default: null },
+    relatedDossier: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
+    channelType: { type: String, enum: ['commercial_direct', 'staff_inbox', 'hotel_operational'], default: null },
     // true = conversation initiée par un non-staff vers le staff (boîte partagée)
     // visible par tout Admin/Collaborateur, sans destinataire unique fixe
     isStaffInbox: {

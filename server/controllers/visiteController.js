@@ -190,10 +190,6 @@ exports.createVisite = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Choisissez un créneau pendant les horaires d’ouverture de l’agence (Lun-Ven 8h-18h, Sam 9h-14h).');
   }
-  if (!clientContactConsent) {
-    res.status(400);
-    throw new Error('Le consentement de contact est requis pour organiser la visite.');
-  }
   // Une seule visite active par client et par bien : si ce client a déjà une
   // visite en cours sur CE bien (demandée, en attente, confirmée ou
   // reprogrammée), on ne crée pas de doublon — on l'invite à reprogrammer
@@ -247,7 +243,7 @@ exports.createVisite = asyncHandler(async (req, res) => {
     clientWhatsAppSnapshot: whatsapp || '',
     preferredContactMethod: preferredContactMethod || '',
     visitorCount: visitorCount || 1,
-    clientContactConsent: true,
+    clientContactConsent: Boolean(clientContactConsent),
     ownerNameSnapshot: property.owner?.name || '',
     ownerPhoneSnapshot: property.owner?.phone || '',
     propertySnapshot: {
@@ -659,7 +655,7 @@ exports.updatePaiementVisite = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     status: 'success',
-    data: { visite },
+    data: { visite: serializeVisite(visite, 'staff') },
   });
 });
 
@@ -683,7 +679,7 @@ exports.getAllPayments = asyncHandler(async (req, res) => {
   res.status(200).json({
     status: 'success',
     results: visites.length,
-    data: { visites },
+    data: { visites: visites.map((visite) => serializeVisite(visite, 'staff')) },
   });
 });
 
@@ -701,7 +697,7 @@ exports.getMyPayments = asyncHandler(async (req, res) => {
   res.status(200).json({
     status: 'success',
     results: visites.length,
-    data: { visites },
+    data: { visites: visites.map((visite) => serializeVisite(visite, 'client')) },
   });
 });
 

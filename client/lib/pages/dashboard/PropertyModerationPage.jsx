@@ -53,7 +53,7 @@ const PropertyModerationPage = () => {
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/properties/status/pending');
+      const res = await api.get('/properties/status/pending', { platformScoped: true });
       const props = res.data.data.properties;
       setProperties(props);
       setFiltered(props);
@@ -80,9 +80,19 @@ const PropertyModerationPage = () => {
     );
   }, [selectedPole, properties]);
 
+  // LOT A — un rejet commercial exige un motif : la décision est tracée côté
+  // serveur (révision commerciale) et refusée sans motif.
+  const [rejectReason, setRejectReason] = useState('');
+
   const handleModeration = async (id, action) => {
+    if (action === 'reject' && !rejectReason.trim()) {
+      toast.error('Un motif de rejet est requis.');
+      return;
+    }
     try {
-      await api.patch(`/properties/admin/${id}/${action}`);
+      const body = action === 'reject' ? { reason: rejectReason.trim() } : {};
+      await api.patch(`/properties/admin/${id}/${action}`, body, { platformScoped: true });
+      setRejectReason('');
       const updated = properties.filter(p => p._id !== id);
       const removed = properties.find(p => p._id === id);
       setProperties(updated);
@@ -331,6 +341,14 @@ const PropertyModerationPage = () => {
               ) : (
                 <p className="text-gray-400 italic text-sm">Aucune image disponible.</p>
               )}
+            </div>
+
+            {/* Motif — obligatoire pour un rejet */}
+            <div className="border-t border-gray-100 pt-5">
+              <label htmlFor="property-reject-reason" className="block text-sm font-semibold text-gray-700 mb-1">Motif du rejet</label>
+              <textarea id="property-reject-reason" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={2}
+                placeholder="Obligatoire pour rejeter l’annonce"
+                className="w-full rounded-lg border border-gray-200 p-2 text-sm" />
             </div>
 
             {/* Actions */}

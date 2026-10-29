@@ -77,10 +77,10 @@ export const approvePropertyAdministration = async (propertyId, { platformScoped
   return response.data?.data?.property || null;
 };
 
-export const rejectPropertyAdministration = async (propertyId, { platformScoped = false } = {}) => {
+export const rejectPropertyAdministration = async (propertyId, { platformScoped = false, reason = '' } = {}) => {
   const response = await api.patch(
     `/admin/properties/${encodeURIComponent(propertyId)}/reject`,
-    {},
+    { reason },
     administrationRequestConfig(platformScoped),
   );
   return response.data?.data?.property || null;
