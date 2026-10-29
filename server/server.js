@@ -414,6 +414,7 @@ app.use('/api/platform-tenants', require('./routes/platformTenantRoutes'));
 // distincte de la gestion des tenants (routeur ci-dessus). Réservé Admin +
 // capacité `platform.operators.manage` (voir platformOperatorRoutes.js).
 app.use('/api/platform-operators', require('./routes/platformOperatorRoutes'));
+app.use('/api/contact-authorizations', require('./routes/contactAuthorizationRoutes')); // GIT-INTEGRATION-03A
 
 // 💬 Messagerie & Emails
 app.use("/api/conversations", conversationRoutes);

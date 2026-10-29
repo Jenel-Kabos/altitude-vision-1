@@ -37,6 +37,11 @@ const { assertResourceTenantOrUnattributed } = require('../services/platformTena
 const { resolveTenantForUser, resolveTenantScope } = require('../services/platformTenant/tenantContextService');
 const { normalizePropertyRegistryQuery, projectPropertyRegistryRows } = require('../services/propertyRegistryQueryService');
 const { ADMINISTRATION_SCOPE_MODE } = require('../services/administrationScopeService');
+const CommercialPublicationRevision = require('../models/CommercialPublicationRevision');
+const {
+  SUBSTANTIVE_PUBLIC_FIELDS, publicSnapshot, projectApprovedPublicResource, classifySubstantiveChanges,
+  createPendingRevision, decideRevision,
+} = require('../services/commercialPublicationService');
 
 // TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traitait un
 // `Property.owner` sans OrgMembership (Proprietaire public-signup, cas
@@ -432,6 +437,7 @@ const createProperty = asyncHandler(async (req, res, next) => {
     images:          imagePaths,
     statusAdmin:     'En attente'
   });
+  await createPendingRevision({ resourceType: 'Property', resource: newProperty, proposedSnapshot: publicSnapshot(newProperty), actor: req.user });
 
   logger.success('✅ Propriété créée :', newProperty._id);
 
@@ -540,6 +546,7 @@ async function runPropertySearch({ query, isAdmin, tenantId = null }) {
     if (hebergementIds.length > 0) {
       properties = await decoratePublicHotelProperties(properties);
     }
+    properties = properties.map(projectApprovedPublicResource);
   }
 
   logger.info(`📦 [runPropertySearch] total=${total} results=${properties.length} baseFilter=${JSON.stringify(Object.keys(baseFilter))}`);
@@ -741,8 +748,9 @@ const getProperty = asyncHandler(async (req, res) => {
     rental = await RentalManagement.findOne({ property: property._id });
   }
 
-  const responseProperty = property.toObject();
+  let responseProperty = property.toObject();
   if (!isAdmin && !isOwner) {
+    responseProperty = projectApprovedPublicResource(responseProperty);
     delete responseProperty.documents;
     delete responseProperty.latitude;
     delete responseProperty.longitude;
@@ -964,11 +972,6 @@ const updateProperty = asyncHandler(async (req, res) => {
     }
     updateData.fraisVisite = amount;
   }
-  // Un propriétaire qui modifie son bien repasse en modération
-  if (!isAdmin) {
-    updateData.statusAdmin = 'En attente';
-  }
-
   // 1. Upload des nouvelles images vers Cloudinary (avec optimisation WebP)
   const newImages = await uploadFilesToCloudinary(req.files);
   logger.info('📸 Nouvelles images Cloudinary:', newImages);
@@ -1035,6 +1038,26 @@ const updateProperty = asyncHandler(async (req, res) => {
     };
   }
 
+  const approvedBaseline = publicSnapshot(property.approvedPublicSnapshot || property);
+  const proposedPatch = publicSnapshot(updateData);
+  const proposedPublicSnapshot = {
+    ...approvedBaseline,
+    ...proposedPatch,
+    ...(proposedPatch.address ? { address: { ...(approvedBaseline.address || {}), ...proposedPatch.address } } : {}),
+  };
+  const substantiveChanges = classifySubstantiveChanges(
+    approvedBaseline,
+    proposedPublicSnapshot,
+  );
+  const alreadyPublic = property.statusAdmin === 'Validée' && property.isPublished === true;
+  if (substantiveChanges.length && alreadyPublic) {
+    await createPendingRevision({ resourceType: 'Property', resource: property, proposedSnapshot: proposedPublicSnapshot, actor: req.user });
+    SUBSTANTIVE_PUBLIC_FIELDS.forEach((field) => delete updateData[field]);
+  } else if (!alreadyPublic) {
+    updateData.statusAdmin = 'En attente';
+    updateData.isPublished = false;
+  }
+
   const linkedPublishedHotel = !isAdmin
     ? await Hotel.exists({ property: property._id, publicationStatus: 'publie' })
     : null;
@@ -1049,6 +1072,10 @@ const updateProperty = asyncHandler(async (req, res) => {
       updateData,
       actorId: req.user.id,
     })).property;
+
+  if (substantiveChanges.length && !alreadyPublic) {
+    await createPendingRevision({ resourceType: 'Property', resource: updatedProperty, proposedSnapshot: publicSnapshot(updatedProperty), actor: req.user });
+  }
 
   res.status(200).json({
     status: 'success',
@@ -1099,19 +1126,33 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   }
   const tenant = req.platformTenant || (target.tenant ? { _id: target.tenant } : null);
 
-  // Pour les annonces Property classiques (vente/location), la file de
-  // modération est l'unique transition staff disponible : valider publie et
-  // rejeter retire. Les hébergements gardent leur cycle spécialisé
-  // Accommodation/Hotel et ne sont jamais publiés par ce raccourci.
+  // GIT-INTEGRATION-03A — la décision passe par une révision commerciale
+  // versionnée (autorité `platform.commercial.manage` revérifiée dans la
+  // transaction de décision). La garde tenant ci-dessus reste une seconde barrière.
+  // Seules les annonces classiques (vente/location) sont publiées par cette
+  // décision : les hébergements gardent leur cycle spécialisé (règle de main).
   const classicListing = ['vente', 'location'].includes(target.status);
-  const publicationUpdate = classicListing
-    ? { isPublished: newStatusAdmin === 'Validée' }
-    : {};
-  const updatedProperty = await Property.findByIdAndUpdate(
-    id,
-    { statusAdmin: newStatusAdmin, reviewedAt: Date.now(), ...publicationUpdate },
-    { new: true }
-  );
+  let revision = await CommercialPublicationRevision.findOne({ resourceType: 'Property', resource: target._id, status: 'pending' }).sort('-createdAt');
+  if (!revision) revision = await createPendingRevision({ resourceType: 'Property', resource: target, proposedSnapshot: publicSnapshot(target), actor: target.owner });
+  const reason = String(req.body.reason || (action === 'validate' ? 'Approbation commerciale Altitude Vision' : '')).trim();
+  await decideRevision({
+    revisionId: revision._id,
+    decision: action === 'validate' ? 'approve' : 'reject',
+    actor: req.user,
+    reason,
+    adapter: {
+      model: Property,
+      buildPromotionUpdate: (approved, decidedRevision) => ({
+        $set: { approvedPublicSnapshot: approved, currentPublicationRevision: decidedRevision._id, statusAdmin: 'Validée', reviewedAt: new Date(), ...(classicListing ? { isPublished: true } : {}) },
+        $inc: { commercialPublicationVersion: 1 },
+      }),
+    },
+  });
+  if (action === 'reject') {
+    const hasApprovedVersion = target.commercialPublicationVersion > 0 || Boolean(target.approvedPublicSnapshot);
+    await Property.updateOne({ _id: id }, { $set: { statusAdmin: hasApprovedVersion ? 'Validée' : 'Rejetée', reviewedAt: new Date(), ...(classicListing ? { isPublished: hasApprovedVersion } : {}) } });
+  }
+  const updatedProperty = await Property.findById(id);
 
   if (!updatedProperty) {
     res.status(404);
@@ -1147,7 +1188,7 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
 
   // Broadcast uniquement si le bien est réellement public. Validation et
   // publication sont deux états distincts dans le modèle Property.
-  if (newStatusAdmin === 'Validée' && updatedProperty.isPublished === true) {
+  if (newStatusAdmin === 'Validée' && updatedProperty.isPublished === true && tenant) {
     try {
       const { scopeUserIds } = await resolveTenantScope(tenant._id);
       const allUsers = await User.find({
@@ -1343,6 +1384,7 @@ const getRecommendedProperties = asyncHandler(async (req, res) => {
   }
 
   properties = await decoratePublicHotelProperties(properties);
+  properties = properties.map(projectApprovedPublicResource);
 
   res.status(200).json({
     status: 'success',

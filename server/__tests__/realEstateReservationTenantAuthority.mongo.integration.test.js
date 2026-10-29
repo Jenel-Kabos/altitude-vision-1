@@ -18,7 +18,7 @@ const realEstateApplicationRoutes = require('../routes/realEstateApplicationRout
 const { errorHandler } = require('../middleware/errorMiddleware');
 const organizationService = require('../services/organizationService');
 const platformTenantService = require('../services/platformTenant/platformTenantService');
-const { grantOperator } = require('../services/platformOperator/platformOperatorService');
+const { provisionPrivilegedOperator } = require('../services/platformOperator/platformOperatorService');
 
 jest.setTimeout(180000);
 
@@ -133,7 +133,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-02) — POST reservatio
   test('9. PlatformOperator global -> annulation autorisee (contrat historique)', async () => {
     const a = await buildTenantWithReservation('A9');
     const operator = await User.create({ name: 'PO Global', email: `fca102-po-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-02 certification', capabilities: [] });
+    await provisionPrivilegedOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-02 certification', capabilities: [] });
     const res = await request(app).post(`/api/real-estate-applications/reservations/${a.reservation._id}/cancel`).set(bearer(operator, a.tenant._id)).send({ reason: 'test' });
     expect(res.status).toBe(200);
   });
@@ -142,7 +142,7 @@ describe('SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-02) — POST reservatio
     const a = await buildTenantWithReservation('A10');
     const b = await buildTenantWithReservation('B10');
     const operator = await User.create({ name: 'PO Scoped', email: `fca102-po-scoped-${Date.now()}@example.com`, password: 'Password123!', passwordConfirm: 'Password123!', role: 'Admin', isEmailVerified: true });
-    await grantOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-02 certification scoped', capabilities: [] });
+    await provisionPrivilegedOperator({ userId: operator._id, actor: a.admin, reason: 'FCA1-02 certification scoped', capabilities: [] });
     const res = await request(app).post(`/api/real-estate-applications/reservations/${b.reservation._id}/cancel`).set(bearer(operator, a.tenant._id)).send({ reason: 'test' });
     expect(res.status).not.toBe(200);
   });

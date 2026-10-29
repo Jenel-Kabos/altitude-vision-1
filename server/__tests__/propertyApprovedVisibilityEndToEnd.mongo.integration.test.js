@@ -87,6 +87,16 @@ describe('Reproduction — bien historique déjà approuvé mais isPublished=fal
 });
 
 describe('Réparation idempotente — re-validation via le vrai workflow (PATCH /admin/:id/validate)', () => {
+  // LOT A — la décision de publication appartient exclusivement à Altitude
+  // Vision : PlatformOperator actif avec platform.commercial.manage, en
+  // contexte PLATFORM. L'Admin fondateur du tenant est refusé.
+  const makeCommercialOperator = async () => {
+    const user = await makeUser({ role: 'Client' });
+    const { PLATFORM_VIEW_REQUIRED_CAPABILITIES } = require('../constants/platformOperatorConstants');
+    await require('../models/PlatformOperator').create({ user: user._id, status: 'active', capabilities: [...PLATFORM_VIEW_REQUIRED_CAPABILITIES], grantedBy: user._id, grantReason: 'LOT A commercial moderation' });
+    return user;
+  };
+
   test('une nouvelle annonce validée par le vrai workflow devient immédiatement visible sur les trois surfaces', async () => {
     const { tenant, bootstrap: admin } = await createTenantFixture({ label: 'ApprovedVisibilityE2E', withAdminMembership: true });
     const owner = await makeUser({ role: 'Proprietaire' });
@@ -97,9 +107,15 @@ describe('Réparation idempotente — re-validation via le vrai workflow (PATCH 
     // tenant explicitly, no silent null relied upon.
     const pending = await Property.create(propertyPayload(owner, { tenant: tenant._id })); // statusAdmin: 'En attente', isPublished non défini (undefined/false par défaut)
 
+    const tenantAdminAttempt = await request(app)
+      .patch(`/api/properties/admin/${pending._id}/validate`)
+      .set('Authorization', `Bearer ${signToken(admin._id)}`)
+      .set('X-Platform-Tenant-Id', String(tenant._id));
+    expect(tenantAdminAttempt.status).toBe(403);
+    const operator = await makeCommercialOperator();
     const res = await request(app)
       .patch(`/api/properties/admin/${pending._id}/validate`)
-      .set('Authorization', `Bearer ${signToken(admin._id)}`);
+      .set('Authorization', `Bearer ${signToken(operator._id)}`);
     expect(res.status).toBe(200);
     expect(res.body.data.property.statusAdmin).toBe('Validée');
     expect(res.body.data.property.isPublished).toBe(true);
@@ -121,6 +137,7 @@ describe('Réparation idempotente — re-validation via le vrai workflow (PATCH 
 
     let portfolio = await getPropertyPortfolio();
     expect(portfolio.items).toHaveLength(0); // confirmé invisible avant réparation
+    const operator = await makeCommercialOperator();
 
     // La réparation légitime est de rejouer le VRAI workflow de validation
     // (jamais une mutation directe `isPublished: true` en base) — idempotent
@@ -128,7 +145,7 @@ describe('Réparation idempotente — re-validation via le vrai workflow (PATCH 
     // Property vente/location, quel que soit son état de départ.
     const res = await request(app)
       .patch(`/api/properties/admin/${stuck._id}/validate`)
-      .set('Authorization', `Bearer ${signToken(admin._id)}`);
+      .set('Authorization', `Bearer ${signToken(operator._id)}`);
     expect(res.status).toBe(200);
     expect(res.body.data.property.isPublished).toBe(true);
 
@@ -139,19 +156,31 @@ describe('Réparation idempotente — re-validation via le vrai workflow (PATCH 
     // résultat, jamais un doublon ni une régression.
     const res2 = await request(app)
       .patch(`/api/properties/admin/${stuck._id}/validate`)
-      .set('Authorization', `Bearer ${signToken(admin._id)}`);
-    expect(res2.status).toBe(200);
+      .set('Authorization', `Bearer ${signToken(operator._id)}`);
+    // LOT A — rien de substantiel à décider : refus explicite 409, sans
+    // aucun effet de bord (ni doublon, ni dépublication).
+    expect(res2.status).toBe(409);
+    expect(res2.body.code).toBe('PUBLICATION_REVISION_EMPTY');
     portfolio = await getPropertyPortfolio();
     expect(portfolio.items).toHaveLength(1);
+    expect(await Property.findById(stuck._id).lean()).toMatchObject({ statusAdmin: 'Validée', isPublished: true });
   });
 
   test('un rejet explicite dépublie un bien resté isPublished=false par erreur (statut final cohérent)', async () => {
     const { tenant, bootstrap: admin } = await createTenantFixture({ label: 'ApprovedVisibilityE2E', withAdminMembership: true });
     const owner = await makeUser({ role: 'Proprietaire' });
     const stuck = await Property.create(propertyPayload(owner, { statusAdmin: 'Validée', isPublished: false, tenant: tenant._id }));
+    const operator = await makeCommercialOperator();
+    // LOT A — un rejet exige un motif (traçabilité de la décision).
+    const noReason = await request(app)
+      .patch(`/api/properties/admin/${stuck._id}/reject`)
+      .set('Authorization', `Bearer ${signToken(operator._id)}`);
+    expect(noReason.status).toBe(422);
+    expect(noReason.body.code).toBe('PUBLICATION_DECISION_REASON_REQUIRED');
     const res = await request(app)
       .patch(`/api/properties/admin/${stuck._id}/reject`)
-      .set('Authorization', `Bearer ${signToken(admin._id)}`);
+      .set('Authorization', `Bearer ${signToken(operator._id)}`)
+      .send({ reason: 'Annonce non conforme' });
     expect(res.status).toBe(200);
     expect(res.body.data.property.statusAdmin).toBe('Rejetée');
     expect(res.body.data.property.isPublished).toBe(false);

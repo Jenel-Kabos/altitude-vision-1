@@ -102,3 +102,28 @@ describe('PropertyModerationPage — bloc "Soumis par"', () => {
     expect(await screen.findByText('Email non renseigné')).toBeInTheDocument();
   });
 });
+
+// LOT A — un rejet commercial exige un motif (décision tracée côté serveur).
+describe('PropertyModerationPage — rejet motivé (LOT A)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test('sans motif, aucun appel serveur et une erreur explicite', async () => {
+    const toast = (await import('@/lib/utils/toast')).default;
+    api.get.mockResolvedValue({ data: { data: { properties: [basePendingProperty()] } } });
+    render(<PropertyModerationPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Voir les détails/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Rejeter/i }));
+    expect(api.patch).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Un motif de rejet est requis.');
+  });
+
+  test('avec motif, le rejet transmet ce motif en contexte plateforme', async () => {
+    api.get.mockResolvedValue({ data: { data: { properties: [basePendingProperty()] } } });
+    api.patch.mockResolvedValue({ data: { data: {} } });
+    render(<PropertyModerationPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Voir les détails/i }));
+    fireEvent.change(screen.getByLabelText('Motif du rejet'), { target: { value: 'Photos non conformes' } });
+    fireEvent.click(screen.getByRole('button', { name: /Rejeter/i }));
+    expect(api.patch).toHaveBeenCalledWith('/properties/admin/PROP-1/reject', { reason: 'Photos non conformes' }, { platformScoped: true });
+  });
+});

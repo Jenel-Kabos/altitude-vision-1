@@ -6,12 +6,24 @@ const { notify } = require('../services/notificationService');
 const workflow = require('../services/realEstateApplicationService');
 const mongoose = require('mongoose');
 const storage = require('../services/storage/realEstateApplicationStorageService');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
 const { resolveActiveOperator, hasCapability } = require('../services/platformOperator/platformOperatorService');
+const {
+  serializeDecisionView, serializeApplicantView, serializePlatformView,
+  authorizeContactDisclosure, authorizeEvidenceAccess, recordApplicationDisclosure,
+} = require('../services/realEstateApplicationPrivacyService');
 
 const isStaff = (user) => STAFF_IMMO.includes(user?.role);
 const fail = (res, error) => res.status(error.statusCode || 500).json({ status: 'fail', code: error.code, message: error.message });
 const canManage = (user, application) => isStaff(user) || String(application.owner) === String(user._id);
+const resourceId = (value) => value?._id || value;
+
+async function serializeForViewer(user, application) {
+  if (String(resourceId(application.applicant)) === String(user?._id || user?.id)) return serializeApplicantView(application);
+  const operator = await resolveActiveOperator(user?._id || user?.id).catch(() => null);
+  if (hasCapability(operator, 'platform.commercial.manage')) return serializePlatformView(application);
+  return serializeDecisionView(application);
+}
 // USER-TENANT-MEMBERSHIP-ARCHITECTURE-2E.1.X-MARKETPLACE-RENTAL-CONTRACT-
 // FORMATION — la décision commerciale d'ACCEPTER/REJETER un dossier
 // (`accept`/`reject`) engage la commercialisation Altitude Vision (locking
@@ -80,7 +92,7 @@ exports.create = async (req, res) => {
     }
     const application = await Application.create(payload);
     await notify({ recipient: property.owner, type: 'real_estate_application_submitted', title: 'Nouveau dossier immobilier', body: `Un dossier a été reçu pour « ${property.title} ».`, entityType: 'RealEstateApplication', entityId: application._id, dedupeKey: `application:${application._id}:submitted` });
-    res.status(201).json({ status: 'success', data: { application } });
+    res.status(201).json({ status: 'success', data: { application: serializeApplicantView(application) } });
   } catch (error) { fail(res, error); }
 };
 
@@ -106,16 +118,16 @@ exports.list = async (req, res) => {
     Application.find(filter).select('-attachments -rentalApplication.monthlyIncome').populate('property', 'title images status availability').populate('applicant', 'name firstName lastName').sort(sort).skip((page - 1) * limit).limit(limit),
     Application.countDocuments(filter),
   ]);
-  res.json({ status: 'success', results: applications.length, pagination: { page, limit, total, pages: Math.ceil(total / limit) }, data: { applications } });
+  const safeApplications = await Promise.all(applications.map((application) => serializeForViewer(req.user, application)));
+  res.json({ status: 'success', results: safeApplications.length, pagination: { page, limit, total, pages: Math.ceil(total / limit) }, data: { applications: safeApplications } });
 };
 
 exports.getOne = async (req, res) => {
   const application = await Application.findById(req.params.id).select('+attachments +attachments.storageKey +rentalApplication.monthlyIncome').populate('property', 'title images status availability owner').populate('applicant', 'name firstName lastName email phone').populate('decidedBy', 'name firstName lastName');
   if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
-  if (!canManage(req.user, application) && String(application.applicant) !== String(req.user._id)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
+  if (!canManage(req.user, application) && String(resourceId(application.applicant)) !== String(req.user._id)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
   if (!(await assertApplicationTenantAccessIfStaff(req, res, application, isStaff(req.user)))) return;
-  const safe = application.toObject();
-  safe.attachments = (safe.attachments || []).map(({ storageKey: _storageKey, ...attachment }) => attachment);
+  const safe = await serializeForViewer(req.user, application);
   res.json({ status: 'success', data: { application: safe } });
 };
 
@@ -209,7 +221,33 @@ exports.cancelReservation = async (req, res) => {
 };
 
 const loadApplicationWithPrivateFields = (id) => Application.findById(id).select('+attachments +attachments.storageKey +rentalApplication.monthlyIncome');
-const canReadPrivate = (user, application) => canManage(user, application) || String(application.applicant) === String(user._id);
+
+async function applicationTenantId(application) {
+  const attribution = await resolveResourceTenant({ resourceType: 'RealEstateApplication', resource: application });
+  if (attribution.status === 'ambiguous') throw Object.assign(new Error('Attribution tenant ambiguë.'), { statusCode: 404, code: 'TENANT_ATTRIBUTION_AMBIGUOUS' });
+  return attribution.status === 'resolved' ? attribution.tenantId : null;
+}
+
+exports.discloseContactDetails = async (req, res) => {
+  try {
+    const reason = String(req.query.reason || '').trim();
+    if (reason.length < 3) return res.status(400).json({ status: 'fail', code: 'DISCLOSURE_REASON_REQUIRED', message: 'Le motif de consultation est requis.' });
+    const application = await Application.findById(req.params.id).populate('applicant', 'name firstName lastName email phone');
+    if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
+    if (!(await assertApplicationTenantAccessIfStaff(req, res, application, Boolean(req.platformTenant)))) return;
+    const tenantId = await applicationTenantId(application);
+    let authority = await authorizeContactDisclosure({ application, actor: req.user, tenantId });
+    await recordApplicationDisclosure({ application, actor: req.user, tenantId, category: 'contact_details', fields: ['email', 'phone'], reason, recipient: req.user._id, authority });
+    // Revalidation au dernier moment : une révocation pendant l'audit gagne toujours.
+    if (!(await assertApplicationTenantAccessIfStaff(req, res, application, Boolean(req.platformTenant)))) return;
+    authority = await authorizeContactDisclosure({ application, actor: req.user, tenantId });
+    const applicant = application.applicant?.toObject ? application.applicant.toObject() : application.applicant;
+    res.json({ status: 'success', data: {
+      contact: { applicantId: String(resourceId(application.applicant)), email: applicant?.email || null, phone: applicant?.phone || null },
+      authorizationId: authority.authorizationId,
+    } });
+  } catch (error) { fail(res, error); }
+};
 
 exports.uploadAttachments = async (req, res) => {
   const application = await loadApplicationWithPrivateFields(req.params.id);
@@ -237,13 +275,21 @@ exports.uploadAttachments = async (req, res) => {
 
 exports.downloadAttachment = async (req, res) => {
   try {
+    const reason = String(req.query.reason || '').trim();
+    if (reason.length < 3) return res.status(400).json({ status: 'fail', code: 'DISCLOSURE_REASON_REQUIRED', message: 'Le motif de consultation est requis.' });
     const application = await loadApplicationWithPrivateFields(req.params.id);
     if (!application) return res.status(404).json({ status: 'fail', message: 'Dossier introuvable.' });
-    if (!canReadPrivate(req.user, application)) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
-    if (!(await assertApplicationTenantAccessIfStaff(req, res, application, isStaff(req.user)))) return;
+    if (!(await assertApplicationTenantAccessIfStaff(req, res, application, Boolean(req.platformTenant)))) return;
+    let authority = await authorizeEvidenceAccess({ application, actor: req.user });
     const attachment = application.attachments.id(req.params.attachmentId);
     if (!attachment) return res.status(404).json({ status: 'fail', message: 'Pièce introuvable.' });
     const buffer = await storage.readPrivateAttachment(attachment.storageKey);
+    authority = await authorizeEvidenceAccess({ application, actor: req.user });
+    const tenantId = await applicationTenantId(application);
+    await recordApplicationDisclosure({ application, actor: req.user, tenantId, category: 'evidence_download', fields: [String(attachment._id)], reason, recipient: req.user._id, authority });
+    // Dernier contrôle après lecture et audit, immédiatement avant la remise des octets.
+    if (!(await assertApplicationTenantAccessIfStaff(req, res, application, Boolean(req.platformTenant)))) return;
+    await authorizeEvidenceAccess({ application, actor: req.user });
     const safeName = attachment.name.replace(/[\r\n"\\]/g, '_');
     res.set({ 'Content-Type': attachment.mimeType, 'Content-Disposition': `attachment; filename="${safeName}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }).send(buffer);
   } catch (error) { fail(res, error); }

@@ -12,7 +12,7 @@ const { notify, notifyStaff } = require('../services/notificationService');
 const { ALL_STAFF } = require('../utils/roles');
 const logger = require('../utils/logger');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
-const { assertConversationAccess } = require('../services/messagingAuthorizationService');
+const { assertConversationAccess, assertConversationWritable } = require('../services/messagingAuthorizationService');
 const { streamRemoteDocument } = require('../services/storage/documentStreamingService');
 const { serializeMessage } = require('../services/messageSerializer');
 
@@ -83,6 +83,11 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     if (receiverId) {
         // CAS 1 : receiverId fourni directement (conv 1-à-1)
         targetUserId = receiverId;
+        // GIT-INTEGRATION-03A — un envoi direct réutilise la conversation
+        // existante de la paire : si elle est commerciale, sa politique
+        // d'écriture s'applique (pas de contournement par `receiverId`).
+        const existing = await Conversation.findOne({ participants: { $all: [req.user.id, receiverId] }, isStaffInbox: { $ne: true } });
+        if (existing) await assertConversationWritable({ actor: req.user, conversation: existing });
     } else if (conversationId) {
         convDoc = await Conversation.findById(conversationId);
         if (!convDoc) {
@@ -122,6 +127,10 @@ exports.sendMessage = asyncHandler(async (req, res) => {
                 throw new Error('Destinataire non trouvé dans la conversation.');
             }
             targetUserId = otherParticipantId;
+            // GIT-INTEGRATION-03A — conversation commerciale (bien, dossier) :
+            // autorisation de contact requise ; conversation générale : libre.
+            // L'historique reste lisible dans tous les cas.
+            await assertConversationWritable({ actor: req.user, conversation: convDoc });
         }
     }
 

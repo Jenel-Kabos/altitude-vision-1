@@ -9,8 +9,9 @@
 // reste invisible ici tant qu'il n'est pas ajouté explicitement.
 const Property = require('../../models/Property');
 const APIFeatures = require('../../utils/apiFeatures');
+const { projectApprovedPublicResource } = require('../commercialPublicationService');
 
-const PUBLIC_PROPERTY_FIELDS = 'title description type status price address latitude longitude location images bedrooms bathrooms surface livingRooms kitchens constructionType amenities availability createdAt';
+const PUBLIC_PROPERTY_FIELDS = 'title description type status price address latitude longitude location images bedrooms bathrooms surface livingRooms kitchens constructionType amenities availability createdAt approvedPublicSnapshot';
 
 // TENANT-CORE-1 (Phase 7) — `scopeUserIds` optionnel (Set d'identifiants
 // User) : quand fourni (clé API liée à un PlatformTenant, voir
@@ -29,14 +30,14 @@ async function listPublicProperties(query = {}, { scopeUserIds } = {}) {
     features.query.select(PUBLIC_PROPERTY_FIELDS).lean(),
     Property.countDocuments(features.query.getFilter()),
   ]);
-  return { properties, total, page: Number(query.page) || 1, limit: Number(query.limit) || 20 };
+  return { properties: properties.map(projectApprovedPublicResource), total, page: Number(query.page) || 1, limit: Number(query.limit) || 20 };
 }
 
 async function getPublicPropertyById(id, { scopeUserIds } = {}) {
   const filter = { _id: id, statusAdmin: 'Validée', isPublished: true };
   if (scopeUserIds) filter.owner = { $in: [...scopeUserIds] };
   const property = await Property.findOne(filter).select(PUBLIC_PROPERTY_FIELDS).lean();
-  return property || null;
+  return property ? projectApprovedPublicResource(property) : null;
 }
 
 module.exports = { listPublicProperties, getPublicPropertyById, PUBLIC_PROPERTY_FIELDS };

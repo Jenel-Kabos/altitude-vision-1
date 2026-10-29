@@ -6,7 +6,7 @@ const User = require('../models/User');
 const Conversation = require('../models/Conversation');
 const { ALL_STAFF } = require('../utils/roles');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
-const { assertConversationAccess, hasSupportCapability, SUPPORT_READ } = require('../services/messagingAuthorizationService');
+const { assertConversationAccess, assertConversationWritable, hasSupportCapability, SUPPORT_READ } = require('../services/messagingAuthorizationService');
 
 const activeTenantId = (req) => req.platformTenant?._id;
 // POST-E2E-1 — un client sans tenant propre voit UNIQUEMENT ses propres
@@ -521,6 +521,15 @@ exports.startConversation = async (req, res) => {
     }
 
     // ── Premier message optionnel ─────────────────────────────────
+    // GIT-INTEGRATION-03A — même politique d'écriture que les envois suivants
+    // pour une conversation 1-à-1 rattachée à un bien.
+    if (message?.trim() && !conversation.isStaffInbox) {
+      try {
+        await assertConversationWritable({ actor: req.user, conversation });
+      } catch (error) {
+        return res.status(error.statusCode || 403).json({ status: 'fail', code: error.code, message: error.message, data: { conversation } });
+      }
+    }
     if (message?.trim()) {
       const { getIO } = require('../socket');
       const { notify, notifyStaff } = require('../services/notificationService');

@@ -42,13 +42,30 @@ describe('visiteWorkflowService — TEST DATA', () => {
     expect(visite.workflowHistory[0]).toMatchObject({ from: STATUS.CONFIRMED, to: STATUS.IN_PROGRESS, source: 'mobile' });
   });
 
-  test('masque le téléphone client au propriétaire avant consentement et confirmation', () => {
+  test('une confirmation ne révèle jamais le téléphone client sans autorisation de contact distincte', () => {
     const base = { _id: 'TEST DATA', status: STATUS.REQUESTED, clientPhoneSnapshot: '+242000000000', clientContactConsent: true, client: { _id: 'CLIENT', name: 'TEST DATA CLIENT', phone: '+242000000000', email: 'test@example.com' } };
     const pending = serializeVisite(base, 'owner');
     expect(pending.telephone).toBe(maskPhone(base.clientPhoneSnapshot));
     expect(pending.client).toEqual({ _id: 'CLIENT', name: 'TEST DATA CLIENT' });
     const confirmed = serializeVisite({ ...base, status: STATUS.CONFIRMED }, 'owner');
-    expect(confirmed.telephone).toBe(base.clientPhoneSnapshot);
+    expect(confirmed.telephone).toBe(maskPhone(base.clientPhoneSnapshot));
+    const authorized = serializeVisite({ ...base, status: STATUS.CONFIRMED }, 'owner', { contactAuthorized: true });
+    expect(authorized.telephone).toBe(base.clientPhoneSnapshot);
+  });
+
+  test('la vue staff omet email, téléphone et snapshots privés par défaut', () => {
+    const visite = serializeVisite({
+      status: STATUS.CONFIRMED, telephone: '+242000000000', clientPhoneSnapshot: '+242000000000',
+      clientWhatsAppSnapshot: '+242011111111', ownerPhoneSnapshot: '+242022222222',
+      client: { _id: 'CLIENT', name: 'Candidate', email: 'candidate@example.test', phone: '+242000000000' },
+      property: { _id: 'PROPERTY', title: 'Villa', owner: { _id: 'OWNER', name: 'Owner', email: 'owner@example.test', phone: '+242022222222' } },
+    }, 'staff');
+    expect(visite.client).toEqual({ _id: 'CLIENT', name: 'Candidate' });
+    expect(visite.telephone).toBe(maskPhone('+242000000000'));
+    expect(visite).not.toHaveProperty('clientPhoneSnapshot');
+    expect(visite).not.toHaveProperty('clientWhatsAppSnapshot');
+    expect(visite).not.toHaveProperty('ownerPhoneSnapshot');
+    expect(visite.property.owner).toEqual({ _id: 'OWNER', name: 'Owner' });
   });
 
   test('masque adresse et contact propriétaire au client avant confirmation', () => {

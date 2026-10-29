@@ -4,12 +4,14 @@ const router = express.Router();
 const propertyController = require('../controllers/propertyController');
 const userController = require('../controllers/userController');
 const authMiddleware = require('../middleware/authMiddleware');
+const { requirePlatformOperatorCapability, requirePlatformScope } = require('../middleware/platformAuthority');
 
 /* =============================================================
    🧩 ACCÈS RÉSERVÉ À L'ADMINISTRATEUR
 ============================================================= */
 router.use(authMiddleware.protect);
-router.use(authMiddleware.restrictTo('Admin')); 
+router.use(requirePlatformOperatorCapability('platform.commercial.manage'));
+router.use(requirePlatformScope);
 
 /* =============================================================
    🏠 GESTION DES PROPRIÉTÉS / PUBLICATIONS

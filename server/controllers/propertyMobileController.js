@@ -2,12 +2,14 @@ const Property = require('../models/Property');
 const User = require('../models/User');
 const { notify } = require('../services/notificationService');
 const { buildMobilePropertyData } = require('../services/propertyPublicationInputService');
+const { publicSnapshot, createPendingRevision } = require('../services/commercialPublicationService');
 
 const createPropertyMobile = async (req, res) => {
   try {
     const propertyData = buildMobilePropertyData(req.body, req.user.id);
     propertyData.tenant = req.propertyCreationTenantId || null;
     const property = await Property.create(propertyData);
+    await createPendingRevision({ resourceType: 'Property', resource: property, proposedSnapshot: publicSnapshot(property), actor: req.user });
 
     // Notifier les Admin (modération réservée à ce rôle, cf. AdminDashboard
     // NAV_SECTIONS "Modération Biens" → roles: ['Admin']) — best-effort
