@@ -41,6 +41,14 @@ const paiementSchema = new mongoose.Schema({
     sentAt:    { type: Date },
     error:     { type: String, maxlength: 500 },
   },
+  // GIT-INTEGRATION-02A — pénalité ni appliquée ni exonérée : dossier signalé
+  // pour décision humaine (droits contractuels préexistants, litige, données
+  // incohérentes). Champ optionnel, aucune migration.
+  penaltyReview: {
+    status:    { type: String, enum: ['REQUIRED'] },
+    reason:    { type: String, trim: true, maxlength: 100 },
+    flaggedAt: { type: Date },
+  },
 }, { timestamps: true });
 paiementSchema.set('toJSON', { transform: (_doc, ret) => {
   const available = Boolean(ret.preuvePaiement?.asset || ret.preuvePaiement?.url);

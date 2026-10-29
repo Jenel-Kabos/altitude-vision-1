@@ -48,8 +48,8 @@ test('Individual A calcule uniquement ses pénalités, jamais Individual B ni Te
     seedPayment(ownerA, 'TENANT-X', new mongoose.Types.ObjectId()),
   ]);
   await IndividualSubscription.create({ user: ownerA._id, plan: 'premium', status: 'active', modulesIncluded: ['location'] });
-  // F-U2.13 : l'ancien moteur ne pénalise que si la politique du bail stipule
-  // une pénalité — le bailleur A l'a stipulée pour son bail (bail de B : aucune).
+  // Bail A : conditions identiques à la politique Altimmo ; bail B : ancienne
+  // option sans pénalité (dossier à revoir) — hors périmètre de A de toute façon.
   await adoptLeasePolicy({ actor: { _id: ownerA._id }, leaseId: a.contrat._id, effectiveFrom: new Date('2020-01-01T00:00:00+01:00') });
   await adoptLeasePolicy({ actor: { _id: ownerB._id }, leaseId: b.contrat._id, terms: {}, effectiveFrom: new Date('2020-01-01T00:00:00+01:00') });
 
@@ -61,14 +61,16 @@ test('Individual A calcule uniquement ses pénalités, jamais Individual B ni Te
   expect((await Paiement.findById(tenantX.paiement._id)).penaliteAppliquee).not.toBe(true);
 });
 
-test('F-U2.13 : sans politique stipulant une pénalité, l’ancien moteur n’applique plus aucune pénalité', async () => {
+// GIT-INTEGRATION-02A — décision de la direction : la pénalité de 3 % est la
+// politique obligatoire Altimmo ; l'absence de politique de bail n'exonère pas.
+test('politique obligatoire Altimmo : sans politique de bail, la pénalité de 3 % s’applique quand même', async () => {
   const ownerA = await makeOwner();
   const a = await seedPayment(ownerA, 'NO-POLICY');
   await IndividualSubscription.create({ user: ownerA._id, plan: 'premium', status: 'active', modulesIncluded: ['location'] });
   const res = await request(app).post('/api/paiements/location/calculer-penalites?scope=individual').set(as(ownerA));
   expect(res.status).toBe(200);
-  expect(res.body.data).toMatchObject({ verifies: 1, penalites: 0 });
-  expect((await Paiement.findById(a.paiement._id)).penaliteAppliquee).not.toBe(true);
+  expect(res.body.data).toMatchObject({ verifies: 1, penalites: 1 });
+  expect(await Paiement.findById(a.paiement._id).lean()).toMatchObject({ penaliteAppliquee: true, penaliteMontant: 3000, montantTotal: 103000 });
 });
 
 test('abonnement expiré refuse le calcul sans altérer le paiement', async () => {
