@@ -26,6 +26,21 @@ const ALTITUDE_DELEGATED_POLICY = Object.freeze({
   }),
 });
 
+// GIT-INTEGRATION-02A — Politique de retard obligatoire Altimmo (décision de la
+// direction) : loyer exigible au plus tard le 5, pénalité unique de 3 % du loyer
+// impayé à partir du 6. Centralisée côté serveur : ni le bailleur ni le
+// locataire ne peuvent en modifier le taux ni la neutraliser par une option de
+// bail. Appliquée par le moteur actif (LEGACY) ; un cas que le code ne peut pas
+// trancher juridiquement est signalé pour traitement humain, jamais exonéré.
+const ALTIMMO_MANDATORY_LATE_PENALTY = Object.freeze({
+  reference: 'ALTIMMO-RETARD-2026-10',
+  decisionReference: 'Décision de la direction Altitude Vision — pénalité obligatoire de 3 % à partir du 6',
+  rateBasisPoints: ALTITUDE_DELEGATED_POLICY.terms.penalty.rateBasisPoints,
+  base: 'UNPAID_RENT_PRINCIPAL',
+  lastDueDay: 5,
+  firstPenaltyDay: 6,
+});
+
 // Méthodes techniquement prises en charge pour les conditions autonomes.
 const SUPPORTED = Object.freeze({
   penaltyBases: ['UNPAID_RENT_PRINCIPAL'],
@@ -36,4 +51,4 @@ const SUPPORTED = Object.freeze({
 const CONSENT_STATUSES = ['PRESENTED', 'ACCEPTED'];
 const PRESENTATION_TTL_MS = 24 * 60 * 60 * 1000;
 
-module.exports = { POLICY_TYPES, ALTITUDE_DELEGATED_POLICY, SUPPORTED, CONSENT_STATUSES, PRESENTATION_TTL_MS };
+module.exports = { POLICY_TYPES, ALTITUDE_DELEGATED_POLICY, ALTIMMO_MANDATORY_LATE_PENALTY, SUPPORTED, CONSENT_STATUSES, PRESENTATION_TTL_MS };

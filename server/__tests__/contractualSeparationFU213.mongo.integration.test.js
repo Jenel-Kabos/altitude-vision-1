@@ -35,7 +35,8 @@ const DirectRentReceipt = require('../models/DirectRentReceipt');
 const Policy = require('../models/LeaseContractualPolicy');
 const Consent = require('../models/LeasePolicyConsent');
 const { PLATFORM_WIDE_CONTEXT_SOURCE } = require('../constants/platformOperatorConstants');
-const { ALTITUDE_DELEGATED_POLICY } = require('../constants/leasePolicyConstants');
+const { ALTITUDE_DELEGATED_POLICY, ALTIMMO_MANDATORY_LATE_PENALTY } = require('../constants/leasePolicyConstants');
+const Litige = require('../models/Litige');
 const calendar = require('../services/finance/billing/rentCalendarService');
 const rent = require('../services/finance/billing/rentBillingService');
 const collection = require('../services/finance/billing/rentCollectionService');
@@ -262,8 +263,11 @@ describe('F-U2.13.D/F — versionnement et changements de mode de gestion', () =
   });
 });
 
-describe('F-U2.13.G — moteur historique : plus de pénalité globale', () => {
-  test('LEGACY : aucune pénalité ni e-mail sans politique stipulant une pénalité ; avec politique autonome à pénalité : comportement historique', async () => {
+// GIT-INTEGRATION-02A — décision de la direction : la pénalité de 3 % à partir
+// du 6 est la politique obligatoire Altimmo ; l'absence de politique
+// contractuelle n'exonère plus (remplace la règle F-U2.13.G antérieure).
+describe('F-U2.13.G — moteur historique : politique de retard obligatoire Altimmo', () => {
+  test('LEGACY : sans politique de bail → politique Altimmo appliquée ; politique autonome à 3 % → appliquée', async () => {
     process.env.RENT_PENALTY_ENGINE = 'LEGACY';
     try {
       const bare = await lease();
@@ -272,10 +276,135 @@ describe('F-U2.13.G — moteur historique : plus de pénalité globale', () => {
       await ownerPolicy(withPenalty.leaseId, { due: { day: 1, monthOffset: 0 }, penalty: { rateBasisPoints: 300 } });
       const p2 = await Paiement.create({ contrat: withPenalty.leaseId, mois: 4, annee: 2026, montant: 150000, statut: 'impayé', jourEcheance: 1 });
       await verifierPaiementsEnRetard();
-      expect(await Paiement.findById(p1._id).lean()).toMatchObject({ penaliteAppliquee: false });
-      expect(await Paiement.findById(p2._id).lean()).toMatchObject({ penaliteAppliquee: true });
-      expect(zohoMailService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(await Paiement.findById(p1._id).lean()).toMatchObject({ penaliteAppliquee: true, penaliteMontant: 4500 });
+      expect(await Paiement.findById(p2._id).lean()).toMatchObject({ penaliteAppliquee: true, penaliteMontant: 4500 });
+      expect(zohoMailService.sendEmail).toHaveBeenCalledTimes(2);
     } finally { process.env.RENT_PENALTY_ENGINE = 'CANONICAL'; }
+  });
+});
+
+describe('GIT-INTEGRATION-02A — politique de retard obligatoire Altimmo (moteur LEGACY)', () => {
+  const APRIL = { mois: 4, annee: 2026, montant: 150000, jourEcheance: 1 };
+  const schedule = (leaseId, extra = {}) => Paiement.create({ contrat: leaseId, ...APRIL, statut: 'impayé', ...extra });
+  const run = (iso, extra = {}) => verifierPaiementsEnRetard({ now: wat(iso), ...extra });
+  const get = (paiement) => Paiement.findById(paiement._id).lean();
+  beforeEach(() => { process.env.RENT_PENALTY_ENGINE = 'LEGACY'; });
+  afterEach(() => { process.env.RENT_PENALTY_ENGINE = 'CANONICAL'; });
+
+  test('politique centralisée : 3 % à partir du 6, non configurable', () => {
+    expect(ALTIMMO_MANDATORY_LATE_PENALTY).toMatchObject({ rateBasisPoints: 300, lastDueDay: 5, firstPenaltyDay: 6, base: 'UNPAID_RENT_PRINCIPAL' });
+    expect(Object.isFrozen(ALTIMMO_MANDATORY_LATE_PENALTY)).toBe(true);
+  });
+
+  test('cas 1/2 : payé avant le 6 ou le 5 → aucune pénalité ; impayé le 5 à 23:59 → rien ; impayé le 6 à 00:00 (Brazzaville) → 3 % une seule fois', async () => {
+    const paidEarly = await schedule((await lease()).leaseId, { statut: 'payé', datePaiement: wat('2026-04-03T10:00:00') });
+    const paidOnFifth = await schedule((await lease()).leaseId, { datePaiement: wat('2026-04-05T18:00:00') });
+    const unpaid = await schedule((await lease()).leaseId);
+
+    expect(await run('2026-04-05T23:59:00')).toMatchObject({ penalites: 0, aRevoir: 0 });
+    expect(await get(unpaid)).toMatchObject({ statut: 'impayé', penaliteAppliquee: false, retardJours: 0 });
+
+    expect(await run('2026-04-06T00:00:00')).toMatchObject({ penalites: 1, aRevoir: 0 });
+    expect(await get(unpaid)).toMatchObject({ statut: 'en_retard', penaliteAppliquee: true, penaliteMontant: 4500, montantTotal: 154500, retardJours: 1 });
+    expect(await get(paidEarly)).toMatchObject({ statut: 'payé', penaliteAppliquee: false });
+    expect(await get(paidOnFifth)).toMatchObject({ statut: 'impayé', penaliteAppliquee: false });
+    expect(zohoMailService.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('cas 3 : bail sans politique (avec ou sans mandat Altitude Vision) et politique Altitude Vision non acceptée → politique Altimmo, taux non modifiable', async () => {
+    const bare = await lease();
+    const delegatedNoPolicy = await lease();
+    await platformMandate(delegatedNoPolicy.propertyId, '2025-12-01T00:00:00');
+    const delegated = await lease();
+    await platformMandate(delegated.propertyId, '2025-12-01T00:00:00');
+    await altitudePolicy(delegated.leaseId); // taux 9 999 demandé : ignoré, conditions Altitude Vision imposées
+    const payments = await Promise.all([bare, delegatedNoPolicy, delegated].map((l) => schedule(l.leaseId)));
+    expect(await run('2026-04-10T08:00:00')).toMatchObject({ penalites: 3, aRevoir: 0 });
+    for (const payment of payments) expect(await get(payment)).toMatchObject({ penaliteAppliquee: true, penaliteMontant: 4500 });
+  });
+
+  test('cas 4 : ancienne option de bail sans pénalité ou taux différent → ni exonération ni pénalité automatique : dossier à revoir, une seule fois', async () => {
+    const noPenalty = await lease();
+    await ownerPolicy(noPenalty.leaseId, {});
+    const otherRate = await lease();
+    await ownerPolicy(otherRate.leaseId, { due: { day: 1, monthOffset: 0 }, penalty: { rateBasisPoints: 500 } });
+    const p1 = await schedule(noPenalty.leaseId);
+    const p2 = await schedule(otherRate.leaseId);
+    expect(await run('2026-04-10T08:00:00')).toMatchObject({ penalites: 0, aRevoir: 2 });
+    const first = await get(p1);
+    expect(first).toMatchObject({ penaliteAppliquee: false, statut: 'en_retard', penaltyReview: { status: 'REQUIRED', reason: 'LEASE_POLICY_WITHOUT_PENALTY' } });
+    expect(await get(p2)).toMatchObject({ penaliteAppliquee: false, penaltyReview: { status: 'REQUIRED', reason: 'LEASE_PENALTY_RATE_DIFFERS' } });
+    expect(await run('2026-04-12T08:00:00')).toMatchObject({ penalites: 0, aRevoir: 0 });
+    expect((await get(p1)).penaltyReview.flaggedAt).toEqual(first.penaltyReview.flaggedAt);
+    expect(zohoMailService.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('cas 5/6 : pénalité déjà enregistrée ou traitement relancé → aucun doublon (montant, total, e-mail)', async () => {
+    const already = await schedule((await lease()).leaseId, { statut: 'en_retard', penaliteAppliquee: true, penaliteMontant: 4500, montantTotal: 154500 });
+    const fresh = await schedule((await lease()).leaseId);
+    await run('2026-04-07T08:00:00');
+    await run('2026-04-08T08:00:00');
+    await run('2026-05-02T08:00:00');
+    expect(await get(already)).toMatchObject({ penaliteMontant: 4500, montantTotal: 154500 });
+    expect(await get(fresh)).toMatchObject({ penaliteAppliquee: true, penaliteMontant: 4500, montantTotal: 154500 });
+    expect(zohoMailService.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('exécution concurrente : trois traitements simultanés → une seule pénalité et un seul e-mail', async () => {
+    const payment = await schedule((await lease()).leaseId);
+    const results = await Promise.all([run('2026-04-06T08:00:00'), run('2026-04-06T08:00:00'), run('2026-04-06T08:00:00')]);
+    expect(results.reduce((sum, r) => sum + r.penalites, 0)).toBe(1);
+    expect(await get(payment)).toMatchObject({ penaliteAppliquee: true, penaliteMontant: 4500, montantTotal: 154500 });
+    expect(zohoMailService.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('isolation : un traitement limité aux baux d’un périmètre ne touche jamais les autres', async () => {
+    const mine = await lease({ org: true });
+    const theirs = await lease();
+    const p1 = await schedule(mine.leaseId);
+    const p2 = await schedule(theirs.leaseId);
+    expect(await run('2026-04-10T08:00:00', { contratIds: [mine.leaseId] })).toMatchObject({ verifies: 1, penalites: 1 });
+    expect(await get(p1)).toMatchObject({ penaliteAppliquee: true });
+    expect(await get(p2)).toMatchObject({ penaliteAppliquee: false, statut: 'impayé' });
+    expect(await run('2026-04-10T08:00:00', { contratIds: [] })).toMatchObject({ verifies: 0, penalites: 0 });
+  });
+
+  test('cas 7 : litige de paiement ouvert → dossier à revoir, ni pénalité ni exonération ; litige clos → politique appliquée', async () => {
+    const disputed = await lease();
+    const closed = await lease();
+    await Litige.collection.insertMany([
+      { type: 'Problème_paiement', statut: 'En_cours_médiation', bienConcerné: disputed.propertyId, description: 'Loyer contesté (fictif)' },
+      { type: 'Problème_paiement', statut: 'Résolu', bienConcerné: closed.propertyId, description: 'Litige clos (fictif)' },
+    ]);
+    const p1 = await schedule(disputed.leaseId);
+    const p2 = await schedule(closed.leaseId);
+    expect(await run('2026-04-10T08:00:00')).toMatchObject({ penalites: 1, aRevoir: 1 });
+    expect(await get(p1)).toMatchObject({ penaliteAppliquee: false, penaltyReview: { reason: 'PAYMENT_DISPUTE_OPEN' } });
+    expect(await get(p2)).toMatchObject({ penaliteAppliquee: true, penaliteMontant: 4500 });
+  });
+
+  test('cohérence de mandat : mandat révoqué avec politique Altitude Vision → dossier à revoir, jamais appliqué d’office', async () => {
+    const revoked = await lease();
+    await platformMandate(revoked.propertyId, '2025-12-01T00:00:00', { ended: '2026-03-15T00:00:00' });
+    await altitudePolicy(revoked.leaseId);
+    const payment = await schedule(revoked.leaseId);
+    expect(await run('2026-04-10T08:00:00')).toMatchObject({ penalites: 0, aRevoir: 1 });
+    expect(await get(payment)).toMatchObject({ penaliteAppliquee: false, penaltyReview: { reason: 'MANAGEMENT_MODE_MISMATCH' } });
+  });
+
+  test('un seul moteur : échéance déjà évaluée par le moteur canonique, moteur CANONICAL ou DISABLED → aucune pénalité historique', async () => {
+    const { leaseId } = await lease();
+    const payment = await schedule(leaseId);
+    await Penalty.collection.insertOne({ lease: leaseId, period: '2026-04', kind: 'LATE_PAYMENT', status: 'SIMULATED' });
+    expect(await run('2026-04-10T08:00:00')).toMatchObject({ penalites: 0 });
+    expect(await get(payment)).toMatchObject({ penaliteAppliquee: false });
+    const other = await schedule((await lease()).leaseId);
+    for (const value of ['CANONICAL', 'BOTH']) {
+      process.env.RENT_PENALTY_ENGINE = value;
+      expect(await run('2026-04-10T08:00:00')).toMatchObject({ skipped: true, penalites: 0 });
+    }
+    expect(await get(other)).toMatchObject({ penaliteAppliquee: false, statut: 'impayé' });
+    expect(zohoMailService.sendEmail).not.toHaveBeenCalled();
   });
 });
 

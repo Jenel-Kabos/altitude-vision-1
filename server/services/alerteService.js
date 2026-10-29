@@ -1,10 +1,18 @@
 const Paiement = require('../models/Paiement');
+const Litige = require('../models/Litige');
 const RentLatePenaltyAssessment = require('../models/RentLatePenaltyAssessment');
 const zohoMailService = require('./zohoMailService');
 const { activePenaltyEngine, ENGINES } = require('./finance/billing/rentPenaltyEngine');
+const { ALTIMMO_MANDATORY_LATE_PENALTY: POLITIQUE, POLICY_TYPES } = require('../constants/leasePolicyConstants');
 
-const TAUX_PENALITE = 0.03;
-const SEUIL_RETARD  = 5; // jours (retard >= 5j = à partir du 6 du mois)
+const JOUR_MS = 1000 * 60 * 60 * 24;
+const LITIGE_OUVERT = ['Ouvert', 'En_cours_médiation', 'Escaladé'];
+
+// Exigible au plus tard le 5 : le retard commence le 6 à 00:00, heure de
+// Brazzaville (UTC+1, sans heure d'été), quel que soit le fuseau du serveur.
+const BRAZZAVILLE_OFFSET_MS = 60 * 60 * 1000;
+const premierJourPenalite = (paiement) => new Date(Date.UTC(paiement.annee, (paiement.mois || 1) - 1, POLITIQUE.firstPenaltyDay) - BRAZZAVILLE_OFFSET_MS);
+const montantPenalite = (montant) => Math.round((montant * POLITIQUE.rateBasisPoints) / 10000);
 
 const MOIS_FR = [
   'janvier','février','mars','avril','mai','juin',
@@ -69,7 +77,7 @@ const claimAndSendPenaltyEmail = async ({ paiement, penalite, retardJours, now =
 // retard, comportement historique préservé. L'absence d'argument N'EST
 // JAMAIS déduite d'une absence d'input de requête : c'est l'appelant
 // interne qui décide explicitement d'un scope tenant.
-const verifierPaiementsEnRetard = async ({ contratIds = null } = {}) => {
+const verifierPaiementsEnRetard = async ({ contratIds = null, now = null } = {}) => {
   // F-U2.11 — choke point unique de l'ancien moteur (cron + routes
   // `calculer-penalites`) : inactif dès que le moteur canonique est retenu.
   const engine = activePenaltyEngine();
@@ -77,7 +85,7 @@ const verifierPaiementsEnRetard = async ({ contratIds = null } = {}) => {
     console.log(`⚠️ [Alerte] ancien moteur de pénalités inactif (moteur : ${engine}) — aucun calcul`);
     return { verifies: 0, penalites: 0, skipped: true, engine };
   }
-  const aujourd_hui = new Date();
+  const aujourd_hui = now ? new Date(now) : new Date();
 
   const filter = { statut: { $in: ['impayé', 'en_retard'] } };
   if (Array.isArray(contratIds)) {
@@ -101,35 +109,28 @@ const verifierPaiementsEnRetard = async ({ contratIds = null } = {}) => {
   const canonical = leaseIds.length ? await RentLatePenaltyAssessment.find({ lease: { $in: leaseIds } }).select('lease period').lean() : [];
   const canonicalKeys = new Set(canonical.map((a) => `${a.lease}:${a.period}`));
   const periodKey = (p) => `${p.contrat?._id || p.contrat}:${p.annee}-${String(p.mois).padStart(2, '0')}`;
-  // F-U2.13 — l'ancien moteur ne peut plus imposer une pénalité hors politique
-  // contractuelle : seulement si la politique du bail pour la période stipule
-  // une pénalité (et, pour les conditions Altitude Vision, après acceptation
-  // du locataire). Sinon : aucun calcul ni e-mail de pénalité.
-  const allowedByPolicy = async (paiement) => {
-    const contrat = paiement.contrat;
-    if (!contrat?._id || !contrat.bien || !paiement.annee || !paiement.mois) return false;
-    const { resolvePolicyForPeriod, consentStatusAt } = require('./finance/billing/leasePolicyService');
-    const label = `${paiement.annee}-${String(paiement.mois).padStart(2, '0')}`;
-    const resolution = await resolvePolicyForPeriod({ lease: contrat._id, propertyId: contrat.bien, periodLabel: label });
-    if (resolution.status !== 'RESOLVED' || !resolution.terms?.penalty) return false;
-    return (await consentStatusAt(resolution, aujourd_hui)).valid;
-  };
+  let nbARevoir = 0;
 
   for (const paiement of paiements) {
-    const dateEcheance = new Date(paiement.annee, (paiement.mois || 1) - 1, 1);
-    const retardJours  = Math.floor(
-      (aujourd_hui - dateEcheance) / (1000 * 60 * 60 * 24),
-    );
-
-    if (retardJours <= 0) continue;
+    const debutRetard = premierJourPenalite(paiement);
+    if (aujourd_hui < debutRetard) continue; // payable jusqu'au 5 inclus
+    const retardJours = Math.floor((aujourd_hui - debutRetard) / JOUR_MS) + 1;
 
     const update = { retardJours, statut: 'en_retard' };
 
-    if (retardJours >= SEUIL_RETARD && !paiement.penaliteAppliquee && !canonicalKeys.has(periodKey(paiement)) && await allowedByPolicy(paiement)) {
-      const penalite = Math.round(paiement.montant * TAUX_PENALITE);
-      const outcome = await claimAndSendPenaltyEmail({ paiement, penalite, retardJours, now: aujourd_hui });
-      if (outcome.claimed) nbPenalitesAppliquees++;
-      if (outcome.claimed) continue;
+    if (!paiement.penaliteAppliquee && !canonicalKeys.has(periodKey(paiement))) {
+      const decision = await decisionPenaliteObligatoire(paiement);
+      if (decision.action === 'APPLY') {
+        const penalite = montantPenalite(paiement.montant);
+        const outcome = await claimAndSendPenaltyEmail({ paiement, penalite, retardJours, now: aujourd_hui });
+        if (outcome.claimed) { nbPenalitesAppliquees++; continue; }
+      } else if (decision.action === 'REVIEW') {
+        const flagged = await Paiement.updateOne(
+          { _id: paiement._id, penaliteAppliquee: { $ne: true }, 'penaltyReview.status': { $exists: false } },
+          { $set: { penaltyReview: { status: 'REQUIRED', reason: decision.reason, flaggedAt: aujourd_hui } } },
+        );
+        if (flagged.modifiedCount) nbARevoir++;
+      } else continue; // payé dans le délai : ni retard ni pénalité
     }
 
     await Paiement.findByIdAndUpdate(paiement._id, update);
@@ -137,9 +138,38 @@ const verifierPaiementsEnRetard = async ({ contratIds = null } = {}) => {
 
   console.log(
     `✅ [Alerte] ${paiements.length} paiements vérifiés, ` +
-    `${nbPenalitesAppliquees} pénalités appliquées`,
+    `${nbPenalitesAppliquees} pénalités appliquées, ${nbARevoir} dossiers à revoir`,
   );
-  return { verifies: paiements.length, penalites: nbPenalitesAppliquees };
+  return { verifies: paiements.length, penalites: nbPenalitesAppliquees, aRevoir: nbARevoir };
+};
+
+// GIT-INTEGRATION-02A — politique de retard obligatoire Altimmo. Aucune option
+// de bail ne neutralise ni ne modifie le taux ; l'absence de politique
+// contractuelle n'exonère pas. Ce que le code ne peut pas trancher
+// (conditions propres divergentes, litige de paiement ouvert, données
+// incohérentes) est signalé pour décision humaine : ni pénalité, ni exonération.
+const APPLY = (reason) => ({ action: 'APPLY', reason });
+const REVIEW = (reason) => ({ action: 'REVIEW', reason });
+
+const decisionPenaliteObligatoire = async (paiement) => {
+  const contrat = paiement.contrat;
+  if (!contrat?._id || !contrat.bien || !paiement.annee || !paiement.mois) return REVIEW('LEASE_DATA_INCOMPLETE');
+  if (paiement.datePaiement && new Date(paiement.datePaiement) < premierJourPenalite(paiement)) return { action: 'SKIP', reason: 'PAID_BEFORE_DEADLINE' };
+  const litige = await Litige.exists({ type: 'Problème_paiement', bienConcerné: contrat.bien, statut: { $in: LITIGE_OUVERT } });
+  if (litige) return REVIEW('PAYMENT_DISPUTE_OPEN');
+
+  const { resolvePolicyForPeriod } = require('./finance/billing/leasePolicyService');
+  const label = `${paiement.annee}-${String(paiement.mois).padStart(2, '0')}`;
+  const resolution = await resolvePolicyForPeriod({ lease: contrat._id, propertyId: contrat.bien, periodLabel: label });
+  if (resolution.status !== 'RESOLVED') {
+    return resolution.reason === 'NO_POLICY' ? APPLY('ALTIMMO_POLICY_NO_LEASE_POLICY') : REVIEW(resolution.reason || 'POLICY_UNRESOLVED');
+  }
+  if (resolution.policy.type === POLICY_TYPES.ALTITUDE_DELEGATED) return APPLY('ALTIMMO_POLICY_DELEGATED');
+  // Conditions propres au bail : appliquées seulement si identiques à la
+  // politique Altimmo ; sinon droits contractuels préexistants à vérifier.
+  const stipulated = resolution.terms?.penalty;
+  if (stipulated?.rateBasisPoints === POLITIQUE.rateBasisPoints && stipulated.base === POLITIQUE.base) return APPLY('LEASE_TERMS_MATCH_ALTIMMO_POLICY');
+  return REVIEW(stipulated ? 'LEASE_PENALTY_RATE_DIFFERS' : 'LEASE_POLICY_WITHOUT_PENALTY');
 };
 
 const envoyerEmailRetard = async (paiement, penalite, retardJours, locataire) => {
@@ -170,8 +200,8 @@ const envoyerEmailRetard = async (paiement, penalite, retardJours, locataire) =>
       </tr>
     </table>
 
-    <p>Conformément aux conditions de votre bail, une pénalité de 3 % est appliquée
-    à partir du 6 du mois.</p>
+    <p>Conformément à la politique de gestion locative Altimmo, le loyer est exigible
+    au plus tard le 5 ; une pénalité unique de 3 % est appliquée à partir du 6 du mois.</p>
 
     <p>Merci de régulariser votre situation dans les plus brefs délais.</p>
 
@@ -186,4 +216,4 @@ const envoyerEmailRetard = async (paiement, penalite, retardJours, locataire) =>
   );
 };
 
-module.exports = { verifierPaiementsEnRetard, claimAndSendPenaltyEmail, penaltyEmailKey };
+module.exports = { verifierPaiementsEnRetard, claimAndSendPenaltyEmail, penaltyEmailKey, decisionPenaliteObligatoire };
