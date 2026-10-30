@@ -42,6 +42,13 @@ const {
   SUBSTANTIVE_PUBLIC_FIELDS, publicSnapshot, projectApprovedPublicResource, classifySubstantiveChanges,
   createPendingRevision, decideRevision,
 } = require('../services/commercialPublicationService');
+const {
+  ownerWithdrawProperty,
+  ownerRequestReactivation,
+  ownerRequestSuspensionReview,
+  adminSuspendProperty,
+  adminLiftSuspension,
+} = require('../services/propertyPublicationLifecycleService');
 
 // TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traitait un
 // `Property.owner` sans OrgMembership (Proprietaire public-signup, cas
@@ -1228,6 +1235,44 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   });
 });
 
+const updatePropertyLifecycle = asyncHandler(async (req, res) => {
+  const property = await ownerWithdrawProperty({
+    propertyId: req.params.id,
+    actor: req.user,
+    availability: req.body.availability,
+    reason: req.body.reason,
+  });
+  res.status(200).json({ status: 'success', data: { property } });
+});
+
+const requestPropertyReactivation = asyncHandler(async (req, res) => {
+  const result = await ownerRequestReactivation({
+    propertyId: req.params.id, actor: req.user, reason: req.body.reason,
+  });
+  res.status(202).json({ status: 'success', data: result });
+});
+
+const requestPropertySuspensionReview = asyncHandler(async (req, res) => {
+  const property = await ownerRequestSuspensionReview({
+    propertyId: req.params.id, actor: req.user, reason: req.body.reason,
+  });
+  res.status(202).json({ status: 'success', data: { property } });
+});
+
+const suspendPropertyPublication = asyncHandler(async (req, res) => {
+  const property = await adminSuspendProperty({
+    propertyId: req.params.id, actor: req.user, reason: req.body.reason,
+  });
+  res.status(200).json({ status: 'success', data: { property } });
+});
+
+const liftPropertyPublicationSuspension = asyncHandler(async (req, res) => {
+  const result = await adminLiftSuspension({
+    propertyId: req.params.id, actor: req.user, reason: req.body.reason,
+  });
+  res.status(202).json({ status: 'success', data: result });
+});
+
 /**
  * @description Supprimer une propriété
  * @route DELETE /api/properties/:id
@@ -1407,6 +1452,11 @@ module.exports = {
   getMyProperties,
   updateProperty,
   updatePropertyStatus,
+  updatePropertyLifecycle,
+  requestPropertyReactivation,
+  requestPropertySuspensionReview,
+  suspendPropertyPublication,
+  liftPropertyPublicationSuspension,
   deleteProperty,
   adminDeleteProperty,
   setRecommande,

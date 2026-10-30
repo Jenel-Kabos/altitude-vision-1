@@ -82,7 +82,7 @@ const errorHandler = (err, req, res, next) => {
     message = err.message;
   }
 
-  if (['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError', 'ContactAuthorizationError', 'CommercialPublicationError', 'MarketingAuthorityError', 'MarketingConsentError', 'CrmActionPolicyError'].includes(err.name)) {
+  if (['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError', 'ContactAuthorizationError', 'CommercialPublicationError', 'PropertyPublicationLifecycleError', 'MarketingAuthorityError', 'MarketingConsentError', 'CrmActionPolicyError'].includes(err.name)) {
     statusCode = err.statusCode || 400;
     message = err.message;
   }
@@ -112,7 +112,7 @@ const errorHandler = (err, req, res, next) => {
     ...(err.name === 'ConversationAccessError' && { code: err.code }),
     ...(err.name === 'BusinessProfileError' && { code: err.code }),
     ...(err.name === 'OrganizationError' && { code: err.code }),
-    ...(['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError', 'ContactAuthorizationError', 'CommercialPublicationError', 'MarketingAuthorityError', 'MarketingConsentError', 'CrmActionPolicyError'].includes(err.name) && { code: err.code }),
+    ...(['CrmError', 'TemplateError', 'CampaignError', 'TenantQuotaError', 'PlatformTenantError', 'ApiKeyError', 'TenantContextError', 'PlatformOperatorError', 'TenantApplicationError', 'ContactAuthorizationError', 'CommercialPublicationError', 'PropertyPublicationLifecycleError', 'MarketingAuthorityError', 'MarketingConsentError', 'CrmActionPolicyError'].includes(err.name) && { code: err.code }),
     ...(['AccountStatusError', 'AuthSessionError'].includes(err.name) && { code: err.code }),
     ...(['TENANT_RESOURCE_NOT_FOUND', 'TENANT_ATTRIBUTION_AMBIGUOUS'].includes(err.code) && { code: err.code }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),

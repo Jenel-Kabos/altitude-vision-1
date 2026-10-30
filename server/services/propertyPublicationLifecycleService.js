@@ -177,6 +177,31 @@ async function adminLiftSuspension({ propertyId, actor, reason = '' }) {
   });
 }
 
+async function ownerRequestSuspensionReview({ propertyId, actor, reason = '' }) {
+  const cleanReason = String(reason || '').trim();
+  if (cleanReason.length < 2) {
+    fail('PROPERTY_SUSPENSION_REVIEW_REASON_REQUIRED', 'Le motif de réexamen est requis.', 422);
+  }
+  return inTransaction(async (session) => {
+    const property = await loadProperty(propertyId, session);
+    assertOwner(property, actor);
+    if (derivePublicationState(property) !== PUBLICATION_STATES.ADMIN_SUSPENDED) {
+      fail('PROPERTY_NOT_SUSPENDED', 'Cette annonce ne fait pas l’objet d’une suspension Altimmo.', 409);
+    }
+    property.publicationSuspensionReview = {
+      requestedAt: new Date(), requestedBy: actorId(actor), reason: cleanReason,
+    };
+    property.publicationLifecycleHistory.push({
+      from: PUBLICATION_STATES.ADMIN_SUSPENDED,
+      to: PUBLICATION_STATES.ADMIN_SUSPENDED,
+      action: 'owner_suspension_review_requested', actor: actorId(actor), reason: cleanReason,
+    });
+    property.isPublished = false;
+    await property.save({ session });
+    return property.toObject();
+  });
+}
+
 module.exports = {
   PUBLICATION_STATES,
   PropertyPublicationLifecycleError,
@@ -186,4 +211,5 @@ module.exports = {
   ownerRequestReactivation,
   adminSuspendProperty,
   adminLiftSuspension,
+  ownerRequestSuspensionReview,
 };
