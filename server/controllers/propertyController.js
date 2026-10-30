@@ -51,6 +51,13 @@ const {
   isPropertyCommerciallyAvailable,
   commerciallyPublishedMongoFilter,
 } = require('../services/propertyPublicationLifecycleService');
+const { notifyPropertyLifecycleEvent } = require('../services/propertyPublicationNotificationService');
+
+const emitPropertyLifecycleNotification = (payload) => {
+  notifyPropertyLifecycleEvent(payload).then((result) => {
+    if (result.failed) logger.warn('property_lifecycle_notification.partial_failure', { ...result, event: payload.event, propertyId: String(payload.property?._id || '') });
+  }).catch((error) => logger.error('property_lifecycle_notification.failed', { event: payload.event, propertyId: String(payload.property?._id || ''), error: error.message }));
+};
 
 // TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traitait un
 // `Property.owner` sans OrgMembership (Proprietaire public-signup, cas
@@ -446,7 +453,8 @@ const createProperty = asyncHandler(async (req, res, next) => {
     images:          imagePaths,
     statusAdmin:     'En attente'
   });
-  await createPendingRevision({ resourceType: 'Property', resource: newProperty, proposedSnapshot: publicSnapshot(newProperty), actor: req.user });
+  const initialRevision = await createPendingRevision({ resourceType: 'Property', resource: newProperty, proposedSnapshot: publicSnapshot(newProperty), actor: req.user });
+  emitPropertyLifecycleNotification({ event: 'submitted', property: newProperty, actor: req.user, transitionKey: String(initialRevision._id) });
 
   logger.success('✅ Propriété créée :', newProperty._id);
 
@@ -1056,8 +1064,10 @@ const updateProperty = asyncHandler(async (req, res) => {
     proposedPublicSnapshot,
   );
   const alreadyPublic = property.statusAdmin === 'Validée' && property.isPublished === true;
+  let submittedRevision = null;
   if (substantiveChanges.length && alreadyPublic) {
     const revision = await createPendingRevision({ resourceType: 'Property', resource: property, proposedSnapshot: proposedPublicSnapshot, actor: req.user });
+    submittedRevision = revision;
     updateData.statusAdmin = 'En attente';
     updateData.isPublished = false;
     updateData.publicationLifecycleState = 'change_pending';
@@ -1090,8 +1100,10 @@ const updateProperty = asyncHandler(async (req, res) => {
     })).property;
 
   if (substantiveChanges.length && !alreadyPublic) {
-    await createPendingRevision({ resourceType: 'Property', resource: updatedProperty, proposedSnapshot: publicSnapshot(updatedProperty), actor: req.user });
+    submittedRevision = await createPendingRevision({ resourceType: 'Property', resource: updatedProperty, proposedSnapshot: publicSnapshot(updatedProperty), actor: req.user });
   }
+
+  if (submittedRevision) emitPropertyLifecycleNotification({ event: 'changed', property: updatedProperty, actor: req.user, transitionKey: String(submittedRevision._id) });
 
   res.status(200).json({
     status: 'success',
@@ -1194,6 +1206,14 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
     data: { property: updatedProperty },
   });
 
+  emitPropertyLifecycleNotification({
+    event: action === 'validate' ? 'approved' : 'rejected',
+    property: updatedProperty,
+    actor: req.user,
+    reason,
+    transitionKey: String(revision._id),
+  });
+
   // Notifie le propriétaire du bien de la décision de modération
   if (updatedProperty.owner) {
     if (newStatusAdmin === 'Validée') {
@@ -1264,6 +1284,9 @@ const updatePropertyLifecycle = asyncHandler(async (req, res) => {
     availability: req.body.availability,
     reason: req.body.reason,
   });
+  const event = ({ Loué: 'rented', Vendu: 'sold', Indisponible: 'unavailable', Retiré: 'withdrawn' })[property.availability];
+  const transition = property.publicationLifecycleHistory?.at(-1);
+  emitPropertyLifecycleNotification({ event, property, actor: req.user, reason: req.body.reason, transitionKey: String(transition?._id || property.updatedAt) });
   res.status(200).json({ status: 'success', data: { property } });
 });
 
@@ -1271,6 +1294,7 @@ const requestPropertyReactivation = asyncHandler(async (req, res) => {
   const result = await ownerRequestReactivation({
     propertyId: req.params.id, actor: req.user, reason: req.body.reason,
   });
+  emitPropertyLifecycleNotification({ event: 'reactivation_requested', property: result.property, actor: req.user, reason: req.body.reason, transitionKey: String(result.revision._id) });
   res.status(202).json({ status: 'success', data: result });
 });
 
@@ -1278,6 +1302,8 @@ const requestPropertySuspensionReview = asyncHandler(async (req, res) => {
   const property = await ownerRequestSuspensionReview({
     propertyId: req.params.id, actor: req.user, reason: req.body.reason,
   });
+  const transition = property.publicationLifecycleHistory?.at(-1);
+  emitPropertyLifecycleNotification({ event: 'suspension_review_requested', property, actor: req.user, reason: req.body.reason, transitionKey: String(transition?._id || property.updatedAt) });
   res.status(202).json({ status: 'success', data: { property } });
 });
 
@@ -1285,6 +1311,8 @@ const suspendPropertyPublication = asyncHandler(async (req, res) => {
   const property = await adminSuspendProperty({
     propertyId: req.params.id, actor: req.user, reason: req.body.reason,
   });
+  const transition = property.publicationLifecycleHistory?.at(-1);
+  emitPropertyLifecycleNotification({ event: 'admin_suspended', property, actor: req.user, reason: req.body.reason, transitionKey: String(transition?._id || property.updatedAt) });
   res.status(200).json({ status: 'success', data: { property } });
 });
 
@@ -1292,6 +1320,7 @@ const liftPropertyPublicationSuspension = asyncHandler(async (req, res) => {
   const result = await adminLiftSuspension({
     propertyId: req.params.id, actor: req.user, reason: req.body.reason,
   });
+  emitPropertyLifecycleNotification({ event: 'suspension_lifted', property: result.property, actor: req.user, reason: req.body.reason, transitionKey: String(result.revision._id) });
   res.status(202).json({ status: 'success', data: result });
 });
 
