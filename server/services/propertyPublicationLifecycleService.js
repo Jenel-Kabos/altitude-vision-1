@@ -151,6 +151,16 @@ async function ownerRequestReactivation({ propertyId, actor, reason = '' }) {
     if (derivePublicationState(property) === PUBLICATION_STATES.ADMIN_SUSPENDED) {
       fail('PROPERTY_ADMIN_SUSPENDED', 'La suspension Altimmo ne peut être levée par le propriétaire.', 409);
     }
+    if (derivePublicationState(property) === PUBLICATION_STATES.PENDING && property.currentPublicationRevision) {
+      const current = await CommercialPublicationRevision.findOne({
+        _id: property.currentPublicationRevision,
+        resourceType: 'Property',
+        resource: property._id,
+        status: 'pending',
+        submissionType: 'reactivation',
+      }).session(session);
+      if (current) return { property: property.toObject(), revision: current, idempotent: true };
+    }
     property.availability = 'Disponible';
     property.isPublished = false;
     appendTransition(property, { to: PUBLICATION_STATES.PENDING, action: 'owner_reactivation_requested', actor, reason });

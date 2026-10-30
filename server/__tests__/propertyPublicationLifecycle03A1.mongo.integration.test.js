@@ -96,7 +96,7 @@ test('le retrait supersède la révision pendante et conserve les snapshots', as
   expect((await Property.findById(property._id).lean()).approvedPublicSnapshot.price).toBe(100000);
 });
 
-test('la réactivation crée une nouvelle révision, reste non publiée et remplace la précédente', async () => {
+test('la réactivation répétée conserve la même révision en attente et reste non publiée', async () => {
   const { owner, property } = await fixture({
     publicationLifecycleState: 'owner_withdrawn', availability: 'Retiré', isPublished: false,
   });
@@ -105,8 +105,9 @@ test('la réactivation crée une nouvelle révision, reste non publiée et rempl
   const fresh = await Property.findById(property._id).lean();
   expect(fresh).toMatchObject({ publicationLifecycleState: 'pending', availability: 'Disponible', isPublished: false });
   expect(first.revision.submissionType).toBe('reactivation');
-  expect(await CommercialPublicationRevision.findById(first.revision._id)).toMatchObject({ status: 'superseded' });
-  expect(second.revision).toMatchObject({ status: 'pending', submissionType: 'reactivation' });
+  expect(await CommercialPublicationRevision.findById(first.revision._id).lean()).toMatchObject({ status: 'pending' });
+  expect(String(second.revision._id)).toBe(String(first.revision._id));
+  expect(second).toMatchObject({ idempotent: true });
   expect(await CommercialPublicationRevision.countDocuments({ resource: property._id, status: 'pending' })).toBe(1);
 });
 
