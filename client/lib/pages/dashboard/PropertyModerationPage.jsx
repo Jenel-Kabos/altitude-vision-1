@@ -8,6 +8,7 @@ import toast from '@/lib/utils/toast';
 import Image from 'next/image';
 import { DashboardCard, DashboardPage, DashboardPageHeader, DashboardState, DashboardToolbar } from '../../components/dashboard/DashboardUI';
 import { buildWhatsAppLink } from '../../utils/whatsapp';
+import { suspendPropertyPublication, liftPropertyPublicationSuspension } from '../../services/propertyService';
 
 // HOTFIX-MODERATION-PROPERTY-SUBMITTER-CONTACT-1 — labels humains pour le
 // rôle du soumissionnaire dans le bloc "Soumis par". Volontairement local à
@@ -108,6 +109,22 @@ const PropertyModerationPage = () => {
       toast.success(`Annonce ${action === 'validate' ? 'validée' : 'rejetée'} avec succès !`);
     } catch (err) {
       toast.error(err.response?.data?.message || "Une erreur est survenue.");
+    }
+  };
+
+  const handleLifecycleModeration = async (property, action) => {
+    const reason = rejectReason.trim();
+    if (!reason) return toast.error('Un motif est requis pour cette action.');
+    try {
+      const updated = action === 'suspend'
+        ? await suspendPropertyPublication(property._id, reason)
+        : await liftPropertyPublicationSuspension(property._id, reason);
+      setSelectedProperty(updated);
+      setProperties((rows) => rows.map((row) => row._id === property._id ? updated : row));
+      setRejectReason('');
+      toast.success(action === 'suspend' ? 'Annonce suspendue.' : 'Suspension levée, nouvelle validation requise.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Action de suspension impossible.');
     }
   };
 
@@ -353,6 +370,13 @@ const PropertyModerationPage = () => {
 
             {/* Actions */}
             <div className="flex justify-end gap-3 flex-wrap border-t border-gray-100 pt-5">
+              {selectedProperty.publicationLifecycleState === 'admin_suspended' ? (
+                <button onClick={() => handleLifecycleModeration(selectedProperty, 'lift')}
+                  className="rounded-lg bg-blue-600 px-6 py-2.5 font-semibold text-white">Lever la suspension</button>
+              ) : (
+                <button onClick={() => handleLifecycleModeration(selectedProperty, 'suspend')}
+                  className="rounded-lg bg-amber-600 px-6 py-2.5 font-semibold text-white">Suspendre</button>
+              )}
               <button onClick={() => handleModeration(selectedProperty._id, 'validate')}
                 className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-6 py-2.5 rounded-lg transition font-semibold shadow">
                 <CheckCircle2 size={18} /> Valider

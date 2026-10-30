@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 import {
   getMyProperties, createProperty, updateProperty,
-  deleteProperty, getPropertyById,
+  deleteProperty, getPropertyById, withdrawPropertyPublication,
+  requestPropertyReactivation, requestPropertySuspensionReview,
+  propertyPublicationStateLabel,
 } from "../../services/propertyService";
 import PropertyForm from "../../components/dashboard/PropertyForm";
 import SalePropertyForm from "../../components/dashboard/SalePropertyForm";
@@ -195,17 +197,11 @@ const PropertyManagementForm = ({ propertyId, onSave, onCancel }) => {
 // ─────────────────────────────────────────────────────────────
 const ALTIMMO_FALLBACK = 'https://placehold.co/600x400/2E7BB5/FFFFFF?text=Altimmo';
 
-const PropertyCard = ({ property, rental, onEdit, onDelete, onToggleAvailability, onRentalRequest, onOpenCockpit }) => {
+const PropertyCard = ({ property, rental, onEdit, onDelete, onLifecycleAction, onRentalRequest, onOpenCockpit }) => {
   const [imgSrc, setImgSrc] = useState(
     getImageUrl(property.images?.[0]) || ALTIMMO_FALLBACK
   );
   const [plannedExitAt, setPlannedExitAt] = useState('');
-  const nextAvailability = property.status === 'location'
-    ? (property.availability === 'Disponible' ? 'Loué' : 'Disponible')
-    : (property.availability === 'Disponible' ? 'Vendu' : 'Disponible');
-  const availabilityLabel = property.status === 'location'
-    ? (property.availability === 'Disponible' ? 'Marquer occupé' : 'Marquer disponible')
-    : (property.availability === 'Disponible' ? 'Marquer vendu' : 'Marquer disponible');
   const businessStatus = projectOwnerPropertyStatus(property, rental);
 
   return (
@@ -279,12 +275,16 @@ const PropertyCard = ({ property, rental, onEdit, onDelete, onToggleAvailability
           </div>
         )}
 
-        {!rental && <button onClick={() => onToggleAvailability(property, nextAvailability)}
-          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02] mb-2"
-          style={{ background: property.availability==='Disponible' ? '#FEF3C7' : '#DCFCE7', color: property.availability==='Disponible' ? '#B45309' : '#15803D', fontFamily:"'DM Sans', sans-serif" }}>
-          <CheckCircle2 size={13} /> {availabilityLabel}
-        </button>}
+        <p className="mb-2 text-xs font-semibold text-slate-600">Publication : {propertyPublicationStateLabel(property.publicationLifecycleState)}</p>
 
+        {!rental && property.publicationLifecycleState === 'admin_suspended' && <button onClick={() => onLifecycleAction(property, 'suspension-review')}
+          className="mb-2 w-full rounded-xl bg-blue-50 py-2 text-xs font-semibold text-blue-700">Demander le réexamen</button>}
+        {!rental && ['owner_withdrawn', 'rejected'].includes(property.publicationLifecycleState) && <button onClick={() => onLifecycleAction(property, 'reactivate')}
+          className="mb-2 w-full rounded-xl bg-green-50 py-2 text-xs font-semibold text-green-700">Demander la réactivation</button>}
+        {!rental && !['owner_withdrawn', 'admin_suspended'].includes(property.publicationLifecycleState) && <div className="mb-2 grid grid-cols-2 gap-1">
+          {['Loué', 'Vendu', 'Indisponible', 'Retiré'].map((availability) => <button key={availability} onClick={() => onLifecycleAction(property, 'withdraw', availability)}
+            className="rounded-lg bg-amber-50 px-2 py-2 text-xs font-semibold text-amber-800">{availability === 'Retiré' ? 'Retirer' : availability}</button>)}
+        </div>}
         {rental && <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs text-gray-600">
           <div className="flex flex-wrap gap-2 font-semibold"><span>{rental.displayStatus}</span><span>·</span><span>{rental.publicationStatus}</span></div>
           {rental.activeLease && <p className="mt-1">Contrat : {rental.activeLease.statut} · fin {rental.activeLease.dateFinBail ? new Date(rental.activeLease.dateFinBail).toLocaleDateString('fr-FR') : 'non renseignée'}</p>}
@@ -408,18 +408,18 @@ const OwnerPropertyManagement = () => {
     }
   };
 
-  const handleToggleAvailability = async (property, availability) => {
+  const handleLifecycleAction = async (property, action, availability) => {
     try {
-      const fd = new FormData();
-      fd.append('availability', availability);
-      if (property.images?.length) {
-        property.images.forEach(image => fd.append('existingImages', image));
-      }
-      const updated = await updateProperty(property._id, fd);
+      const reason = action === 'withdraw' ? `Disponibilité déclarée : ${availability}` : 'Demande depuis le dashboard propriétaire';
+      const updated = action === 'withdraw'
+        ? await withdrawPropertyPublication(property._id, availability, reason)
+        : action === 'reactivate'
+          ? await requestPropertyReactivation(property._id, reason)
+          : await requestPropertySuspensionReview(property._id, reason);
       setProperties(prev => prev.map(p => p._id === property._id ? updated : p));
-      toast.success(availability === 'Disponible' ? 'Bien marqué disponible.' : 'Disponibilité mise à jour.');
+      toast.success(action === 'withdraw' ? 'Annonce retirée immédiatement.' : 'Demande transmise à Altimmo.');
     } catch (err) {
-      toast.error(err.response?.data?.message || "Erreur lors de la mise à jour de la disponibilité.");
+      toast.error(err.response?.data?.message || "Action de publication impossible.");
     }
   };
 
@@ -672,7 +672,7 @@ const OwnerPropertyManagement = () => {
               {properties.map(p => (
                 <PropertyCard key={p._id} property={p} rental={rentals.find(r=>String(r.property?._id||r.property)===String(p._id))}
                   onEdit={handleEdit} onDelete={handleDelete}
-                  onToggleAvailability={handleToggleAvailability} onRentalRequest={handleRentalRequest}
+                  onLifecycleAction={handleLifecycleAction} onRentalRequest={handleRentalRequest}
                   onOpenCockpit={setCockpitProperty} />
               ))}
             </div>

@@ -86,6 +86,39 @@ export const rejectPropertyAdministration = async (propertyId, { platformScoped 
   return response.data?.data?.property || null;
 };
 
+export const PROPERTY_PUBLICATION_STATE_LABELS = Object.freeze({
+  draft: 'Brouillon', pending: 'En attente de validation', published: 'Publiée',
+  change_pending: 'Modification en attente', owner_withdrawn: 'Retirée par le propriétaire',
+  admin_suspended: 'Suspendue par Altimmo', rejected: 'Rejetée',
+});
+
+export const propertyPublicationStateLabel = (state) => PROPERTY_PUBLICATION_STATE_LABELS[state] || 'État non renseigné';
+
+export const withdrawPropertyPublication = async (propertyId, availability, reason = '') => {
+  const response = await api.patch(`/properties/${encodeURIComponent(propertyId)}/lifecycle`, { availability, reason });
+  return response.data?.data?.property || null;
+};
+
+export const requestPropertyReactivation = async (propertyId, reason = '') => {
+  const response = await api.post(`/properties/${encodeURIComponent(propertyId)}/reactivation`, { reason });
+  return response.data?.data?.property || null;
+};
+
+export const requestPropertySuspensionReview = async (propertyId, reason = '') => {
+  const response = await api.post(`/properties/${encodeURIComponent(propertyId)}/suspension-review`, { reason });
+  return response.data?.data?.property || null;
+};
+
+export const suspendPropertyPublication = async (propertyId, reason = '') => {
+  const response = await api.post(`/admin/properties/${encodeURIComponent(propertyId)}/suspend`, { reason }, { platformScoped: true });
+  return response.data?.data?.property || null;
+};
+
+export const liftPropertyPublicationSuspension = async (propertyId, reason = '') => {
+  const response = await api.post(`/admin/properties/${encodeURIComponent(propertyId)}/lift-suspension`, { reason }, { platformScoped: true });
+  return response.data?.data?.property || null;
+};
+
 /**
  * Récupère une propriété par son ID
  * @param {String} propertyId - ID de la propriété
