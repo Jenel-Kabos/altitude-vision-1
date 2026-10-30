@@ -48,6 +48,8 @@ const {
   ownerRequestSuspensionReview,
   adminSuspendProperty,
   adminLiftSuspension,
+  isPropertyCommerciallyAvailable,
+  commerciallyPublishedMongoFilter,
 } = require('../services/propertyPublicationLifecycleService');
 
 // TENANT-SCOPE-AUDIT-2A — `assertResourceTenant` (STRICTE) traitait un
@@ -487,9 +489,7 @@ async function runPropertySearch({ query, isAdmin, tenantId = null }) {
   // annonces validées/disponibles/Altimmo.
   const baseFilter = tenantId ? { tenant: tenantId } : {};
   if (!isAdmin) {
-    baseFilter.availability = 'Disponible';
-    baseFilter.statusAdmin  = 'Validée';
-    baseFilter.isPublished  = true;
+    Object.assign(baseFilter, commerciallyPublishedMongoFilter());
     baseFilter.pole         = 'Altimmo';
   }
 
@@ -726,8 +726,7 @@ const getProperty = asyncHandler(async (req, res) => {
   // Les documents historiques hydratés par Mongoose reçoivent la valeur par
   // défaut "Disponible" ; le test explicite conserve néanmoins la lecture
   // de rares projections legacy où le champ est absent.
-  const explicitlyUnavailable = property.availability && property.availability !== 'Disponible';
-  if ((property.statusAdmin !== 'Validée' || property.isPublished !== true || explicitlyUnavailable) && !isAdmin && !isOwner) {
+  if (!isPropertyCommerciallyAvailable(property) && !isAdmin && !isOwner) {
     res.status(403);
     throw new Error('Cette propriété n’est pas disponible publiquement.');
   }
@@ -1432,7 +1431,7 @@ const getRecommendedProperties = asyncHandler(async (req, res) => {
   // `pole: 'Altimmo'` — cohérent avec `getAllProperties` (audit filtrage Altimmo) : sans ce
   // filtre, un bien MilaEvents/Altcom marqué `recommande:true` pourrait apparaître sur les
   // pages de recommandation Altimmo.
-  const publicFilter = { statusAdmin: 'Validée', isPublished: true, availability: 'Disponible', pole: 'Altimmo' };
+  const publicFilter = { ...commerciallyPublishedMongoFilter(), pole: 'Altimmo' };
 
   let properties = await Property.find({
     ...publicFilter,
