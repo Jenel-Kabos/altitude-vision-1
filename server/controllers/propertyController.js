@@ -1058,8 +1058,18 @@ const updateProperty = asyncHandler(async (req, res) => {
   );
   const alreadyPublic = property.statusAdmin === 'Validée' && property.isPublished === true;
   if (substantiveChanges.length && alreadyPublic) {
-    await createPendingRevision({ resourceType: 'Property', resource: property, proposedSnapshot: proposedPublicSnapshot, actor: req.user });
-    SUBSTANTIVE_PUBLIC_FIELDS.forEach((field) => delete updateData[field]);
+    const revision = await createPendingRevision({ resourceType: 'Property', resource: property, proposedSnapshot: proposedPublicSnapshot, actor: req.user });
+    updateData.statusAdmin = 'En attente';
+    updateData.isPublished = false;
+    updateData.publicationLifecycleState = 'change_pending';
+    updateData.currentPublicationRevision = revision._id;
+    updateData.publicationLifecycleHistory = [
+      ...(property.publicationLifecycleHistory || []).map((entry) => entry.toObject ? entry.toObject() : entry),
+      {
+        from: 'published', to: 'change_pending', action: 'content_change_submitted',
+        actor: req.user._id || req.user.id, reason: 'Modification substantielle soumise à une nouvelle approbation.',
+      },
+    ];
   } else if (!alreadyPublic) {
     updateData.statusAdmin = 'En attente';
     updateData.isPublished = false;
@@ -1140,7 +1150,12 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   // décision : les hébergements gardent leur cycle spécialisé (règle de main).
   const classicListing = ['vente', 'location'].includes(target.status);
   let revision = await CommercialPublicationRevision.findOne({ resourceType: 'Property', resource: target._id, status: 'pending' }).sort('-createdAt');
-  if (!revision) revision = await createPendingRevision({ resourceType: 'Property', resource: target, proposedSnapshot: publicSnapshot(target), actor: target.owner });
+  if (!revision) {
+    revision = await createPendingRevision({ resourceType: 'Property', resource: target, proposedSnapshot: publicSnapshot(target), actor: target.owner });
+    await Property.updateOne({ _id: target._id }, {
+      $set: { currentPublicationRevision: revision._id, publicationLifecycleState: 'pending', isPublished: false },
+    });
+  }
   const reason = String(req.body.reason || (action === 'validate' ? 'Approbation commerciale Altitude Vision' : '')).trim();
   await decideRevision({
     revisionId: revision._id,
@@ -1149,15 +1164,23 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
     reason,
     adapter: {
       model: Property,
+      buildPromotionFilter: (decidedRevision) => ({
+        currentPublicationRevision: decidedRevision._id,
+        publicationLifecycleState: { $in: ['pending', 'change_pending'] },
+        availability: 'Disponible',
+      }),
       buildPromotionUpdate: (approved, decidedRevision) => ({
-        $set: { approvedPublicSnapshot: approved, currentPublicationRevision: decidedRevision._id, statusAdmin: 'Validée', reviewedAt: new Date(), ...(classicListing ? { isPublished: true } : {}) },
+        $set: { approvedPublicSnapshot: approved, currentPublicationRevision: decidedRevision._id, statusAdmin: 'Validée', reviewedAt: new Date(), publicationLifecycleState: 'published', ...(classicListing ? { isPublished: true } : {}) },
+        $push: { publicationLifecycleHistory: { from: target.publicationLifecycleState || 'pending', to: 'published', action: 'commercial_revision_approved', actor: req.user._id || req.user.id, reason } },
         $inc: { commercialPublicationVersion: 1 },
       }),
     },
   });
   if (action === 'reject') {
-    const hasApprovedVersion = target.commercialPublicationVersion > 0 || Boolean(target.approvedPublicSnapshot);
-    await Property.updateOne({ _id: id }, { $set: { statusAdmin: hasApprovedVersion ? 'Validée' : 'Rejetée', reviewedAt: new Date(), ...(classicListing ? { isPublished: hasApprovedVersion } : {}) } });
+    await Property.updateOne({ _id: id }, {
+      $set: { statusAdmin: 'Rejetée', reviewedAt: new Date(), publicationLifecycleState: 'rejected', isPublished: false },
+      $push: { publicationLifecycleHistory: { from: target.publicationLifecycleState || 'pending', to: 'rejected', action: 'commercial_revision_rejected', actor: req.user._id || req.user.id, reason } },
+    });
   }
   const updatedProperty = await Property.findById(id);
 

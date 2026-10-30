@@ -3,6 +3,7 @@ const Application = require('../models/RealEstateApplication');
 const Reservation = require('../models/RealEstateReservation');
 const Property = require('../models/Property');
 const { notify } = require('./notificationService');
+const { isPropertyCommerciallyAvailable } = require('./propertyPublicationLifecycleService');
 
 class RealEstateWorkflowError extends Error {
   constructor(code, message, statusCode = 409) {
@@ -26,7 +27,7 @@ async function acceptInSession({ applicationId, actorId, idempotencyKey, session
     throw new RealEstateWorkflowError('APPLICATION_NOT_ACCEPTABLE', 'Ce dossier n’est plus acceptable.');
   }
   const property = await Property.findById(application.property).session(session || null);
-  if (!property || property.statusAdmin !== 'Validée' || !property.isPublished || property.availability !== 'Disponible' || property.reservationLock?.reservation) {
+  if (!property || !isPropertyCommerciallyAvailable(property) || property.reservationLock?.reservation) {
     throw new RealEstateWorkflowError('PROPERTY_NOT_AVAILABLE', 'Le bien n’est plus disponible.');
   }
   const expectedStatus = application.kind === 'purchase_offer' ? 'vente' : 'location';

@@ -37,28 +37,29 @@ test('liste et détail publics lisent exclusivement le snapshot approuvé', asyn
   expect(detail).toMatchObject({ price: 100000, description: 'Description approuvée', images: ['approved.jpg'] });
 });
 
-test('une édition substantielle publiée crée une révision et conserve la version publique jusqu’à approbation', async () => {
+test('une édition substantielle publiée crée une révision et retire immédiatement la version publique jusqu’à approbation', async () => {
   const { owner, operator, property } = await fixture();
   const edit = await request(app).put(`/api/properties/${property._id}`).set(bearer(owner)).send({ price: 125000 });
   expect(edit.status).toBe(200);
   const before = await Property.findById(property._id).lean();
-  expect(before).toMatchObject({ price: 100000, statusAdmin: 'Validée', isPublished: true, commercialPublicationVersion: 1 });
+  expect(before).toMatchObject({ price: 125000, statusAdmin: 'En attente', isPublished: false, publicationLifecycleState: 'change_pending', commercialPublicationVersion: 1 });
   const revision = await CommercialPublicationRevision.findOne({ resource: property._id, status: 'pending' }).lean();
   expect(revision).toMatchObject({ proposedSnapshot: { price: 125000 }, changedFields: ['price'] });
-  expect((await getPublicPropertyById(property._id)).price).toBe(100000);
+  expect(await getPublicPropertyById(property._id)).toBeNull();
 
   const approve = await request(app).patch(`/api/properties/admin/${property._id}/validate`).set(bearer(operator)).send({ reason: 'Prix vérifié' });
   expect(approve.status).toBe(200);
   expect((await getPublicPropertyById(property._id)).price).toBe(125000);
 });
 
-test('un rejet de révision conserve la version approuvée et la publication', async () => {
+test('un rejet de révision conserve le snapshot historique sans republier l’ancienne version', async () => {
   const { owner, operator, property } = await fixture();
   expect((await request(app).put(`/api/properties/${property._id}`).set(bearer(owner)).send({ price: 130000 })).status).toBe(200);
   const reject = await request(app).patch(`/api/properties/admin/${property._id}/reject`).set(bearer(operator)).send({ reason: 'Prix non justifié' });
   expect(reject.status).toBe(200);
-  expect(await Property.findById(property._id)).toMatchObject({ price: 100000, statusAdmin: 'Validée', isPublished: true });
-  expect((await getPublicPropertyById(property._id)).price).toBe(100000);
+  expect(await Property.findById(property._id)).toMatchObject({ price: 130000, statusAdmin: 'Rejetée', isPublished: false, publicationLifecycleState: 'rejected' });
+  expect((await Property.findById(property._id).lean()).approvedPublicSnapshot.price).toBe(100000);
+  expect(await getPublicPropertyById(property._id)).toBeNull();
 });
 
 test('une annonce legacy validée sans snapshot reste publiquement compatible', async () => {
