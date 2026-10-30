@@ -204,6 +204,31 @@ const propertySchema = new mongoose.Schema(
     },
 
     isPublished: { type: Boolean, default: false },
+    // GIT-INTEGRATION-03A-1 — état de publication distinct de la
+    // disponibilité métier et de la version commerciale. `default: null`
+    // préserve le comportement des annonces legacy sans migration.
+    publicationLifecycleState: {
+      type: String,
+      enum: ['draft', 'pending', 'published', 'change_pending', 'owner_withdrawn', 'admin_suspended', 'rejected'],
+      default: null,
+      index: true,
+    },
+    publicationLifecycleHistory: {
+      type: [{
+        from: { type: String, default: null },
+        to: { type: String, required: true },
+        action: { type: String, required: true },
+        actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        reason: { type: String, trim: true, maxlength: 1000, default: '' },
+        at: { type: Date, default: Date.now },
+      }],
+      default: [],
+    },
+    publicationSuspensionReview: {
+      requestedAt: { type: Date, default: null },
+      requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      reason: { type: String, trim: true, maxlength: 1000, default: '' },
+    },
     // Lot A — snapshot public approuvé et verrou de concurrence. Champs
     // additifs : les annonces legacy validées restent lisibles via fallback.
     commercialPublicationVersion: { type: Number, default: 0, min: 0 },
