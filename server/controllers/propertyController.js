@@ -40,7 +40,7 @@ const { ADMINISTRATION_SCOPE_MODE } = require('../services/administrationScopeSe
 const CommercialPublicationRevision = require('../models/CommercialPublicationRevision');
 const {
   SUBSTANTIVE_PUBLIC_FIELDS, publicSnapshot, projectApprovedPublicResource, classifySubstantiveChanges,
-  createPendingRevision, decideRevision,
+  createPendingRevision, decideRevision, CommercialPublicationError,
 } = require('../services/commercialPublicationService');
 const {
   ownerWithdrawProperty,
@@ -1162,10 +1162,27 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   const classicListing = ['vente', 'location'].includes(target.status);
   let revision = await CommercialPublicationRevision.findOne({ resourceType: 'Property', resource: target._id, status: 'pending' }).sort('-createdAt');
   if (!revision) {
-    revision = await createPendingRevision({ resourceType: 'Property', resource: target, proposedSnapshot: publicSnapshot(target), actor: target.owner });
-    await Property.updateOne({ _id: target._id }, {
+    const freshTarget = await Property.findById(id);
+    const initialSubmission = freshTarget
+      && freshTarget.availability === 'Disponible'
+      && ['pending', null].includes(freshTarget.publicationLifecycleState ?? null)
+      && !freshTarget.currentPublicationRevision;
+    if (!initialSubmission) {
+      throw new CommercialPublicationError('PUBLICATION_REVISION_STALE', 'Aucune révision courante admissible à décider.', 409);
+    }
+    revision = await createPendingRevision({ resourceType: 'Property', resource: freshTarget, proposedSnapshot: publicSnapshot(freshTarget), actor: freshTarget.owner });
+    const linked = await Property.updateOne({
+      _id: freshTarget._id,
+      availability: 'Disponible',
+      currentPublicationRevision: null,
+      $or: [{ publicationLifecycleState: 'pending' }, { publicationLifecycleState: null }, { publicationLifecycleState: { $exists: false } }],
+    }, {
       $set: { currentPublicationRevision: revision._id, publicationLifecycleState: 'pending', isPublished: false },
     });
+    if (linked.modifiedCount !== 1) {
+      await CommercialPublicationRevision.updateOne({ _id: revision._id, status: 'pending' }, { $set: { status: 'superseded' } });
+      throw new CommercialPublicationError('PUBLICATION_REVISION_STALE', 'Le cycle de publication a changé pendant la décision.', 409);
+    }
   }
   const reason = String(req.body.reason || (action === 'validate' ? 'Approbation commerciale Altitude Vision' : '')).trim();
   await decideRevision({
@@ -1213,27 +1230,6 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
     reason,
     transitionKey: String(revision._id),
   });
-
-  // Notifie le propriétaire du bien de la décision de modération
-  if (updatedProperty.owner) {
-    if (newStatusAdmin === 'Validée') {
-      notify({ recipient: updatedProperty.owner,
-        type:  'bien_valide',
-        title: '✅ Bien validé',
-        body: updatedProperty.isPublished === true
-          ? `"${updatedProperty.title}" est maintenant visible sur la plateforme.`
-          : `"${updatedProperty.title}" a été validé dans son workflow spécialisé.`,
-        data:  { propertyId: updatedProperty._id.toString(), screen: 'Annonces' },
-      }).catch(() => {});
-    } else if (newStatusAdmin === 'Rejetée') {
-      notify({ recipient: updatedProperty.owner,
-        type:  'bien_rejete',
-        title: '❌ Bien non validé',
-        body:  `"${updatedProperty.title}" n'a pas été validé. Contactez-nous.`,
-        data:  { propertyId: updatedProperty._id.toString(), screen: 'Profil' },
-      }).catch(() => {});
-    }
-  }
 
   // Broadcast uniquement si le bien est réellement public. Validation et
   // publication sont deux états distincts dans le modèle Property.
