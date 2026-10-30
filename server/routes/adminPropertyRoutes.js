@@ -39,6 +39,8 @@ router.patch(
     '/properties/:id/:action(validate|reject)',
     propertyController.updatePropertyStatus 
 );
+router.post('/properties/:id/suspend', propertyController.suspendPropertyPublication);
+router.post('/properties/:id/lift-suspension', propertyController.liftPropertyPublicationSuspension);
 
 
 /* =============================================================

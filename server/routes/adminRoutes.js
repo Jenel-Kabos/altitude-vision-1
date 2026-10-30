@@ -66,6 +66,8 @@ router.get('/properties',               requireTenantScopeForStaffAllowPlatformW
 // ── Propriétés : modération / suppression (Admin uniquement) ─────
 router.patch('/properties/:id/approve', requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, (req, _res, next) => { req.params.action = 'validate'; next(); }, propertyController.updatePropertyStatus);
 router.patch('/properties/:id/reject',  requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, (req, _res, next) => { req.params.action = 'reject'; next(); }, propertyController.updatePropertyStatus);
+router.post('/properties/:id/suspend', requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, propertyController.suspendPropertyPublication);
+router.post('/properties/:id/lift-suspension', requirePlatformOperatorCapability('platform.commercial.manage'), requirePlatformScope, propertyController.liftPropertyPublicationSuspension);
 router.delete('/properties/:id',        requireTenantScopeForStaffAllowPlatformWide, propertyManageAuthority, adminController.deleteProperty);
 
 // ── Utilisateurs (Admin uniquement) ──────────────────────────────

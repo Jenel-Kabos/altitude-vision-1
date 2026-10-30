@@ -188,6 +188,10 @@ router.post('/:id/like', authController.protect, propertyController.toggleLike);
 router.post('/:id/share', propertyController.incrementShare);
 router.post('/:id/reviews', authController.protect, propertyController.addPropertyReview);
 
+router.patch('/:id/lifecycle', authController.protect, propertyController.updatePropertyLifecycle);
+router.post('/:id/reactivation', authController.protect, propertyController.requestPropertyReactivation);
+router.post('/:id/suspension-review', authController.protect, propertyController.requestPropertySuspensionReview);
+
 // ── MIXED owner-or-tenant-staff mutations (Decision 2) ──────────────────────
 // The controller resolves the authority dually:
 //  • OWNER: `Property.owner === req.user.id` → allowed without any tenant
