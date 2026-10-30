@@ -43,7 +43,20 @@ function isPropertyCommerciallyAvailable(property = {}) {
   return derivePublicationState(property) === PUBLICATION_STATES.PUBLISHED
     && property.statusAdmin === 'Validée'
     && property.isPublished === true
-    && property.availability === 'Disponible';
+    && (property.availability === undefined || property.availability === null || property.availability === 'Disponible');
+}
+
+function commerciallyPublishedMongoFilter() {
+  return {
+    statusAdmin: 'Validée',
+    isPublished: true,
+    availability: 'Disponible',
+    $or: [
+      { publicationLifecycleState: PUBLICATION_STATES.PUBLISHED },
+      { publicationLifecycleState: null },
+      { publicationLifecycleState: { $exists: false } },
+    ],
+  };
 }
 
 async function inTransaction(work) {
@@ -207,6 +220,7 @@ module.exports = {
   PropertyPublicationLifecycleError,
   derivePublicationState,
   isPropertyCommerciallyAvailable,
+  commerciallyPublishedMongoFilter,
   ownerWithdrawProperty,
   ownerRequestReactivation,
   adminSuspendProperty,
