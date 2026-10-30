@@ -97,6 +97,11 @@ const NOTIFICATION_TYPES = [
   // ── Biens immobiliers ──
   'new_property',                 // tous les utilisateurs : nouveau bien validé et publié
   'property_pending_moderation',  // staff : nouveau bien mobile en attente de modération
+  'property_publication_submitted', 'property_publication_changed',
+  'property_owner_withdrawn', 'property_availability_changed',
+  'property_reactivation_requested', 'property_publication_approved',
+  'property_publication_rejected', 'property_admin_suspended',
+  'property_suspension_review_requested', 'property_suspension_lifted',
   // ── Compte ──
   'account_verified',     // client : compte propriétaire validé par admin
   'account_suspended',    // utilisateur : compte suspendu

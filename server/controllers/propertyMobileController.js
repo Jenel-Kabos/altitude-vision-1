@@ -1,26 +1,16 @@
 const Property = require('../models/Property');
-const User = require('../models/User');
-const { notify } = require('../services/notificationService');
 const { buildMobilePropertyData } = require('../services/propertyPublicationInputService');
 const { publicSnapshot, createPendingRevision } = require('../services/commercialPublicationService');
+const { notifyPropertyLifecycleEvent } = require('../services/propertyPublicationNotificationService');
 
 const createPropertyMobile = async (req, res) => {
   try {
     const propertyData = buildMobilePropertyData(req.body, req.user.id);
     propertyData.tenant = req.propertyCreationTenantId || null;
     const property = await Property.create(propertyData);
-    await createPendingRevision({ resourceType: 'Property', resource: property, proposedSnapshot: publicSnapshot(property), actor: req.user });
+    const revision = await createPendingRevision({ resourceType: 'Property', resource: property, proposedSnapshot: publicSnapshot(property), actor: req.user });
 
-    // Notifier les Admin (modération réservée à ce rôle, cf. AdminDashboard
-    // NAV_SECTIONS "Modération Biens" → roles: ['Admin']) — best-effort
-    User.find({ role: 'Admin' }).select('_id').lean()
-      .then((admins) => Promise.allSettled(admins.map((a) => notify({ recipient: a._id,
-        type:  'property_pending_moderation',
-        title: `Nouveau bien à modérer : ${req.body.titre}`,
-        body:  `${req.body.ville || ''} ${req.body.arrondissement || ''}`.trim(),
-        link:  '/dashboard/moderation/properties',
-        data:  { screen: 'ModerationProperties', propertyId: property._id.toString() },
-      }))))
+    notifyPropertyLifecycleEvent({ event: 'submitted', property, actor: req.user, transitionKey: String(revision._id) })
       .catch(() => {});
 
     return res.status(201).json({
