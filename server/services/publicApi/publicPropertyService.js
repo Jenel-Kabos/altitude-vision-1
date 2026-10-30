@@ -20,7 +20,14 @@ const PUBLIC_PROPERTY_FIELDS = 'title description type status price address lati
 // CRM), jamais une seconde implémentation. `undefined`/`null` = comportement
 // STRICTEMENT inchangé (catalogue global, tel qu'avant ce sprint).
 async function listPublicProperties(query = {}, { scopeUserIds } = {}) {
-  const filter = { statusAdmin: 'Validée', isPublished: true, availability: { $ne: 'Retiré' } };
+  const filter = {
+    statusAdmin: 'Validée', isPublished: true, availability: 'Disponible',
+    $or: [
+      { publicationLifecycleState: 'published' },
+      { publicationLifecycleState: null },
+      { publicationLifecycleState: { $exists: false } },
+    ],
+  };
   if (scopeUserIds) filter.owner = { $in: [...scopeUserIds] };
   const baseQuery = Property.find(filter);
   const features = new APIFeatures(baseQuery, query).filter().sort().paginate();
@@ -34,7 +41,14 @@ async function listPublicProperties(query = {}, { scopeUserIds } = {}) {
 }
 
 async function getPublicPropertyById(id, { scopeUserIds } = {}) {
-  const filter = { _id: id, statusAdmin: 'Validée', isPublished: true };
+  const filter = {
+    _id: id, statusAdmin: 'Validée', isPublished: true, availability: 'Disponible',
+    $or: [
+      { publicationLifecycleState: 'published' },
+      { publicationLifecycleState: null },
+      { publicationLifecycleState: { $exists: false } },
+    ],
+  };
   if (scopeUserIds) filter.owner = { $in: [...scopeUserIds] };
   const property = await Property.findOne(filter).select(PUBLIC_PROPERTY_FIELDS).lean();
   return property ? projectApprovedPublicResource(property) : null;

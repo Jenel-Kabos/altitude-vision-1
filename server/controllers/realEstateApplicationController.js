@@ -4,6 +4,7 @@ const Property = require('../models/Property');
 const { STAFF_IMMO } = require('../utils/roles');
 const { notify } = require('../services/notificationService');
 const workflow = require('../services/realEstateApplicationService');
+const { isPropertyCommerciallyAvailable } = require('../services/propertyPublicationLifecycleService');
 const mongoose = require('mongoose');
 const storage = require('../services/storage/realEstateApplicationStorageService');
 const { assertResourceTenantOrUnattributed, resolveResourceTenant } = require('../services/platformTenant/tenantResourceAttributionService');
@@ -62,10 +63,10 @@ async function assertApplicationTenantAccessIfStaff(req, res, application, isSta
 
 exports.create = async (req, res) => {
   try {
-    const property = await Property.findById(req.body.propertyId).select('owner status statusAdmin availability isPublished title');
+    const property = await Property.findById(req.body.propertyId).select('owner status statusAdmin availability isPublished publicationLifecycleState title');
     if (!property) return res.status(404).json({ status: 'fail', code: 'PROPERTY_NOT_FOUND', message: 'Bien introuvable.' });
     const kind = property.status === 'vente' ? 'purchase_offer' : property.status === 'location' ? 'rental_application' : null;
-    if (!kind || property.statusAdmin !== 'Validée' || !property.isPublished || property.availability !== 'Disponible') {
+    if (!kind || !isPropertyCommerciallyAvailable(property)) {
       return res.status(409).json({ status: 'fail', code: 'PROPERTY_NOT_AVAILABLE', message: 'Ce bien ne reçoit pas de dossier.' });
     }
     if (String(property.owner) === String(req.user._id)) return res.status(409).json({ status: 'fail', code: 'OWNER_CANNOT_APPLY', message: 'Le propriétaire ne peut pas candidater sur son bien.' });

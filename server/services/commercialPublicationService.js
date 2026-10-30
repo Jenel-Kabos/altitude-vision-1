@@ -121,7 +121,8 @@ async function decideRevision({ revisionId, decision, actor, reason, adapter }) 
         const promotion = adapter.buildPromotionUpdate
           ? adapter.buildPromotionUpdate(revision.proposedSnapshot, revision)
           : { $set: { approvedPublicSnapshot: revision.proposedSnapshot, currentPublicationRevision: revision._id }, $inc: { commercialPublicationVersion: 1 } };
-        const result = await adapter.model.updateOne({ _id: revision.resource, ...versionFilter }, promotion, { session });
+        const adapterFilter = adapter.buildPromotionFilter ? adapter.buildPromotionFilter(revision) : {};
+        const result = await adapter.model.updateOne({ _id: revision.resource, ...versionFilter, ...adapterFilter }, promotion, { session });
         if (result.modifiedCount !== 1) fail('PUBLICATION_REVISION_STALE', 'La version publique a changé pendant la décision.', 409);
       }
       return revision;

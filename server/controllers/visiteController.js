@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Visite   = require('../models/Visite');
 const User     = require('../models/User');
 const Property = require('../models/Property');
+const { isPropertyCommerciallyAvailable } = require('../services/propertyPublicationLifecycleService');
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { notify, notifyStaff } = require('../services/notificationService');
 const yabetooService = require('../services/yabetooService');
@@ -176,7 +177,7 @@ exports.createVisite = asyncHandler(async (req, res) => {
   // publique générale — voir propertyMapper.js (mobile) pour la même
   // correction côté client. Un bien validé et disponible ne doit jamais
   // être bloqué pour cette seule raison.
-  if (property.availability !== 'Disponible' || property.statusAdmin !== 'Validée') {
+  if (!isPropertyCommerciallyAvailable(property)) {
     res.status(409);
     throw new Error('Ce bien n’est pas disponible pour une nouvelle visite.');
   }
