@@ -15,6 +15,12 @@ const schema = new mongoose.Schema({
   baseVersion: { type: Number, required: true, min: 0 },
   proposedSnapshot: { type: mongoose.Schema.Types.Mixed, required: true },
   changedFields: [{ type: String, required: true }],
+  submissionType: {
+    type: String,
+    enum: ['initial', 'content_change', 'reactivation', 'suspension_review'],
+    default: 'content_change',
+    index: true,
+  },
   status: { type: String, enum: ['pending', 'approved', 'rejected', 'superseded'], default: 'pending', index: true },
   submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
