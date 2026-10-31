@@ -56,7 +56,7 @@ function parseLocation(text, criteria) {
   if (/congo(?:-brazzaville)?/.test(text)) criteria.location.country = 'CG';
 }
 
-const AMOUNT = '(\\d{1,3}(?:[ .]\\d{3})+|\\d+(?:[.,]\\d+)?)(?![\\d])\\s*(milliards?|millions?|mille|mds?|mil(?!l)|k|m(?![a-z²]))?';
+const AMOUNT = '(\\d{1,3}(?:[ .]\\d{3})+|\\d+(?:[.,]\\d+)?)(?![\\d])\\s*(milliards?|millions?|mille|mds?|mil(?!l)|k|m(?![a-z²\\d]))?'; // « 120 m2 » : surface, jamais 120 millions
 function amountValue(raw, unit) {
   const base = number(raw); const u = unit || '';
   if (/^(k|mil|mille)$/.test(u)) return Math.round(base * 1e3);
@@ -64,13 +64,16 @@ function amountValue(raw, unit) {
   if (/^(md|mds|milliard|milliards)$/.test(u)) return Math.round(base * 1e9);
   return Math.round(base);
 }
+// AI-INTEGRATION-02 — un nombre suivi d'une unité de taille ou d'occupation n'est jamais un montant
+// (« au moins 3 chambres », « maximum 2 salles de bain », « minimum 4 nuits »).
+const NOT_AN_AMOUNT = '(?!\\s*(?:m2|m²|metres? carres?|chambres?|pieces?|salles?|sdb|etages?|nuits?|adultes?|enfants?|personnes?|voyageurs?|lits?))';
 function parseBudget(text, criteria, issues, ambiguities) {
   if (/(?:budget|prix|loyer)\s*-\s*\d/.test(text)) issues.push(notice('INVALID_NEGATIVE_AMOUNT', 'Un montant négatif est refusé.', 'budget'));
   const between = new RegExp(`entre\\s+${AMOUNT}\\s*(?:xaf|fcfa|francs?)?\\s+et\\s+${AMOUNT}`).exec(text);
-  const single = new RegExp(`(?:budget|prix|loyer|maximum|max|au plus|jusqu'a)\\s*(?:de|a|:)?\\s*${AMOUNT}`).exec(text)
+  const single = new RegExp(`(?:budget|prix|loyer|maximum|max|au plus|jusqu'a)\\s*(?:de|a|:)?\\s*${AMOUNT}${NOT_AN_AMOUNT}`).exec(text)
     || new RegExp(`pour\\s+${AMOUNT}\\s*(?:xaf|fcfa|francs?)`).exec(text)
     || new RegExp(`${AMOUNT}\\s*(?:xaf|fcfa|francs?)(?:\\s|$)`).exec(text);
-  const minimum = new RegExp(`(?:au moins|minimum|min|a partir de)\\s*(?:de|:)?\\s*${AMOUNT}(?!\\s*(?:m2|m²|metres? carres?))\\s*(?:xaf|fcfa|francs?)?`).exec(text);
+  const minimum = new RegExp(`(?:au moins|minimum|min|a partir de)\\s*(?:de|:)?\\s*${AMOUNT}${NOT_AN_AMOUNT}\\s*(?:xaf|fcfa|francs?)?`).exec(text);
   if (between) { const sharedUnit = between[2] || between[4]; criteria.budget.min = amountValue(between[1], sharedUnit); criteria.budget.max = amountValue(between[3], between[4] || sharedUnit); }
   else if (minimum) criteria.budget.min = amountValue(minimum[1], minimum[2]);
   else if (single) criteria.budget.max = amountValue(single[1], single[2]);
