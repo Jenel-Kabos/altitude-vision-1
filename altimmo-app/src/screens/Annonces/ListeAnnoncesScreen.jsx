@@ -18,6 +18,9 @@ import { PROPERTY_TYPES_WITH_ALL, formatPriceShort, PRICE_MAX } from '../../cons
 import { ACCOMMODATION_TYPES_WITH_ALL } from '../../constants/accommodation';
 import { DEFAULT_PROPERTY_FILTERS, buildPropertyQueryParams } from '../../utils/propertyQueryParams';
 import { resolveMobileDestination } from '../../navigation/navigationSdk';
+import AssistantEntryCard from '../../components/AssistantEntryCard';
+import { assistantFiltersFromListFilters } from '../../utils/assistantFilters';
+import { getAssistantStatus } from '../../services/altimmoAssistantService';
 import {
   Screen, Card, PrixFCFA, RecommendedCarousel, SearchPanel,
   GreetingBar, AdCarousel,
@@ -477,6 +480,19 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
     [navigation],
   );
   const onResetFilters = useCallback(() => setActiveFilters(DEFAULT_FILTERS), []);
+  // ALTIMMO-AI-01 / AI-INTEGRATION-02 — « Affiner avec l'assistant » : l'assistant reprend les filtres
+  // actifs (liste blanche, revalidée par le serveur). La carte n'apparaît que si le serveur confirme
+  // l'activation de l'assistant : aucun accès vers un assistant indisponible.
+  const [assistantEnabled, setAssistantEnabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getAssistantStatus().then((value) => { if (active) setAssistantEnabled(value); }).catch(() => {}); // getAssistantStatus ne rejette pas : garde de forme
+    return () => { active = false; };
+  }, []);
+  const onOpenAssistant = useCallback(
+    () => navigation.navigate('Assistant', { filters: assistantFiltersFromListFilters(activeFilters) }),
+    [navigation, activeFilters],
+  );
   const onToggleSearch = useCallback(() => setSearchOpen(s => !s), []);
   const onCloseSearch  = useCallback(() => setSearchOpen(false), []);
 
@@ -484,6 +500,7 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
   const ListHeader = useMemo(() => (
     <View>
       <GreetingBar onPressNotifications={onPressNotifications} />
+      {assistantEnabled ? <AssistantEntryCard onPress={onOpenAssistant} refine={activeFilterCount > 0} /> : null}
 
       {pubs.length > 0 ? (
         <AdCarousel items={pubs} tintColor={c.gold} />
@@ -667,7 +684,7 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
     pubs, pubsLoadState, recommended, activeFilters, activeFilterCount, filterSummary, searchOpen,
     styles, c,
     onPressNotifications, onPressRecommended, onToggleSearch, onCloseSearch,
-    onResetFilters, onSearchSubmit,
+    onResetFilters, onSearchSubmit, onOpenAssistant, assistantEnabled,
   ]);
 
   // ─── Return conditionnel APRÈS tous les hooks ───
