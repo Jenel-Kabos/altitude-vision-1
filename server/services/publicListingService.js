@@ -27,6 +27,34 @@ const PUBLIC_RATE_FIELDS = Object.freeze([
 ]);
 
 const isScalar = (value) => value !== undefined && value !== null && typeof value !== 'object';
+// DATA-READINESS-01 — types attendus par le contrat de l'assistant. Une valeur nulle ou d'un autre
+// type (document ancien, saisie vide) est retirée : elle devient « non renseignée », jamais convertie
+// ni inventée, et ne fait plus rejeter la réponse entière par la garde de contrat.
+const TYPED_FIELDS = Object.freeze({
+  string: ['title', 'description', 'pole', 'type', 'status', 'constructionType', 'availability', 'statusAdmin', 'accommodationType'],
+  number: ['price', 'honoraires', 'fraisVisite', 'cautionMultiplicateur', 'views', 'shares'],
+  boolean: ['isPublished', 'recommande'],
+  scalar: ['bedrooms', 'bathrooms', 'surface', 'livingRooms', 'kitchens'],
+  scalarList: ['images', 'amenities', 'profilsLocataireRecherches', 'documentsRequis'],
+});
+const hasType = (kind, value) => {
+  if (kind === 'number') return typeof value === 'number' && Number.isFinite(value);
+  if (kind === 'scalar') return isScalar(value);
+  if (kind === 'scalarList') return Array.isArray(value);
+  return typeof value === kind;
+};
+function dropUntyped(out) {
+  for (const [kind, fields] of Object.entries(TYPED_FIELDS)) {
+    for (const field of fields) {
+      if (out[field] === undefined) continue;
+      if (!hasType(kind, out[field])) delete out[field];
+      else if (kind === 'scalarList') out[field] = out[field].filter(isScalar);
+    }
+  }
+  for (const field of ['createdAt', 'updatedAt']) if (out[field] !== undefined && !(out[field] instanceof Date) && typeof out[field] !== 'string') delete out[field];
+  if (out.hotelServices !== undefined && (!out.hotelServices || typeof out.hotelServices !== 'object' || Array.isArray(out.hotelServices))) delete out.hotelServices;
+  return out;
+}
 const pick = (source, fields) => Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]));
 const refId = (value) => (value && typeof value === 'object' && value._id ? value._id : value);
 
@@ -64,7 +92,11 @@ function toPublicListing(value, { viewerId = null } = {}) {
   const projected = projectApprovedPublicResource(plain);
   const out = pick(projected, PUBLIC_PROPERTY_FIELDS);
   if (out.hotel) out.hotel = refId(out.hotel);
-  if (projected.address && typeof projected.address === 'object') out.address = pick(projected.address, PUBLIC_ADDRESS_FIELDS);
+  dropUntyped(out);
+  if (projected.address && typeof projected.address === 'object') {
+    out.address = pick(projected.address, PUBLIC_ADDRESS_FIELDS);
+    for (const field of PUBLIC_ADDRESS_FIELDS) if (out.address[field] !== undefined && typeof out.address[field] !== 'string') delete out.address[field];
+  }
   const likes = Array.isArray(projected.likes) ? projected.likes : [];
   out.likesCount = likes.length;
   if (viewerId) out.likedByMe = likes.some((id) => String(refId(id)) === String(viewerId));

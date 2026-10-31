@@ -8,6 +8,7 @@ const { searchPublicAccommodations } = require('../accommodationSearchService');
 const publicListing = require('../publicListingService');
 const { ACCOMMODATION_TYPES } = require('../../constants/propertyFilterConstants');
 const { assistantPublicPropertyGates } = require('./publicVisibility');
+const { AMBIGUOUS_ZERO_TYPES } = require('./listingFacts');
 
 function minimumFilter(query, key, field) {
   const value = toFiniteNumber(query[key]);
@@ -97,7 +98,9 @@ function scanPropertyFilter(rawRequest, { lodging }) {
   if (price) and.push({ $or: [{ price }, notNumber('price')] });
   for (const [key, field] of [['minBedrooms', 'bedrooms'], ['minBathrooms', 'bathrooms'], ['minSurface', 'surface']]) {
     const value = toFiniteNumber(query[key]);
-    if (value !== undefined) and.push({ $or: [{ [field]: { $gte: value } }, notNumber(field)] });
+    // DATA-READINESS-01 : un 0 ambigu (logement) reste candidat « à vérifier », comme une valeur absente.
+    const ambiguousZero = field === 'surface' ? [] : [{ [field]: 0, type: { $in: AMBIGUOUS_ZERO_TYPES } }];
+    if (value !== undefined) and.push({ $or: [{ [field]: { $gte: value } }, notNumber(field), ...ambiguousZero] });
   }
   const neighborhood = typeof rawRequest.neighborhood === 'string' && rawRequest.neighborhood.length <= 80 ? buildExactCiRegexFilter(rawRequest.neighborhood) : null;
   if (neighborhood) and.push({ $or: [{ 'address.neighborhood': neighborhood }, { 'address.neighborhood': { $in: [null, ''] } }, { 'address.neighborhood': { $not: { $type: 'string' } } }] });
