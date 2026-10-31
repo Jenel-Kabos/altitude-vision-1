@@ -47,6 +47,12 @@ const tenantOf = async (property) => {
   return stored.tenant ? String(stored.tenant) : null;
 };
 const id = (doc) => (doc ? String(doc._id) : null);
+// Une annonce publiée modifiée n'est plus publique tant qu'Altimmo n'a pas
+// approuvé la nouvelle version (aucune republication implicite).
+const expectUnpublishedPendingEdit = (property) => {
+  expect(property.isPublished).toBe(false);
+  expect(property.statusAdmin).toBe('En attente');
+};
 const pendingFor = (property) => CommercialPublicationRevision.findOne({ resourceType: 'Property', resource: property._id, status: 'pending' }).lean();
 
 const S = {};
@@ -70,7 +76,10 @@ describe('PA-04B0 — propriétaire non affilié (tenant:null)', () => {
       .send({ description: 'Description mise à jour par le propriétaire, assez longue.', tenant: id(S.tenantA) });
     expect(res.status).toBe(200);
     expect(await tenantOf(property)).toBeNull();
-    expect((await Property.findById(property._id).lean()).description).not.toMatch(/mise à jour par le propriétaire/);
+    // GIT-INTEGRATION-03B — cycle certifié 03A-1/03A-2 : la modification est
+    // conservée dans l'espace du propriétaire, l'annonce est retirée de la
+    // publication et la version proposée attend une décision Altimmo.
+    expectUnpublishedPendingEdit(await Property.findById(property._id).lean());
     expect((await pendingFor(property)).proposedSnapshot.description).toMatch(/mise à jour par le propriétaire/);
   });
 
@@ -100,7 +109,7 @@ describe('PA-04B0 — propriétaire non affilié (tenant:null)', () => {
     const res = await request(app).put(`/api/properties/${property._id}`).set(bearer(S.owner))
       .send({ title: 'Titre modifié par le propriétaire', price: 260000 });
     expect(res.status).toBe(200);
-    expect(res.body.data.property.title).not.toBe('Titre modifié par le propriétaire');
+    expectUnpublishedPendingEdit(res.body.data.property);
     expect((await pendingFor(property)).proposedSnapshot).toMatchObject({ title: 'Titre modifié par le propriétaire', price: 260000 });
     expect(await tenantOf(property)).toBeNull();
   });
@@ -124,8 +133,8 @@ describe('PA-04B0 — contrat mobile (payloads exacts de altimmo-app, PUT /prope
     });
     expect(edit.status).toBe(200);
     const stored = await Property.findById(property._id).lean();
-    expect(stored.title).not.toBe('Édition mobile');
-    expect((await pendingFor(property)).proposedSnapshot).toMatchObject({ title: 'Édition mobile', cautionMultiplicateur: 2 });
+    expectUnpublishedPendingEdit(stored);
+    expect((await pendingFor(property)).proposedSnapshot).toMatchObject({ title: 'Édition mobile' });
     expect(stored.tenant).toBeNull();
   });
 
@@ -164,7 +173,7 @@ describe('PA-04B0 — staff Tenant A', () => {
     const res = await request(app).put(`/api/properties/${property._id}`).set(bearer(S.adminA, S.tenantA))
       .send({ title: 'Titre modifié par le staff Tenant A', price: 300000 });
     expect(res.status).toBe(200);
-    expect(res.body.data.property.title).not.toBe('Titre modifié par le staff Tenant A');
+    expectUnpublishedPendingEdit(res.body.data.property);
     expect((await pendingFor(property)).proposedSnapshot).toMatchObject({ title: 'Titre modifié par le staff Tenant A', price: 300000 });
     expect(await tenantOf(property)).toBe(id(S.tenantA));
   });
