@@ -16,6 +16,7 @@ router.get('/search', search);
 router.get('/map-aggregates', getMapAggregates);
 // ALTIMMO-AI-INTEGRATION-01 — assistant de recherche (public, lecture seule, désactivé par défaut :
 // voir config/altimmoAssistant.js). Monté ici pour ne pas modifier server.js.
+router.get('/assistant/status', altimmoAssistant.status);
 router.post('/assistant/search', altimmoAssistantLimiter, altimmoAssistant.search);
 router.post('/assistant/compare', altimmoAssistantLimiter, altimmoAssistant.compare);
 

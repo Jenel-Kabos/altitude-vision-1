@@ -1,0 +1,2257 @@
+{
+  "status": {
+    "status": "success",
+    "data": {
+      "enabled": true
+    }
+  },
+  "searchResults": {
+    "status": "success",
+    "data": {
+      "status": "success",
+      "intent": "RENT",
+      "interpretedCriteria": {
+        "transaction": "RENT",
+        "propertyTypes": [
+          "Maison"
+        ],
+        "accommodationTypes": [],
+        "location": {
+          "country": null,
+          "city": "Brazzaville",
+          "districts": [
+            "Moungali"
+          ],
+          "preferredDistricts": [],
+          "neighborhood": null,
+          "zone": null,
+          "radiusMeters": null
+        },
+        "budget": {
+          "min": null,
+          "max": null,
+          "currency": null,
+          "period": null
+        },
+        "bedrooms": {
+          "min": null,
+          "max": null
+        },
+        "bathrooms": {
+          "min": null,
+          "max": null
+        },
+        "surface": {
+          "min": null,
+          "max": null
+        },
+        "floors": {
+          "min": null,
+          "max": null
+        },
+        "amenities": {
+          "required": [],
+          "preferred": [
+            "parking"
+          ],
+          "excluded": []
+        },
+        "proximity": {
+          "required": [],
+          "preferred": []
+        },
+        "stay": {
+          "checkIn": null,
+          "checkOut": null,
+          "nights": null,
+          "adults": null,
+          "children": null,
+          "rooms": null,
+          "stayType": null
+        }
+      },
+      "appliedCriteria": [
+        "transaction",
+        "type",
+        "location.city",
+        "location.districts"
+      ],
+      "unverifiableCriteria": [],
+      "unsupportedCriteria": [],
+      "ambiguities": [],
+      "clarificationQuestions": [],
+      "preferences": [
+        "parking"
+      ],
+      "total": 3,
+      "verificationTotal": 0,
+      "coverage": {
+        "mongoMatchedTotal": 3,
+        "mongoTotalExact": true,
+        "sourceTotal": 3,
+        "evaluated": 3,
+        "scanned": 3,
+        "readCalls": 1,
+        "admissible": 3,
+        "toVerify": 0,
+        "complete": true,
+        "admissibleTotalExact": true,
+        "limit": 1000,
+        "batchSize": 100,
+        "maxScanned": 2000
+      },
+      "warnings": [],
+      "rankingStatus": "ranked",
+      "rankedResults": [
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a535",
+            "title": "AI02 Maison Moungali 3 chambres",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Maison",
+            "status": "location",
+            "price": 200000,
+            "honoraires": 200000,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 3,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [
+              "Parking"
+            ],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:59:00.000Z",
+            "updatedAt": "2026-10-30T11:59:00.000Z",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a535"
+          },
+          "score": 10000,
+          "confidence": 10000,
+          "satisfiedPreferences": [
+            "parking"
+          ],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [],
+          "explanation": {
+            "summary": "1 préférence confirmée.",
+            "favorable": [
+              "Parking confirmé."
+            ],
+            "unfavorable": [],
+            "toVerify": [],
+            "tradeoffs": [],
+            "provenance": [
+              {
+                "criterion": "amenity.parking",
+                "source": "public_listing.amenities",
+                "state": "TRUE"
+              }
+            ],
+            "warnings": []
+          },
+          "position": 1
+        },
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a537",
+            "title": "AI02 Maison Moungali 4 chambres",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Maison",
+            "status": "location",
+            "price": 350000,
+            "honoraires": null,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 4,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [
+              "Parking",
+              "Jardin"
+            ],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:58:00.000Z",
+            "updatedAt": "2026-10-30T11:58:00.000Z",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a537"
+          },
+          "score": 10000,
+          "confidence": 10000,
+          "satisfiedPreferences": [
+            "parking"
+          ],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [],
+          "explanation": {
+            "summary": "1 préférence confirmée.",
+            "favorable": [
+              "Parking confirmé."
+            ],
+            "unfavorable": [],
+            "toVerify": [],
+            "tradeoffs": [],
+            "provenance": [
+              {
+                "criterion": "amenity.parking",
+                "source": "public_listing.amenities",
+                "state": "TRUE"
+              }
+            ],
+            "warnings": []
+          },
+          "position": 2
+        },
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a539",
+            "title": "AI02 Maison Moungali équipements non renseignés",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Maison",
+            "status": "location",
+            "price": 180000,
+            "honoraires": null,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 3,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:57:00.000Z",
+            "updatedAt": "2026-10-30T11:57:00.000Z",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a539"
+          },
+          "score": 5000,
+          "confidence": 0,
+          "satisfiedPreferences": [],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [
+            "parking"
+          ],
+          "explanation": {
+            "summary": "Les données disponibles ne permettent pas de départager ce bien de manière fiable.",
+            "favorable": [],
+            "unfavorable": [],
+            "toVerify": [
+              "Parking non vérifiable avec les données disponibles."
+            ],
+            "tradeoffs": [],
+            "provenance": [
+              {
+                "criterion": "amenity.parking",
+                "source": "public_listing.amenities",
+                "state": "UNKNOWN"
+              }
+            ],
+            "warnings": []
+          },
+          "position": 3
+        }
+      ],
+      "rankedCandidatesToVerify": [],
+      "rankingWarnings": [],
+      "normalizedPreferences": [
+        {
+          "kind": "AMENITY",
+          "key": "parking",
+          "weight": 100
+        }
+      ],
+      "rankingCoverage": {
+        "evaluated": 3,
+        "complete": true,
+        "limit": 1000,
+        "sourceCoverage": {
+          "mongoMatchedTotal": 3,
+          "mongoTotalExact": true,
+          "sourceTotal": 3,
+          "evaluated": 3,
+          "scanned": 3,
+          "readCalls": 1,
+          "admissible": 3,
+          "toVerify": 0,
+          "complete": true,
+          "admissibleTotalExact": true,
+          "limit": 1000,
+          "batchSize": 100,
+          "maxScanned": 2000
+        },
+        "ranked": 3
+      },
+      "rankingOrder": "RELEVANCE",
+      "pagination": {
+        "page": 1,
+        "limit": 10,
+        "pages": 1
+      },
+      "nextPageToken": null,
+      "contractVersion": "IA-03C4.1"
+    },
+    "notices": [
+      {
+        "code": "NO_COMMERCIAL_ACTION",
+        "message": "L’assistant ne publie, ne réserve, ne paie et ne transmet aucune coordonnée. Pour une visite, une candidature ou une réservation, utilisez la fiche de l’annonce."
+      }
+    ]
+  },
+  "searchToVerify": {
+    "status": "success",
+    "data": {
+      "status": "success",
+      "intent": "RENT",
+      "interpretedCriteria": {
+        "transaction": "RENT",
+        "propertyTypes": [
+          "Maison"
+        ],
+        "accommodationTypes": [],
+        "location": {
+          "country": null,
+          "city": "Brazzaville",
+          "districts": [
+            "Moungali"
+          ],
+          "preferredDistricts": [],
+          "neighborhood": null,
+          "zone": null,
+          "radiusMeters": null
+        },
+        "budget": {
+          "min": null,
+          "max": null,
+          "currency": null,
+          "period": null
+        },
+        "bedrooms": {
+          "min": null,
+          "max": null
+        },
+        "bathrooms": {
+          "min": null,
+          "max": null
+        },
+        "surface": {
+          "min": null,
+          "max": null
+        },
+        "floors": {
+          "min": null,
+          "max": null
+        },
+        "amenities": {
+          "required": [
+            "parking"
+          ],
+          "preferred": [],
+          "excluded": []
+        },
+        "proximity": {
+          "required": [],
+          "preferred": []
+        },
+        "stay": {
+          "checkIn": null,
+          "checkOut": null,
+          "nights": null,
+          "adults": null,
+          "children": null,
+          "rooms": null,
+          "stayType": null
+        }
+      },
+      "appliedCriteria": [
+        "transaction",
+        "type",
+        "location.city",
+        "location.districts"
+      ],
+      "unverifiableCriteria": [
+        {
+          "code": "CRITERION_UNKNOWN",
+          "field": "amenities.required.parking",
+          "message": "Critère non vérifiable avec les données disponibles."
+        }
+      ],
+      "unsupportedCriteria": [],
+      "ambiguities": [],
+      "clarificationQuestions": [],
+      "preferences": [],
+      "total": 2,
+      "verificationTotal": 1,
+      "coverage": {
+        "mongoMatchedTotal": 3,
+        "mongoTotalExact": true,
+        "sourceTotal": 3,
+        "evaluated": 3,
+        "scanned": 3,
+        "readCalls": 1,
+        "admissible": 2,
+        "toVerify": 1,
+        "complete": true,
+        "admissibleTotalExact": true,
+        "limit": 1000,
+        "batchSize": 100,
+        "maxScanned": 2000
+      },
+      "warnings": [],
+      "rankingStatus": "ranked",
+      "rankedResults": [
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a535",
+            "title": "AI02 Maison Moungali 3 chambres",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Maison",
+            "status": "location",
+            "price": 200000,
+            "honoraires": 200000,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 3,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [
+              "Parking"
+            ],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:59:00.000Z",
+            "updatedAt": "2026-10-30T11:59:00.000Z",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a535"
+          },
+          "score": 0,
+          "confidence": 0,
+          "satisfiedPreferences": [],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [],
+          "explanation": {
+            "summary": "Les données disponibles ne permettent pas de départager ce bien de manière fiable.",
+            "favorable": [],
+            "unfavorable": [],
+            "toVerify": [],
+            "tradeoffs": [],
+            "provenance": [],
+            "warnings": []
+          },
+          "position": 1
+        },
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a537",
+            "title": "AI02 Maison Moungali 4 chambres",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Maison",
+            "status": "location",
+            "price": 350000,
+            "honoraires": null,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 4,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [
+              "Parking",
+              "Jardin"
+            ],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:58:00.000Z",
+            "updatedAt": "2026-10-30T11:58:00.000Z",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a537"
+          },
+          "score": 0,
+          "confidence": 0,
+          "satisfiedPreferences": [],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [],
+          "explanation": {
+            "summary": "Les données disponibles ne permettent pas de départager ce bien de manière fiable.",
+            "favorable": [],
+            "unfavorable": [],
+            "toVerify": [],
+            "tradeoffs": [],
+            "provenance": [],
+            "warnings": []
+          },
+          "position": 2
+        }
+      ],
+      "rankedCandidatesToVerify": [
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a539",
+            "title": "AI02 Maison Moungali équipements non renseignés",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Maison",
+            "status": "location",
+            "price": 180000,
+            "honoraires": null,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 3,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:57:00.000Z",
+            "updatedAt": "2026-10-30T11:57:00.000Z",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a539"
+          },
+          "score": 0,
+          "confidence": 0,
+          "satisfiedPreferences": [],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [],
+          "explanation": {
+            "summary": "Les données disponibles ne permettent pas de départager ce bien de manière fiable.",
+            "favorable": [],
+            "unfavorable": [],
+            "toVerify": [],
+            "tradeoffs": [],
+            "provenance": [],
+            "warnings": []
+          },
+          "unknownCriteria": [
+            {
+              "field": "amenities.required.parking",
+              "state": "UNKNOWN"
+            }
+          ],
+          "position": 1
+        }
+      ],
+      "rankingWarnings": [],
+      "normalizedPreferences": [],
+      "rankingCoverage": {
+        "evaluated": 3,
+        "complete": true,
+        "limit": 1000,
+        "sourceCoverage": {
+          "mongoMatchedTotal": 3,
+          "mongoTotalExact": true,
+          "sourceTotal": 3,
+          "evaluated": 3,
+          "scanned": 3,
+          "readCalls": 1,
+          "admissible": 2,
+          "toVerify": 1,
+          "complete": true,
+          "admissibleTotalExact": true,
+          "limit": 1000,
+          "batchSize": 100,
+          "maxScanned": 2000
+        },
+        "ranked": 3
+      },
+      "rankingOrder": "CHRONOLOGICAL",
+      "pagination": {
+        "page": 1,
+        "limit": 10,
+        "pages": 1
+      },
+      "nextPageToken": null,
+      "contractVersion": "IA-03C4.1"
+    },
+    "notices": [
+      {
+        "code": "NO_COMMERCIAL_ACTION",
+        "message": "L’assistant ne publie, ne réserve, ne paie et ne transmet aucune coordonnée. Pour une visite, une candidature ou une réservation, utilisez la fiche de l’annonce."
+      }
+    ]
+  },
+  "searchEmpty": {
+    "status": "success",
+    "data": {
+      "status": "success",
+      "intent": "RENT",
+      "interpretedCriteria": {
+        "transaction": "RENT",
+        "propertyTypes": [
+          "Villa"
+        ],
+        "accommodationTypes": [],
+        "location": {
+          "country": null,
+          "city": "Brazzaville",
+          "districts": [
+            "Poto-Poto"
+          ],
+          "preferredDistricts": [],
+          "neighborhood": null,
+          "zone": null,
+          "radiusMeters": null
+        },
+        "budget": {
+          "min": null,
+          "max": 100000,
+          "currency": "XAF",
+          "period": null
+        },
+        "bedrooms": {
+          "min": 6,
+          "max": null
+        },
+        "bathrooms": {
+          "min": null,
+          "max": null
+        },
+        "surface": {
+          "min": null,
+          "max": null
+        },
+        "floors": {
+          "min": null,
+          "max": null
+        },
+        "amenities": {
+          "required": [
+            "pool"
+          ],
+          "preferred": [],
+          "excluded": []
+        },
+        "proximity": {
+          "required": [],
+          "preferred": []
+        },
+        "stay": {
+          "checkIn": null,
+          "checkOut": null,
+          "nights": null,
+          "adults": null,
+          "children": null,
+          "rooms": null,
+          "stayType": null
+        }
+      },
+      "appliedCriteria": [
+        "transaction",
+        "type",
+        "location.city",
+        "location.districts",
+        "budget",
+        "bedrooms.min"
+      ],
+      "unverifiableCriteria": [],
+      "unsupportedCriteria": [],
+      "ambiguities": [],
+      "clarificationQuestions": [],
+      "preferences": [],
+      "total": 0,
+      "verificationTotal": 0,
+      "coverage": {
+        "mongoMatchedTotal": 0,
+        "mongoTotalExact": true,
+        "sourceTotal": 0,
+        "evaluated": 0,
+        "scanned": 0,
+        "readCalls": 1,
+        "admissible": 0,
+        "toVerify": 0,
+        "complete": true,
+        "admissibleTotalExact": true,
+        "limit": 1000,
+        "batchSize": 100,
+        "maxScanned": 2000
+      },
+      "warnings": [
+        {
+          "code": "NO_EXACT_MATCH",
+          "message": "Aucune annonce ne satisfait toutes les contraintes vérifiables."
+        }
+      ],
+      "rankingStatus": "ranked",
+      "rankedResults": [],
+      "rankedCandidatesToVerify": [],
+      "rankingWarnings": [],
+      "normalizedPreferences": [],
+      "rankingCoverage": {
+        "evaluated": 0,
+        "complete": true,
+        "limit": 1000,
+        "sourceCoverage": {
+          "mongoMatchedTotal": 0,
+          "mongoTotalExact": true,
+          "sourceTotal": 0,
+          "evaluated": 0,
+          "scanned": 0,
+          "readCalls": 1,
+          "admissible": 0,
+          "toVerify": 0,
+          "complete": true,
+          "admissibleTotalExact": true,
+          "limit": 1000,
+          "batchSize": 100,
+          "maxScanned": 2000
+        },
+        "ranked": 0
+      },
+      "rankingOrder": "CHRONOLOGICAL",
+      "pagination": {
+        "page": 1,
+        "limit": 10,
+        "pages": 0
+      },
+      "nextPageToken": null,
+      "contractVersion": "IA-03C4.1"
+    },
+    "notices": [
+      {
+        "code": "NO_COMMERCIAL_ACTION",
+        "message": "L’assistant ne publie, ne réserve, ne paie et ne transmet aucune coordonnée. Pour une visite, une candidature ou une réservation, utilisez la fiche de l’annonce."
+      }
+    ]
+  },
+  "searchIncomplete": {
+    "status": "success",
+    "data": {
+      "status": "needs_clarification",
+      "intent": null,
+      "interpretedCriteria": {
+        "transaction": null,
+        "propertyTypes": [],
+        "accommodationTypes": [],
+        "location": {
+          "country": null,
+          "city": "Brazzaville",
+          "districts": [],
+          "preferredDistricts": [],
+          "neighborhood": null,
+          "zone": null,
+          "radiusMeters": null
+        },
+        "budget": {
+          "min": null,
+          "max": null,
+          "currency": null,
+          "period": null
+        },
+        "bedrooms": {
+          "min": null,
+          "max": null
+        },
+        "bathrooms": {
+          "min": null,
+          "max": null
+        },
+        "surface": {
+          "min": null,
+          "max": null
+        },
+        "floors": {
+          "min": null,
+          "max": null
+        },
+        "amenities": {
+          "required": [],
+          "preferred": [],
+          "excluded": []
+        },
+        "proximity": {
+          "required": [],
+          "preferred": []
+        },
+        "stay": {
+          "checkIn": null,
+          "checkOut": null,
+          "nights": null,
+          "adults": null,
+          "children": null,
+          "rooms": null,
+          "stayType": null
+        }
+      },
+      "appliedCriteria": [],
+      "unverifiableCriteria": [],
+      "unsupportedCriteria": [],
+      "ambiguities": [],
+      "clarificationQuestions": [
+        "Pouvez-vous préciser achat, location ou séjour ?"
+      ],
+      "preferences": [],
+      "total": 0,
+      "verificationTotal": 0,
+      "coverage": {
+        "evaluated": 0,
+        "sourceTotal": 0,
+        "complete": true,
+        "limit": 1000
+      },
+      "warnings": [
+        {
+          "code": "BLOCKING_AMBIGUITY",
+          "message": "La demande doit être clarifiée avant toute recherche."
+        }
+      ],
+      "rankingStatus": "not_ranked",
+      "rankedResults": [],
+      "rankedCandidatesToVerify": [],
+      "rankingWarnings": [
+        {
+          "code": "RANKING_INPUT_REJECTED",
+          "message": "Le résultat de recherche ne peut pas être classé."
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 10,
+        "pages": 0
+      },
+      "nextPageToken": null,
+      "contractVersion": "IA-03C4.1"
+    },
+    "notices": [
+      {
+        "code": "NO_COMMERCIAL_ACTION",
+        "message": "L’assistant ne publie, ne réserve, ne paie et ne transmet aucune coordonnée. Pour une visite, une candidature ou une réservation, utilisez la fiche de l’annonce."
+      }
+    ]
+  },
+  "searchProximity": {
+    "status": "success",
+    "data": {
+      "status": "success",
+      "intent": "RENT",
+      "interpretedCriteria": {
+        "transaction": "RENT",
+        "propertyTypes": [
+          "Maison"
+        ],
+        "accommodationTypes": [],
+        "location": {
+          "country": null,
+          "city": "Brazzaville",
+          "districts": [
+            "Moungali"
+          ],
+          "preferredDistricts": [],
+          "neighborhood": null,
+          "zone": null,
+          "radiusMeters": null
+        },
+        "budget": {
+          "min": null,
+          "max": null,
+          "currency": null,
+          "period": null
+        },
+        "bedrooms": {
+          "min": null,
+          "max": null
+        },
+        "bathrooms": {
+          "min": null,
+          "max": null
+        },
+        "surface": {
+          "min": null,
+          "max": null
+        },
+        "floors": {
+          "min": null,
+          "max": null
+        },
+        "amenities": {
+          "required": [],
+          "preferred": [],
+          "excluded": []
+        },
+        "proximity": {
+          "required": [
+            {
+              "category": "market",
+              "maxMeters": 1500
+            }
+          ],
+          "preferred": []
+        },
+        "stay": {
+          "checkIn": null,
+          "checkOut": null,
+          "nights": null,
+          "adults": null,
+          "children": null,
+          "rooms": null,
+          "stayType": null
+        }
+      },
+      "appliedCriteria": [
+        "transaction",
+        "type",
+        "location.city",
+        "location.districts"
+      ],
+      "unverifiableCriteria": [
+        {
+          "code": "POI_CATALOG_UNAVAILABLE",
+          "field": "proximity",
+          "message": "Proximité non vérifiée sans catalogue POI validé."
+        }
+      ],
+      "unsupportedCriteria": [],
+      "ambiguities": [],
+      "clarificationQuestions": [],
+      "preferences": [],
+      "total": 3,
+      "verificationTotal": 0,
+      "coverage": {
+        "mongoMatchedTotal": 3,
+        "mongoTotalExact": true,
+        "sourceTotal": 3,
+        "evaluated": 3,
+        "scanned": 3,
+        "readCalls": 1,
+        "admissible": 3,
+        "toVerify": 0,
+        "complete": true,
+        "admissibleTotalExact": true,
+        "limit": 1000,
+        "batchSize": 100,
+        "maxScanned": 2000
+      },
+      "warnings": [],
+      "rankingStatus": "ranked",
+      "rankedResults": [
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a535",
+            "title": "AI02 Maison Moungali 3 chambres",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Maison",
+            "status": "location",
+            "price": 200000,
+            "honoraires": 200000,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 3,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [
+              "Parking"
+            ],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:59:00.000Z",
+            "updatedAt": "2026-10-30T11:59:00.000Z",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a535"
+          },
+          "score": 0,
+          "confidence": 0,
+          "satisfiedPreferences": [],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [],
+          "explanation": {
+            "summary": "Les données disponibles ne permettent pas de départager ce bien de manière fiable.",
+            "favorable": [],
+            "unfavorable": [],
+            "toVerify": [],
+            "tradeoffs": [],
+            "provenance": [],
+            "warnings": []
+          },
+          "position": 1
+        },
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a537",
+            "title": "AI02 Maison Moungali 4 chambres",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Maison",
+            "status": "location",
+            "price": 350000,
+            "honoraires": null,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 4,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [
+              "Parking",
+              "Jardin"
+            ],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:58:00.000Z",
+            "updatedAt": "2026-10-30T11:58:00.000Z",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a537"
+          },
+          "score": 0,
+          "confidence": 0,
+          "satisfiedPreferences": [],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [],
+          "explanation": {
+            "summary": "Les données disponibles ne permettent pas de départager ce bien de manière fiable.",
+            "favorable": [],
+            "unfavorable": [],
+            "toVerify": [],
+            "tradeoffs": [],
+            "provenance": [],
+            "warnings": []
+          },
+          "position": 2
+        },
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a539",
+            "title": "AI02 Maison Moungali équipements non renseignés",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Maison",
+            "status": "location",
+            "price": 180000,
+            "honoraires": null,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 3,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:57:00.000Z",
+            "updatedAt": "2026-10-30T11:57:00.000Z",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a539"
+          },
+          "score": 0,
+          "confidence": 0,
+          "satisfiedPreferences": [],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [],
+          "explanation": {
+            "summary": "Les données disponibles ne permettent pas de départager ce bien de manière fiable.",
+            "favorable": [],
+            "unfavorable": [],
+            "toVerify": [],
+            "tradeoffs": [],
+            "provenance": [],
+            "warnings": []
+          },
+          "position": 3
+        }
+      ],
+      "rankedCandidatesToVerify": [],
+      "rankingWarnings": [],
+      "normalizedPreferences": [],
+      "rankingCoverage": {
+        "evaluated": 3,
+        "complete": true,
+        "limit": 1000,
+        "sourceCoverage": {
+          "mongoMatchedTotal": 3,
+          "mongoTotalExact": true,
+          "sourceTotal": 3,
+          "evaluated": 3,
+          "scanned": 3,
+          "readCalls": 1,
+          "admissible": 3,
+          "toVerify": 0,
+          "complete": true,
+          "admissibleTotalExact": true,
+          "limit": 1000,
+          "batchSize": 100,
+          "maxScanned": 2000
+        },
+        "ranked": 3
+      },
+      "rankingOrder": "CHRONOLOGICAL",
+      "pagination": {
+        "page": 1,
+        "limit": 10,
+        "pages": 1
+      },
+      "nextPageToken": null,
+      "contractVersion": "IA-03C4.1"
+    },
+    "notices": [
+      {
+        "code": "NO_COMMERCIAL_ACTION",
+        "message": "L’assistant ne publie, ne réserve, ne paie et ne transmet aucune coordonnée. Pour une visite, une candidature ou une réservation, utilisez la fiche de l’annonce."
+      }
+    ]
+  },
+  "searchHotel": {
+    "status": "success",
+    "data": {
+      "status": "success",
+      "intent": "STAY",
+      "interpretedCriteria": {
+        "transaction": "STAY",
+        "propertyTypes": [],
+        "accommodationTypes": [
+          "hotel"
+        ],
+        "location": {
+          "country": null,
+          "city": "Brazzaville",
+          "districts": [],
+          "preferredDistricts": [],
+          "neighborhood": null,
+          "zone": null,
+          "radiusMeters": null
+        },
+        "budget": {
+          "min": null,
+          "max": null,
+          "currency": null,
+          "period": null
+        },
+        "bedrooms": {
+          "min": null,
+          "max": null
+        },
+        "bathrooms": {
+          "min": null,
+          "max": null
+        },
+        "surface": {
+          "min": null,
+          "max": null
+        },
+        "floors": {
+          "min": null,
+          "max": null
+        },
+        "amenities": {
+          "required": [],
+          "preferred": [],
+          "excluded": []
+        },
+        "proximity": {
+          "required": [],
+          "preferred": []
+        },
+        "stay": {
+          "checkIn": null,
+          "checkOut": null,
+          "nights": null,
+          "adults": null,
+          "children": null,
+          "rooms": null,
+          "stayType": null
+        }
+      },
+      "appliedCriteria": [
+        "transaction",
+        "type",
+        "location.city"
+      ],
+      "unverifiableCriteria": [],
+      "unsupportedCriteria": [],
+      "ambiguities": [],
+      "clarificationQuestions": [],
+      "preferences": [],
+      "total": 1,
+      "verificationTotal": 0,
+      "coverage": {
+        "mongoMatchedTotal": 1,
+        "mongoTotalExact": false,
+        "sourceTotal": 1,
+        "evaluated": 1,
+        "scanned": 1,
+        "readCalls": 1,
+        "admissible": 1,
+        "toVerify": 0,
+        "complete": true,
+        "admissibleTotalExact": true,
+        "limit": 1000,
+        "batchSize": 100,
+        "maxScanned": 2000
+      },
+      "warnings": [],
+      "rankingStatus": "ranked",
+      "rankedResults": [
+        {
+          "listing": {
+            "_id": "6ae5ba9c8ed256bfece7a53f",
+            "title": "AI02 Hôtel Brazzaville",
+            "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
+            "pole": "Altimmo",
+            "type": "Commerce",
+            "status": "hebergement",
+            "price": 45000,
+            "honoraires": null,
+            "fraisVisite": 0,
+            "images": [
+              "https://placehold.co/1200x800/png?text=AI02"
+            ],
+            "bedrooms": 3,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "kitchens": 0,
+            "constructionType": "Non spécifié",
+            "amenities": [
+              "Wifi"
+            ],
+            "availability": "Disponible",
+            "cautionMultiplicateur": 2,
+            "profilsLocataireRecherches": [],
+            "documentsRequis": [],
+            "isPublished": true,
+            "statusAdmin": "Validée",
+            "recommande": false,
+            "views": 0,
+            "shares": 0,
+            "createdAt": "2026-10-30T11:54:00.000Z",
+            "updatedAt": "2026-10-30T11:54:00.000Z",
+            "accommodationType": "hotel",
+            "accommodationId": "6ae5ba9c8ed256bfece7a543",
+            "hotel": "6ae5ba9c8ed256bfece7a541",
+            "hotelServices": {
+              "restaurant": false,
+              "bar": false,
+              "piscine": false,
+              "spa": false,
+              "salleSport": false,
+              "salleConference": false,
+              "navette": false,
+              "parking": false,
+              "reception24h": false,
+              "wifi": false
+            },
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "likesCount": 0,
+            "reviews": [],
+            "id": "6ae5ba9c8ed256bfece7a53f"
+          },
+          "score": 0,
+          "confidence": 0,
+          "satisfiedPreferences": [],
+          "unsatisfiedPreferences": [],
+          "unknownPreferences": [],
+          "explanation": {
+            "summary": "Les données disponibles ne permettent pas de départager ce bien de manière fiable.",
+            "favorable": [],
+            "unfavorable": [],
+            "toVerify": [],
+            "tradeoffs": [],
+            "provenance": [],
+            "warnings": []
+          },
+          "position": 1
+        }
+      ],
+      "rankedCandidatesToVerify": [],
+      "rankingWarnings": [],
+      "normalizedPreferences": [],
+      "rankingCoverage": {
+        "evaluated": 1,
+        "complete": true,
+        "limit": 1000,
+        "sourceCoverage": {
+          "mongoMatchedTotal": 1,
+          "mongoTotalExact": false,
+          "sourceTotal": 1,
+          "evaluated": 1,
+          "scanned": 1,
+          "readCalls": 1,
+          "admissible": 1,
+          "toVerify": 0,
+          "complete": true,
+          "admissibleTotalExact": true,
+          "limit": 1000,
+          "batchSize": 100,
+          "maxScanned": 2000
+        },
+        "ranked": 1
+      },
+      "rankingOrder": "CHRONOLOGICAL",
+      "pagination": {
+        "page": 1,
+        "limit": 10,
+        "pages": 1
+      },
+      "nextPageToken": null,
+      "contractVersion": "IA-03C4.1"
+    },
+    "notices": [
+      {
+        "code": "NO_COMMERCIAL_ACTION",
+        "message": "L’assistant ne publie, ne réserve, ne paie et ne transmet aucune coordonnée. Pour une visite, une candidature ou une réservation, utilisez la fiche de l’annonce."
+      },
+      {
+        "code": "STAY_AVAILABILITY_NOT_VERIFIED",
+        "message": "Les disponibilités aux dates souhaitées ne sont pas vérifiées par l’assistant : elles sont confirmées uniquement lors de la réservation."
+      }
+    ]
+  },
+  "compareSelected": {
+    "status": "success",
+    "data": {
+      "version": "IA-03C2.1",
+      "status": "success",
+      "mode": "SELECTED_LISTINGS",
+      "comparedIds": [
+        "6ae5ba9c8ed256bfece7a535",
+        "6ae5ba9c8ed256bfece7a537"
+      ],
+      "items": [
+        {
+          "id": "6ae5ba9c8ed256bfece7a535",
+          "label": "AI02 Maison Moungali 3 chambres",
+          "position": 1,
+          "sourcePosition": null,
+          "matchStatus": "SELECTED",
+          "category": "RENTAL",
+          "listing": {
+            "id": "6ae5ba9c8ed256bfece7a535",
+            "title": "AI02 Maison Moungali 3 chambres",
+            "status": "location",
+            "type": "Maison",
+            "constructionType": "Non spécifié",
+            "availability": "Disponible",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "price": 200000,
+            "bedrooms": 3,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "cautionMultiplicateur": 2,
+            "amenities": [
+              "parking"
+            ],
+            "image": "https://placehold.co/1200x800/png?text=AI02"
+          },
+          "price": {
+            "state": "KNOWN",
+            "amount": 200000,
+            "currency": "XAF",
+            "period": "MONTH",
+            "source": "public_listing.price",
+            "issue": null
+          },
+          "monthlyPrice": {
+            "state": "NOT_APPLICABLE",
+            "amount": null,
+            "currency": null,
+            "period": "MONTH",
+            "source": null,
+            "issue": null
+          },
+          "score": 0,
+          "confidence": 0,
+          "confidenceLevel": "NOT_APPLICABLE",
+          "scoreRange": null,
+          "scoreSource": "IA-03C1",
+          "scoreBasis": "NO_PREFERENCES",
+          "confirmedCriteria": [
+            "transaction",
+            "propertyTypes",
+            "location.city",
+            "location.districts",
+            "amenities.required.parking"
+          ],
+          "unmetCriteria": [],
+          "criteriaToVerify": [],
+          "constraintStatus": "MATCHING",
+          "advantages": [
+            {
+              "code": "CRITERION_MET",
+              "criterion": "transaction",
+              "state": "TRUE",
+              "text": "Proposé en location, conformément à votre demande.",
+              "source": "public_listing.status"
+            },
+            {
+              "code": "CRITERION_MET",
+              "criterion": "propertyTypes",
+              "state": "TRUE",
+              "text": "Type de bien : Maison, conformément à votre demande.",
+              "source": "public_listing.type"
+            },
+            {
+              "code": "CRITERION_MET",
+              "criterion": "location.city",
+              "state": "TRUE",
+              "text": "Situé à Brazzaville, conformément à votre demande.",
+              "source": "public_listing.address.city"
+            },
+            {
+              "code": "CRITERION_MET",
+              "criterion": "location.districts",
+              "state": "TRUE",
+              "text": "Situé à Moungali, conformément à votre demande.",
+              "source": "public_listing.address.arrondissement"
+            },
+            {
+              "code": "CRITERION_MET",
+              "criterion": "amenities.required.parking",
+              "state": "TRUE",
+              "text": "Parking confirmé, conformément à votre exigence.",
+              "source": "public_listing.amenities"
+            }
+          ],
+          "disadvantages": [],
+          "unknowns": [],
+          "summary": "5 avantages vérifiés, 0 inconvénients vérifiés, 0 points à vérifier.",
+          "provenance": [
+            {
+              "criterion": "transaction",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "propertyTypes",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "location.city",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "location.districts",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "amenities.required.parking",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "price",
+              "state": "TRUE",
+              "source": "public_listing.price"
+            }
+          ]
+        },
+        {
+          "id": "6ae5ba9c8ed256bfece7a537",
+          "label": "AI02 Maison Moungali 4 chambres",
+          "position": 2,
+          "sourcePosition": null,
+          "matchStatus": "SELECTED",
+          "category": "RENTAL",
+          "listing": {
+            "id": "6ae5ba9c8ed256bfece7a537",
+            "title": "AI02 Maison Moungali 4 chambres",
+            "status": "location",
+            "type": "Maison",
+            "constructionType": "Non spécifié",
+            "availability": "Disponible",
+            "address": {
+              "neighborhood": "Plateau des 15 ans",
+              "arrondissement": "Moungali",
+              "city": "Brazzaville"
+            },
+            "price": 350000,
+            "bedrooms": 4,
+            "bathrooms": 0,
+            "surface": 120,
+            "livingRooms": 0,
+            "cautionMultiplicateur": 2,
+            "amenities": [
+              "parking",
+              "garden"
+            ],
+            "image": "https://placehold.co/1200x800/png?text=AI02"
+          },
+          "price": {
+            "state": "KNOWN",
+            "amount": 350000,
+            "currency": "XAF",
+            "period": "MONTH",
+            "source": "public_listing.price",
+            "issue": null
+          },
+          "monthlyPrice": {
+            "state": "NOT_APPLICABLE",
+            "amount": null,
+            "currency": null,
+            "period": "MONTH",
+            "source": null,
+            "issue": null
+          },
+          "score": 0,
+          "confidence": 0,
+          "confidenceLevel": "NOT_APPLICABLE",
+          "scoreRange": null,
+          "scoreSource": "IA-03C1",
+          "scoreBasis": "NO_PREFERENCES",
+          "confirmedCriteria": [
+            "transaction",
+            "propertyTypes",
+            "location.city",
+            "location.districts",
+            "amenities.required.parking"
+          ],
+          "unmetCriteria": [],
+          "criteriaToVerify": [],
+          "constraintStatus": "MATCHING",
+          "advantages": [
+            {
+              "code": "CRITERION_MET",
+              "criterion": "transaction",
+              "state": "TRUE",
+              "text": "Proposé en location, conformément à votre demande.",
+              "source": "public_listing.status"
+            },
+            {
+              "code": "CRITERION_MET",
+              "criterion": "propertyTypes",
+              "state": "TRUE",
+              "text": "Type de bien : Maison, conformément à votre demande.",
+              "source": "public_listing.type"
+            },
+            {
+              "code": "CRITERION_MET",
+              "criterion": "location.city",
+              "state": "TRUE",
+              "text": "Situé à Brazzaville, conformément à votre demande.",
+              "source": "public_listing.address.city"
+            },
+            {
+              "code": "CRITERION_MET",
+              "criterion": "location.districts",
+              "state": "TRUE",
+              "text": "Situé à Moungali, conformément à votre demande.",
+              "source": "public_listing.address.arrondissement"
+            },
+            {
+              "code": "CRITERION_MET",
+              "criterion": "amenities.required.parking",
+              "state": "TRUE",
+              "text": "Parking confirmé, conformément à votre exigence.",
+              "source": "public_listing.amenities"
+            }
+          ],
+          "disadvantages": [],
+          "unknowns": [],
+          "summary": "5 avantages vérifiés, 0 inconvénients vérifiés, 0 points à vérifier.",
+          "provenance": [
+            {
+              "criterion": "transaction",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "propertyTypes",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "location.city",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "location.districts",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "amenities.required.parking",
+              "state": "TRUE"
+            },
+            {
+              "criterion": "price",
+              "state": "TRUE",
+              "source": "public_listing.price"
+            }
+          ]
+        }
+      ],
+      "unavailable": [
+        {
+          "id": "6ae5ba9c8ed256bfece7a53b",
+          "code": "LISTING_UNAVAILABLE"
+        }
+      ],
+      "criteriaUsed": {
+        "constraints": [
+          "transaction",
+          "propertyTypes",
+          "location.city",
+          "location.districts",
+          "amenities.required.parking"
+        ],
+        "preferences": [],
+        "unverifiable": []
+      },
+      "grid": {
+        "rows": [
+          {
+            "group": "FACT",
+            "key": "category",
+            "label": "Catégorie",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": "RENTAL",
+                "display": "Location"
+              },
+              {
+                "state": "KNOWN",
+                "value": "RENTAL",
+                "display": "Location"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "offer",
+            "label": "Type d'offre",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": "location",
+                "display": "Location"
+              },
+              {
+                "state": "KNOWN",
+                "value": "location",
+                "display": "Location"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "propertyType",
+            "label": "Type de bien",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": "Maison",
+                "display": "Maison"
+              },
+              {
+                "state": "KNOWN",
+                "value": "Maison",
+                "display": "Maison"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "location.city",
+            "label": "Ville",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": "Brazzaville",
+                "display": "Brazzaville"
+              },
+              {
+                "state": "KNOWN",
+                "value": "Brazzaville",
+                "display": "Brazzaville"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "location.arrondissement",
+            "label": "Arrondissement",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": "Moungali",
+                "display": "Moungali"
+              },
+              {
+                "state": "KNOWN",
+                "value": "Moungali",
+                "display": "Moungali"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "location.neighborhood",
+            "label": "Quartier",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": "Plateau des 15 ans",
+                "display": "Plateau des 15 ans"
+              },
+              {
+                "state": "KNOWN",
+                "value": "Plateau des 15 ans",
+                "display": "Plateau des 15 ans"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "price",
+            "label": "Prix applicable",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": {
+                  "amount": 200000,
+                  "currency": "XAF",
+                  "period": "MONTH"
+                },
+                "display": "200 000 XAF / mois"
+              },
+              {
+                "state": "KNOWN",
+                "value": {
+                  "amount": 350000,
+                  "currency": "XAF",
+                  "period": "MONTH"
+                },
+                "display": "350 000 XAF / mois"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "surface",
+            "label": "Superficie",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": 120,
+                "display": "120 m²"
+              },
+              {
+                "state": "KNOWN",
+                "value": 120,
+                "display": "120 m²"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "bedrooms",
+            "label": "Chambres",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": 3,
+                "display": "3"
+              },
+              {
+                "state": "KNOWN",
+                "value": 4,
+                "display": "4"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "bathrooms",
+            "label": "Salles de bains",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": 0,
+                "display": "0"
+              },
+              {
+                "state": "KNOWN",
+                "value": 0,
+                "display": "0"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "amenities.declared",
+            "label": "Équipements déclarés",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": [
+                  "parking"
+                ],
+                "display": "Parking"
+              },
+              {
+                "state": "KNOWN",
+                "value": [
+                  "parking",
+                  "garden"
+                ],
+                "display": "Parking, Jardin"
+              }
+            ]
+          },
+          {
+            "group": "FACT",
+            "key": "availability.public",
+            "label": "Disponibilité de l'annonce",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": "Disponible",
+                "display": "Annoncé disponible (non daté)"
+              },
+              {
+                "state": "KNOWN",
+                "value": "Disponible",
+                "display": "Annoncé disponible (non daté)"
+              }
+            ]
+          },
+          {
+            "group": "RENTAL",
+            "key": "rental.deposit",
+            "label": "Caution",
+            "values": [
+              {
+                "state": "KNOWN",
+                "value": 2,
+                "display": "2 mois de loyer"
+              },
+              {
+                "state": "KNOWN",
+                "value": 2,
+                "display": "2 mois de loyer"
+              }
+            ]
+          },
+          {
+            "key": "need.transaction",
+            "label": "type d'offre",
+            "group": "NEED",
+            "criterion": "transaction",
+            "values": [
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              },
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              }
+            ]
+          },
+          {
+            "key": "need.propertyTypes",
+            "label": "type de bien",
+            "group": "NEED",
+            "criterion": "propertyTypes",
+            "values": [
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              },
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              }
+            ]
+          },
+          {
+            "key": "need.location.city",
+            "label": "ville",
+            "group": "NEED",
+            "criterion": "location.city",
+            "values": [
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              },
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              }
+            ]
+          },
+          {
+            "key": "need.location.districts",
+            "label": "arrondissement",
+            "group": "NEED",
+            "criterion": "location.districts",
+            "values": [
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              },
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              }
+            ]
+          },
+          {
+            "key": "need.amenity.parking",
+            "label": "parking",
+            "group": "NEED",
+            "criterion": "amenities.required.parking",
+            "values": [
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              },
+              {
+                "state": "TRUE",
+                "value": null,
+                "display": "Confirmé"
+              }
+            ]
+          }
+        ]
+      },
+      "comparability": {
+        "level": "COMPARABLE",
+        "reasons": [],
+        "dimensions": {
+          "price": {
+            "comparable": true,
+            "groups": [
+              {
+                "period": "MONTH",
+                "currency": "XAF",
+                "ids": [
+                  "6ae5ba9c8ed256bfece7a535",
+                  "6ae5ba9c8ed256bfece7a537"
+                ]
+              }
+            ]
+          },
+          "surface": {
+            "comparable": true
+          },
+          "bedrooms": {
+            "comparable": true
+          },
+          "bathrooms": {
+            "comparable": true
+          }
+        }
+      },
+      "tradeoffs": [
+        {
+          "id": "6ae5ba9c8ed256bfece7a535",
+          "strengths": [
+            {
+              "code": "PRICE_LOWEST",
+              "dimension": "price",
+              "value": {
+                "amount": 200000,
+                "currency": "XAF",
+                "period": "MONTH"
+              }
+            }
+          ],
+          "weaknesses": [],
+          "neutral": [],
+          "toVerify": [],
+          "text": "« AI02 Maison Moungali 3 chambres » : prix le plus bas (200 000 XAF par mois)."
+        },
+        {
+          "id": "6ae5ba9c8ed256bfece7a537",
+          "strengths": [],
+          "weaknesses": [
+            {
+              "code": "PRICE_HIGHEST",
+              "dimension": "price",
+              "value": {
+                "amount": 350000,
+                "currency": "XAF",
+                "period": "MONTH"
+              }
+            }
+          ],
+          "neutral": [],
+          "toVerify": [],
+          "text": "« AI02 Maison Moungali 4 chambres » : aucun atout distinctif vérifié, mais prix le plus élevé (350 000 XAF par mois)."
+        }
+      ],
+      "hasTradeoffs": false,
+      "tradeoffSummary": "Les différences vérifiées vont dans le même sens : aucun compromis n'a été identifié.",
+      "conclusion": {
+        "verdict": "NO_PREFERENCES",
+        "basis": "SEVERAL_ELIGIBLE",
+        "leaderId": null,
+        "recommendedId": null,
+        "tiedIds": [],
+        "conditions": [],
+        "text": "Plusieurs biens respectent vos critères vérifiables ; sans préférence explicite, aucun n'est désigné."
+      },
+      "scoreNote": "Le score mesure la correspondance aux préférences exprimées ; ce n'est pas une probabilité de satisfaction.",
+      "coverage": {
+        "mode": "INDIVIDUAL_RESOLUTION",
+        "windowDependent": false,
+        "complete": null,
+        "evaluated": null,
+        "sourceTotal": null,
+        "limit": null
+      },
+      "limits": {
+        "maxListings": 5,
+        "requested": 3
+      },
+      "errors": [],
+      "warnings": [],
+      "clarificationQuestions": [],
+      "contractVersion": "IA-03C4.1"
+    },
+    "notices": [
+      {
+        "code": "NO_COMMERCIAL_ACTION",
+        "message": "L’assistant ne publie, ne réserve, ne paie et ne transmet aucune coordonnée. Pour une visite, une candidature ou une réservation, utilisez la fiche de l’annonce."
+      }
+    ]
+  },
+  "compareUnavailable": {
+    "status": "success",
+    "data": {
+      "version": "IA-03C2.1",
+      "status": "insufficient",
+      "mode": "SELECTED_LISTINGS",
+      "comparedIds": [
+        "6ae5ba9c8ed256bfece7a535"
+      ],
+      "items": [],
+      "unavailable": [
+        {
+          "id": "6ae5ba9c8ed256bfece7a53b",
+          "code": "LISTING_UNAVAILABLE"
+        }
+      ],
+      "criteriaUsed": {
+        "constraints": [],
+        "preferences": [],
+        "unverifiable": []
+      },
+      "grid": {
+        "rows": []
+      },
+      "comparability": null,
+      "tradeoffs": [],
+      "hasTradeoffs": false,
+      "tradeoffSummary": null,
+      "conclusion": null,
+      "scoreNote": "Le score mesure la correspondance aux préférences exprimées ; ce n'est pas une probabilité de satisfaction.",
+      "coverage": {
+        "mode": "INDIVIDUAL_RESOLUTION",
+        "windowDependent": false,
+        "complete": null,
+        "evaluated": null,
+        "sourceTotal": null,
+        "limit": null
+      },
+      "limits": {
+        "maxListings": 5,
+        "requested": 2
+      },
+      "errors": [
+        {
+          "code": "NOT_ENOUGH_LISTINGS"
+        }
+      ],
+      "warnings": [],
+      "clarificationQuestions": [],
+      "contractVersion": "IA-03C4.1"
+    },
+    "notices": [
+      {
+        "code": "NO_COMMERCIAL_ACTION",
+        "message": "L’assistant ne publie, ne réserve, ne paie et ne transmet aucune coordonnée. Pour une visite, une candidature ou une réservation, utilisez la fiche de l’annonce."
+      }
+    ]
+  },
+  "disabled": {
+    "status": "fail",
+    "code": "ALTIMMO_ASSISTANT_DISABLED",
+    "message": "L’assistant de recherche Altimmo n’est pas encore disponible."
+  },
+  "rateLimited": {
+    "status": "fail",
+    "message": "Trop de messages envoyés à l'assistant. Réessayez dans une minute."
+  },
+  "invalid": {
+    "status": "fail",
+    "code": "ALTIMMO_ASSISTANT_INVALID_REQUEST",
+    "message": "Requête invalide."
+  }
+}
