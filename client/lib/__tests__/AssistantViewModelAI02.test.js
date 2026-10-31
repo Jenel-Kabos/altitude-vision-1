@@ -98,3 +98,17 @@ test('critères : budget, chambres, équipements exigés ou exclus, voyageurs', 
     proximity: { required: [], preferred: [] }, stay: { adults: 2 },
   }).map((chip) => chip.label)).toEqual(['Séjour', 'Studio meublé', 'Brazzaville', 'Budget de 10 000 FCFA à 50 000 FCFA', '2 chambres minimum', 'Exigé : Wi-Fi', 'Sans : Piscine', '2 adultes']);
 });
+
+test('DATA-READINESS-01 : champs inconnus du moteur traduits, jamais affichés en code technique', async () => {
+  const { criterionLabel, toListingCard } = await import('../utils/assistantViewModel');
+  expect(criterionLabel('bedrooms.min')).toBe('Nombre de chambres');
+  expect(criterionLabel('budget.max')).toBe('Prix (budget maximum)');
+  expect(criterionLabel('surface.min')).toBe('Surface');
+  const card = toListingCard({
+    listing: { id: 'x', title: 'Maison', status: 'location', type: 'Maison', bedrooms: 0 },
+    explanation: {}, unknownCriteria: [{ field: 'bedrooms.min', state: 'UNKNOWN' }, { field: 'budget.max', state: 'UNKNOWN' }],
+  }, { needsVerification: true });
+  expect(card.toVerify).toEqual(['Nombre de chambres', 'Prix (budget maximum)']);
+  expect(card.features).toEqual([]); // 0 ambigu jamais affiché
+  expect(card.price).toBeNull(); // prix absent : « non renseigné », jamais 0
+});

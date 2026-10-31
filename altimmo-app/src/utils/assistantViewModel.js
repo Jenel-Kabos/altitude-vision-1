@@ -27,6 +27,11 @@ const FIELD_LABELS = Object.freeze({
   price: 'Prix', bedrooms: 'Nombre de chambres', bathrooms: 'Salles de bain', surface: 'Surface',
   'location.city': 'Ville', 'location.districts': 'Arrondissement', 'location.neighborhood': 'Quartier',
   proximity: 'Proximité', capacity: 'Capacité d’accueil', 'stay.adults': 'Nombre de voyageurs',
+  // Champs des contrôles du moteur (`unknownCriteria[].field`).
+  'budget.min': 'Prix (budget minimum)', 'budget.max': 'Prix (budget maximum)', 'budget.currency': 'Devise du prix',
+  'bedrooms.min': 'Nombre de chambres', 'bathrooms.min': 'Salles de bain', 'surface.min': 'Surface',
+  transaction: 'Type d’opération', propertyTypes: 'Type de bien', accommodationTypes: 'Type d’hébergement',
+  'stay.availability': 'Disponibilité aux dates', 'stay.children': 'Nombre d’enfants',
 });
 const CURRENCY_LABELS = Object.freeze({ XAF: 'FCFA', EUR: '€', USD: '$' });
 
