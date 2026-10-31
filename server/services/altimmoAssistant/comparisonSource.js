@@ -6,6 +6,7 @@ const Property = require('../../models/Property');
 const Accommodation = require('../../models/Accommodation');
 const RatePlan = require('../../models/RatePlan');
 const { projectApprovedPublicResource } = require('../commercialPublicationService');
+const { assistantPublicPropertyGates } = require('./publicVisibility');
 
 const MAX_IDS = 10;
 const PROPERTY_FIELDS = [
@@ -33,7 +34,7 @@ async function resolvePublicListings(ids = []) {
   if (!validIds.length) return [];
   // find() uniquement : aucune écriture (pas de compteur de vues comme GET /api/properties/:id).
   const properties = await Property.find({
-    _id: { $in: validIds }, availability: 'Disponible', statusAdmin: 'Validée', isPublished: true, pole: 'Altimmo',
+    $and: [{ _id: { $in: validIds } }, assistantPublicPropertyGates()],
   }).select(PROPERTY_FIELDS).lean();
   const lodgingIds = properties.filter((item) => item.status === 'hebergement').map((item) => item._id);
   const accommodations = lodgingIds.length
