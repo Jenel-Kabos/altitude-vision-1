@@ -88,3 +88,16 @@ exports.publicApiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// ALTIMMO-AI-01 — assistant de recherche Altimmo (public, sans connexion obligatoire) :
+// chaque tour déclenche des recherches ; plafond par IP pour éviter l'abus.
+exports.altimmoAssistantLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 40,
+  message: {
+    status: "fail",
+    message: "Trop de messages envoyés à l'assistant. Réessayez dans une minute.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
