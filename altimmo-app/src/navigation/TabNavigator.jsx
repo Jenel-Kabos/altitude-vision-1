@@ -12,6 +12,7 @@ import ListeAnnoncesScreen  from '../screens/Annonces/ListeAnnoncesScreen';
 import DetailAnnonceScreen  from '../screens/Annonces/DetailAnnonceScreen';
 import CarteScreen          from '../screens/Annonces/CarteScreen';
 import NotificationsScreen  from '../screens/Notifications/NotificationsScreen';
+import AssistantScreen      from '../screens/Assistant/AssistantScreen';
 import MessagerieStack      from './stacks/MessagerieStack';
 import ProfilStack          from './stacks/ProfilStack';
 import VisitesScreen        from '../screens/Visites/VisitesScreen';
@@ -32,6 +33,8 @@ function AnnoncesStack() {
       <Stack.Screen name="ListeAnnonces" component={ListeAnnoncesScreen} />
       <Stack.Screen name="DetailAnnonce" component={DetailAnnonceScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      {/* ALTIMMO-AI-01 / AI-INTEGRATION-02 — assistant de recherche (sans connexion obligatoire). */}
+      <Stack.Screen name="Assistant" component={AssistantScreen} />
     </Stack.Navigator>
   );
 }
