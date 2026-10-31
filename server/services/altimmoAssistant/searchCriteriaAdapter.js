@@ -1,5 +1,6 @@
 const C = require('./catalog');
 const { classifyAmenity, AMENITY_STATE } = require('../altimmoRankingPolicyService');
+const { isFiniteNumber, isAmbiguousZero } = require('./listingFacts');
 
 const TRANSACTION_OFFER = Object.freeze({ BUY: 'vente', RENT: 'location', STAY: 'hebergement' });
 const EXPECTED_PERIOD = Object.freeze({ BUY: 'TOTAL', RENT: 'MONTH', STAY: 'NIGHT' });
@@ -84,13 +85,16 @@ function evaluateListingConstraints(listing = {}, criteria = {}) {
   if (criteria.location?.city) add('location.city', exactState(listing.address?.city, criteria.location.city));
   if (criteria.location?.districts?.length) add('location.districts', !known(listing.address?.arrondissement) ? 'UNKNOWN' : criteria.location.districts.some((x) => String(x).toLowerCase() === String(listing.address.arrondissement).toLowerCase()) ? 'TRUE' : 'FALSE');
   if (criteria.location?.neighborhood) add('location.neighborhood', exactState(listing.address?.neighborhood, criteria.location.neighborhood));
-  for (const [field, actual, bound, op] of [
+  // DATA-READINESS-01 — seule une valeur numérique établie est comparée : un prix absent, nul ou
+  // stocké en texte, et un 0 ambigu de chambres ou de salles de bain sur un logement, restent inconnus.
+  for (const [field, actual, bound, op, ambiguous] of [
     ['budget.min', budgetActual, criteria.budget?.min, 'min'], ['budget.max', budgetActual, criteria.budget?.max, 'max'],
-    ['bedrooms.min', listing.bedrooms, criteria.bedrooms?.min, 'min'], ['bathrooms.min', listing.bathrooms, criteria.bathrooms?.min, 'min'],
+    ['bedrooms.min', listing.bedrooms, criteria.bedrooms?.min, 'min', isAmbiguousZero(listing, 'bedrooms')],
+    ['bathrooms.min', listing.bathrooms, criteria.bathrooms?.min, 'min', isAmbiguousZero(listing, 'bathrooms')],
     ['surface.min', listing.surface, criteria.surface?.min, 'min'],
   ]) {
     if (bound === null || bound === undefined) continue;
-    if (!Number.isFinite(Number(actual))) add(field, 'UNKNOWN');
+    if (!isFiniteNumber(actual) || ambiguous) add(field, 'UNKNOWN');
     else add(field, op === 'min' ? (Number(actual) >= bound ? 'TRUE' : 'FALSE') : (Number(actual) <= bound ? 'TRUE' : 'FALSE'));
   }
   if (criteria.transaction === 'STAY' && (criteria.budget?.min !== null || criteria.budget?.max !== null) && criteria.budget?.currency) {

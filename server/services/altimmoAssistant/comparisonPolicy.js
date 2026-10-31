@@ -6,6 +6,7 @@ const { evaluateListingConstraints, EXPECTED_PERIOD } = require('./searchCriteri
 const { evaluateRankingCandidate, normalizeRankingPreferences, SCORE_SCALE } = require('./rankingPolicy');
 const { toPublicListing } = require('../publicListingService');
 const X = require('./comparisonExplanation');
+const { isAmbiguousZero } = require('./listingFacts');
 
 const DEFAULT_MAX_LISTINGS = 5;
 const MIN_LISTINGS = 2;
@@ -100,6 +101,8 @@ function sanitizeComparisonCriteria(raw) {
 function factOf(raw, field) {
   const value = raw?.[field];
   if (value === undefined || value === null || value === '') return { state: 'UNKNOWN', value: null, issue: null };
+  // DATA-READINESS-01 : 0 chambre ou salle de bain sur un logement = valeur par défaut, jamais affichée comme connue.
+  if (isAmbiguousZero(raw, field)) return { state: 'UNKNOWN', value: null, issue: null };
   if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= FACT_LIMITS[field]) return { state: 'KNOWN', value, issue: null };
   return { state: 'UNKNOWN', value: null, issue: 'INVALID_VALUE' };
 }

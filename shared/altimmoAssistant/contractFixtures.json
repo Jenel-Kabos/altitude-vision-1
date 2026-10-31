@@ -105,7 +105,7 @@
       "rankedResults": [
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a535",
+            "_id": "6ae5ee3adbb502f57acaf950",
             "title": "AI02 Maison Moungali 3 chambres",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
@@ -144,7 +144,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a535"
+            "id": "6ae5ee3adbb502f57acaf950"
           },
           "score": 10000,
           "confidence": 10000,
@@ -174,14 +174,13 @@
         },
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a537",
+            "_id": "6ae5ee3adbb502f57acaf952",
             "title": "AI02 Maison Moungali 4 chambres",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
             "type": "Maison",
             "status": "location",
             "price": 350000,
-            "honoraires": null,
             "fraisVisite": 0,
             "images": [
               "https://placehold.co/1200x800/png?text=AI02"
@@ -214,7 +213,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a537"
+            "id": "6ae5ee3adbb502f57acaf952"
           },
           "score": 10000,
           "confidence": 10000,
@@ -244,14 +243,13 @@
         },
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a539",
+            "_id": "6ae5ee3adbb502f57acaf954",
             "title": "AI02 Maison Moungali équipements non renseignés",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
             "type": "Maison",
             "status": "location",
             "price": 180000,
-            "honoraires": null,
             "fraisVisite": 0,
             "images": [
               "https://placehold.co/1200x800/png?text=AI02"
@@ -281,7 +279,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a539"
+            "id": "6ae5ee3adbb502f57acaf954"
           },
           "score": 5000,
           "confidence": 0,
@@ -460,7 +458,7 @@
       "rankedResults": [
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a535",
+            "_id": "6ae5ee3adbb502f57acaf950",
             "title": "AI02 Maison Moungali 3 chambres",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
@@ -499,7 +497,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a535"
+            "id": "6ae5ee3adbb502f57acaf950"
           },
           "score": 0,
           "confidence": 0,
@@ -519,14 +517,13 @@
         },
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a537",
+            "_id": "6ae5ee3adbb502f57acaf952",
             "title": "AI02 Maison Moungali 4 chambres",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
             "type": "Maison",
             "status": "location",
             "price": 350000,
-            "honoraires": null,
             "fraisVisite": 0,
             "images": [
               "https://placehold.co/1200x800/png?text=AI02"
@@ -559,7 +556,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a537"
+            "id": "6ae5ee3adbb502f57acaf952"
           },
           "score": 0,
           "confidence": 0,
@@ -581,14 +578,13 @@
       "rankedCandidatesToVerify": [
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a539",
+            "_id": "6ae5ee3adbb502f57acaf954",
             "title": "AI02 Maison Moungali équipements non renseignés",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
             "type": "Maison",
             "status": "location",
             "price": 180000,
-            "honoraires": null,
             "fraisVisite": 0,
             "images": [
               "https://placehold.co/1200x800/png?text=AI02"
@@ -618,7 +614,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a539"
+            "id": "6ae5ee3adbb502f57acaf954"
           },
           "score": 0,
           "confidence": 0,
@@ -1037,7 +1033,7 @@
       "rankedResults": [
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a535",
+            "_id": "6ae5ee3adbb502f57acaf950",
             "title": "AI02 Maison Moungali 3 chambres",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
@@ -1076,7 +1072,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a535"
+            "id": "6ae5ee3adbb502f57acaf950"
           },
           "score": 0,
           "confidence": 0,
@@ -1096,14 +1092,13 @@
         },
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a537",
+            "_id": "6ae5ee3adbb502f57acaf952",
             "title": "AI02 Maison Moungali 4 chambres",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
             "type": "Maison",
             "status": "location",
             "price": 350000,
-            "honoraires": null,
             "fraisVisite": 0,
             "images": [
               "https://placehold.co/1200x800/png?text=AI02"
@@ -1136,7 +1131,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a537"
+            "id": "6ae5ee3adbb502f57acaf952"
           },
           "score": 0,
           "confidence": 0,
@@ -1156,14 +1151,13 @@
         },
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a539",
+            "_id": "6ae5ee3adbb502f57acaf954",
             "title": "AI02 Maison Moungali équipements non renseignés",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
             "type": "Maison",
             "status": "location",
             "price": 180000,
-            "honoraires": null,
             "fraisVisite": 0,
             "images": [
               "https://placehold.co/1200x800/png?text=AI02"
@@ -1193,7 +1187,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a539"
+            "id": "6ae5ee3adbb502f57acaf954"
           },
           "score": 0,
           "confidence": 0,
@@ -1345,14 +1339,13 @@
       "rankedResults": [
         {
           "listing": {
-            "_id": "6ae5ba9c8ed256bfece7a53f",
+            "_id": "6ae5ee3adbb502f57acaf95a",
             "title": "AI02 Hôtel Brazzaville",
             "description": "Annonce fictive de test pour le contrat de l’assistant Altimmo.",
             "pole": "Altimmo",
             "type": "Commerce",
             "status": "hebergement",
             "price": 45000,
-            "honoraires": null,
             "fraisVisite": 0,
             "images": [
               "https://placehold.co/1200x800/png?text=AI02"
@@ -1378,8 +1371,8 @@
             "createdAt": "2026-10-30T11:54:00.000Z",
             "updatedAt": "2026-10-30T11:54:00.000Z",
             "accommodationType": "hotel",
-            "accommodationId": "6ae5ba9c8ed256bfece7a543",
-            "hotel": "6ae5ba9c8ed256bfece7a541",
+            "accommodationId": "6ae5ee3adbb502f57acaf95e",
+            "hotel": "6ae5ee3adbb502f57acaf95c",
             "hotelServices": {
               "restaurant": false,
               "bar": false,
@@ -1399,7 +1392,7 @@
             },
             "likesCount": 0,
             "reviews": [],
-            "id": "6ae5ba9c8ed256bfece7a53f"
+            "id": "6ae5ee3adbb502f57acaf95a"
           },
           "score": 0,
           "confidence": 0,
@@ -1469,19 +1462,19 @@
       "status": "success",
       "mode": "SELECTED_LISTINGS",
       "comparedIds": [
-        "6ae5ba9c8ed256bfece7a535",
-        "6ae5ba9c8ed256bfece7a537"
+        "6ae5ee3adbb502f57acaf950",
+        "6ae5ee3adbb502f57acaf952"
       ],
       "items": [
         {
-          "id": "6ae5ba9c8ed256bfece7a535",
+          "id": "6ae5ee3adbb502f57acaf950",
           "label": "AI02 Maison Moungali 3 chambres",
           "position": 1,
           "sourcePosition": null,
           "matchStatus": "SELECTED",
           "category": "RENTAL",
           "listing": {
-            "id": "6ae5ba9c8ed256bfece7a535",
+            "id": "6ae5ee3adbb502f57acaf950",
             "title": "AI02 Maison Moungali 3 chambres",
             "status": "location",
             "type": "Maison",
@@ -1494,7 +1487,6 @@
             },
             "price": 200000,
             "bedrooms": 3,
-            "bathrooms": 0,
             "surface": 120,
             "livingRooms": 0,
             "cautionMultiplicateur": 2,
@@ -1604,14 +1596,14 @@
           ]
         },
         {
-          "id": "6ae5ba9c8ed256bfece7a537",
+          "id": "6ae5ee3adbb502f57acaf952",
           "label": "AI02 Maison Moungali 4 chambres",
           "position": 2,
           "sourcePosition": null,
           "matchStatus": "SELECTED",
           "category": "RENTAL",
           "listing": {
-            "id": "6ae5ba9c8ed256bfece7a537",
+            "id": "6ae5ee3adbb502f57acaf952",
             "title": "AI02 Maison Moungali 4 chambres",
             "status": "location",
             "type": "Maison",
@@ -1624,7 +1616,6 @@
             },
             "price": 350000,
             "bedrooms": 4,
-            "bathrooms": 0,
             "surface": 120,
             "livingRooms": 0,
             "cautionMultiplicateur": 2,
@@ -1737,7 +1728,7 @@
       ],
       "unavailable": [
         {
-          "id": "6ae5ba9c8ed256bfece7a53b",
+          "id": "6ae5ee3adbb502f57acaf956",
           "code": "LISTING_UNAVAILABLE"
         }
       ],
@@ -1921,14 +1912,14 @@
             "label": "Salles de bains",
             "values": [
               {
-                "state": "KNOWN",
-                "value": 0,
-                "display": "0"
+                "state": "UNKNOWN",
+                "value": null,
+                "display": "Non renseigné"
               },
               {
-                "state": "KNOWN",
-                "value": 0,
-                "display": "0"
+                "state": "UNKNOWN",
+                "value": null,
+                "display": "Non renseigné"
               }
             ]
           },
@@ -2091,8 +2082,8 @@
                 "period": "MONTH",
                 "currency": "XAF",
                 "ids": [
-                  "6ae5ba9c8ed256bfece7a535",
-                  "6ae5ba9c8ed256bfece7a537"
+                  "6ae5ee3adbb502f57acaf950",
+                  "6ae5ee3adbb502f57acaf952"
                 ]
               }
             ]
@@ -2104,13 +2095,14 @@
             "comparable": true
           },
           "bathrooms": {
-            "comparable": true
+            "comparable": false,
+            "reason": "INSUFFICIENT_DATA"
           }
         }
       },
       "tradeoffs": [
         {
-          "id": "6ae5ba9c8ed256bfece7a535",
+          "id": "6ae5ee3adbb502f57acaf950",
           "strengths": [
             {
               "code": "PRICE_LOWEST",
@@ -2128,7 +2120,7 @@
           "text": "« AI02 Maison Moungali 3 chambres » : prix le plus bas (200 000 XAF par mois)."
         },
         {
-          "id": "6ae5ba9c8ed256bfece7a537",
+          "id": "6ae5ee3adbb502f57acaf952",
           "strengths": [],
           "weaknesses": [
             {
@@ -2189,12 +2181,12 @@
       "status": "insufficient",
       "mode": "SELECTED_LISTINGS",
       "comparedIds": [
-        "6ae5ba9c8ed256bfece7a535"
+        "6ae5ee3adbb502f57acaf950"
       ],
       "items": [],
       "unavailable": [
         {
-          "id": "6ae5ba9c8ed256bfece7a53b",
+          "id": "6ae5ee3adbb502f57acaf956",
           "code": "LISTING_UNAVAILABLE"
         }
       ],
