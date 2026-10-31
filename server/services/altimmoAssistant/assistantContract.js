@@ -41,7 +41,7 @@ const criteria = nullable(obj({
 
 // Projection publique IA-02 (publicListingService.toPublicListing) — jamais propriétaire, tenant, documents, coordonnées.
 const publicListing = obj({
-  _id: T.id, id: T.id, title: str, description: str, pole: str, type: str, status: str, price: num, honoraires: num,
+  _id: T.id, id: T.id, title: str, description: str, pole: str, type: str, status: str, price: num, honoraires: nullable(num), // main : `Property.honoraires` vaut null par défaut
   fraisVisite: num, images: arr(T.scalar), bedrooms: T.scalar, bathrooms: T.scalar, surface: T.scalar, livingRooms: T.scalar,
   kitchens: T.scalar, constructionType: str, amenities: arr(T.scalar), availability: str, cautionMultiplicateur: num,
   profilsLocataireRecherches: arr(T.scalar), documentsRequis: arr(T.scalar), isPublished: bool, statusAdmin: str,

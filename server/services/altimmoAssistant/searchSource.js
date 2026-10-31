@@ -7,6 +7,7 @@ const { buildPropertyMongoFilter, buildExactCiRegexFilter, toFiniteNumber } = re
 const { searchPublicAccommodations } = require('../accommodationSearchService');
 const publicListing = require('../publicListingService');
 const { ACCOMMODATION_TYPES } = require('../../constants/propertyFilterConstants');
+const { assistantPublicPropertyGates } = require('./publicVisibility');
 
 function minimumFilter(query, key, field) {
   const value = toFiniteNumber(query[key]);
@@ -17,11 +18,12 @@ async function searchProperties(rawRequest = {}) {
   const query = publicListing.sanitizePublicSearchQuery(rawRequest);
   const { mongoFilter } = buildPropertyMongoFilter(query);
   const filter = {
-    availability: 'Disponible', statusAdmin: 'Validée', isPublished: true, pole: 'Altimmo',
-    ...mongoFilter,
-    ...minimumFilter(query, 'minBedrooms', 'bedrooms'),
-    ...minimumFilter(query, 'minBathrooms', 'bathrooms'),
-    ...minimumFilter(query, 'minSurface', 'surface'),
+    $and: [assistantPublicPropertyGates(), {
+      ...mongoFilter,
+      ...minimumFilter(query, 'minBedrooms', 'bedrooms'),
+      ...minimumFilter(query, 'minBathrooms', 'bathrooms'),
+      ...minimumFilter(query, 'minSurface', 'surface'),
+    }],
   };
   const { page, limit, skip } = publicListing.publicPagination(query);
   const [rows, total] = await Promise.all([
@@ -70,7 +72,6 @@ async function searchAccommodations(rawRequest = {}) {
 // pas les lots suivants (pas de saut ni de doublon), contrairement à une pagination par skip.
 const MAX_BATCH_SIZE = 250;
 const DEFAULT_BATCH_SIZE = 100;
-const PUBLIC_GATES = Object.freeze({ availability: 'Disponible', statusAdmin: 'Validée', isPublished: true, pole: 'Altimmo' });
 // Projection : champs publics IA-02 et faits nécessaires à l'évaluation — jamais documents, propriétaire, tenant.
 const SCAN_PROPERTY_FIELDS = [
   '_id', 'title', 'description', 'pole', 'type', 'status', 'price', 'honoraires', 'fraisVisite', 'images', 'bedrooms', 'bathrooms',
@@ -90,7 +91,7 @@ function scanPropertyFilter(rawRequest, { lodging }) {
   const query = publicListing.sanitizePublicSearchQuery(rawRequest);
   const { mongoFilter } = buildPropertyMongoFilter(lodging ? { ...query, minPrice: undefined, maxPrice: undefined } : query);
   const { price, 'address.city': city, ...strict } = mongoFilter;
-  const and = [{ ...PUBLIC_GATES, ...strict, ...(lodging ? { status: 'hebergement' } : {}) }];
+  const and = [assistantPublicPropertyGates(), { ...strict, ...(lodging ? { status: 'hebergement' } : {}) }];
   // La ville a une valeur par défaut mais n'est pas obligatoire : absente = inconnue, pas exclue.
   if (city) and.push({ $or: [{ 'address.city': city }, { 'address.city': { $in: [null, ''] } }] });
   if (price) and.push({ $or: [{ price }, notNumber('price')] });
