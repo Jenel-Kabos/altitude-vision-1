@@ -63,6 +63,7 @@ const MesPaiementsPage = () => {
   const [pollingId,     setPollingId]     = useState(null);
   const [pollingStatus, setPollingStatus] = useState(null);
   const [payError,      setPayError]      = useState(null);
+  const [paymentInitiationAvailable, setPaymentInitiationAvailable] = useState(false);
 
   const pollTimerRef   = useRef(null);
   const pollDeadlineRef = useRef(null);
@@ -70,7 +71,8 @@ const MesPaiementsPage = () => {
   const fetchVisites = async () => {
     try {
       const data = await getMyPayments();
-      setVisites(data);
+      setVisites(data.visites);
+      setPaymentInitiationAvailable(data.paymentInitiationAvailable);
     } finally {
       setLoading(false);
     }
@@ -234,13 +236,19 @@ const MesPaiementsPage = () => {
                   {visite.paiementStatus === 'en_attente' && (
                     <div className="border-t border-gray-100 px-5 py-4">
                       {showPayForm !== visite._id ? (
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() => openPayForm(visite._id)}
-                            className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-sm">
-                            <CreditCard className="w-4 h-4" />
-                            Payer maintenant
-                          </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {paymentInitiationAvailable ? (
+                            <button
+                              onClick={() => openPayForm(visite._id)}
+                              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-sm">
+                              <CreditCard className="w-4 h-4" />
+                              Payer maintenant
+                            </button>
+                          ) : (
+                            <p className="w-full text-sm text-gray-600">
+                              Le paiement en ligne des visites est temporairement indisponible. Contactez l’agence Altimmo pour toute question sur votre visite.
+                            </p>
+                          )}
                           <a href="tel:+242068002151"
                             className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition">
                             <Phone className="w-4 h-4" />

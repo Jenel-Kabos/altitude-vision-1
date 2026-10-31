@@ -35,9 +35,14 @@ export const updatePaiementVisite = async (id, data) => {
   return res.data?.data?.visite;
 };
 
+// ALTIMMO-PAY-SAFETY-04A — `paymentInitiationAvailable` vaut false tant que
+// le serveur ne l'annonce pas explicitement (paiement en ligne suspendu).
 export const getMyPayments = async () => {
   const res = await api.get('/visites/my-payments');
-  return res.data?.data?.visites || [];
+  return {
+    visites: res.data?.data?.visites || [],
+    paymentInitiationAvailable: res.data?.data?.paymentInitiationAvailable === true,
+  };
 };
 
 export const initierPaiementVisite = async (id, data) => {
