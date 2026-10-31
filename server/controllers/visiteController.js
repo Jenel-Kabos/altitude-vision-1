@@ -6,6 +6,7 @@ const { isPropertyCommerciallyAvailable } = require('../services/propertyPublica
 const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { notify, notifyStaff } = require('../services/notificationService');
 const yabetooService = require('../services/yabetooService');
+const { isVisitPaymentInitiationEnabled, VISIT_PAYMENT_SUSPENDED } = require('../config/visitePayment');
 const mongoose = require('mongoose');
 const {
   STATUS, LABELS, LEGACY_TO_STATUS, normalizeStatus, canTransition,
@@ -698,7 +699,10 @@ exports.getMyPayments = asyncHandler(async (req, res) => {
   res.status(200).json({
     status: 'success',
     results: visites.length,
-    data: { visites: visites.map((visite) => serializeVisite(visite, 'client')) },
+    data: {
+      visites: visites.map((visite) => serializeVisite(visite, 'client')),
+      paymentInitiationAvailable: isVisitPaymentInitiationEnabled(),
+    },
   });
 });
 
@@ -706,6 +710,11 @@ exports.getMyPayments = asyncHandler(async (req, res) => {
 // POST /api/visites/:id/paiement/initier — client initie un paiement YabetooPay
 // ─────────────────────────────────────────────
 exports.initierPaiementVisite = asyncHandler(async (req, res) => {
+  // ALTIMMO-PAY-SAFETY-04A — aucune nouvelle intention Yabetoo ni écriture
+  // sur la visite tant que ce parcours n'est pas certifié.
+  if (!isVisitPaymentInitiationEnabled()) {
+    return res.status(503).json({ status: 'fail', code: VISIT_PAYMENT_SUSPENDED.code, message: VISIT_PAYMENT_SUSPENDED.message });
+  }
   const { phone, operator } = req.body;
 
   if (!phone || !operator) {
