@@ -70,10 +70,13 @@ describe('IA-03C3 — filtres poussés en base sans changer la sémantique', () 
     expect(out.coverage.scanned).toBe(2);
   });
 
-  test('type numérique incorrect : évalué en mémoire comme avant, jamais éliminé en base', async () => {
+  // DATA-READINESS-01 : une valeur stockée en texte n'est plus convertie ; elle reste candidate mais
+  // « à vérifier » (jamais éliminée en base, jamais confirmée sans valeur numérique établie).
+  test('type numérique incorrect : jamais éliminé en base, présenté « à vérifier »', async () => {
     await insert([doc(1, { title: 'Chambres en texte', bedrooms: '3' }), doc(2, { title: 'Prix normal' })]);
     const out = await rank(RENT);
-    expect(titles(out.rankedResults).sort()).toEqual(['Chambres en texte', 'Prix normal']);
+    expect(titles(out.rankedResults)).toEqual(['Prix normal']);
+    expect(titles(out.rankedCandidatesToVerify)).toEqual(['Chambres en texte']);
   });
 });
 
