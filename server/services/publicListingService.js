@@ -1,0 +1,100 @@
+const { LEGACY_QUERY_PARAM_ALIASES } = require('../constants/propertyFilterConstants');
+const { projectApprovedPublicResource } = require('./commercialPublicationService');
+
+const PUBLIC_MAX_LIMIT = 50;
+const PUBLIC_DEFAULT_LIMIT = 10;
+const PUBLIC_SEARCH_PARAMS = Object.freeze([
+  'offerType', ...LEGACY_QUERY_PARAM_ALIASES.offerType,
+  'propertyType', ...LEGACY_QUERY_PARAM_ALIASES.propertyType,
+  'accommodationType', 'city', ...LEGACY_QUERY_PARAM_ALIASES.city,
+  'arrondissement', 'minPrice', 'maxPrice', 'price',
+  'minBedrooms', 'minBathrooms', 'minSurface', 'search', 'sort', 'page', 'limit',
+]);
+const PUBLIC_PROPERTY_FIELDS = Object.freeze([
+  '_id', 'title', 'description', 'pole', 'type', 'status', 'price', 'honoraires', 'fraisVisite', 'images',
+  'bedrooms', 'bathrooms', 'surface', 'livingRooms', 'kitchens', 'constructionType', 'amenities', 'availability',
+  'cautionMultiplicateur', 'profilsLocataireRecherches', 'documentsRequis', 'isPublished', 'statusAdmin',
+  'recommande', 'views', 'shares', 'createdAt', 'updatedAt', 'accommodationType', 'accommodationId', 'hotel', 'hotelServices',
+]);
+const PUBLIC_ADDRESS_FIELDS = Object.freeze(['neighborhood', 'arrondissement', 'city']);
+const PUBLIC_ACCOMMODATION_FIELDS = Object.freeze([
+  '_id', 'property', 'accommodationType', 'hotel', 'occupancyMode', 'furnished', 'capacity', 'beds', 'checkInTime',
+  'checkOutTime', 'minimumStay', 'maximumStay', 'amenities', 'rules', 'houseRules', 'includedServices', 'gallery',
+  'cancellationPolicy', 'securityDeposit', 'cleaningFee', 'currency', 'publicationStatus', 'active', 'publishedAt',
+]);
+const PUBLIC_RATE_FIELDS = Object.freeze([
+  '_id', 'accommodation', 'roomCategory', 'mode', 'rateType', 'amount', 'currency', 'active', 'mealPlan', 'cancellation',
+]);
+
+const isScalar = (value) => value !== undefined && value !== null && typeof value !== 'object';
+const pick = (source, fields) => Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]));
+const refId = (value) => (value && typeof value === 'object' && value._id ? value._id : value);
+
+function sanitizePublicSearchQuery(raw = {}) {
+  const clean = {};
+  for (const key of PUBLIC_SEARCH_PARAMS) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
+    const value = raw[key];
+    if (key === 'price') {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        const price = {};
+        for (const op of ['gte', 'lte', 'gt', 'lt']) if (isScalar(value[op])) price[op] = String(value[op]);
+        if (Object.keys(price).length) clean.price = price;
+      }
+      continue;
+    }
+    if (!isScalar(value)) continue;
+    clean[key] = key === 'search' ? String(value).trim().slice(0, 100) : String(value).trim();
+  }
+  const { page, limit } = publicPagination(clean);
+  clean.page = String(page);
+  clean.limit = String(limit);
+  return clean;
+}
+
+function publicPagination(query = {}) {
+  const page = Math.max(1, Math.floor(Number(query.page)) || 1);
+  const limit = Math.min(PUBLIC_MAX_LIMIT, Math.max(1, Math.floor(Number(query.limit)) || PUBLIC_DEFAULT_LIMIT));
+  return { page, limit, skip: (page - 1) * limit };
+}
+
+function toPublicListing(value, { viewerId = null } = {}) {
+  if (!value) return value;
+  const plain = value && typeof value.toObject === 'function' ? value.toObject() : value;
+  const projected = projectApprovedPublicResource(plain);
+  const out = pick(projected, PUBLIC_PROPERTY_FIELDS);
+  if (out.hotel) out.hotel = refId(out.hotel);
+  if (projected.address && typeof projected.address === 'object') out.address = pick(projected.address, PUBLIC_ADDRESS_FIELDS);
+  const likes = Array.isArray(projected.likes) ? projected.likes : [];
+  out.likesCount = likes.length;
+  if (viewerId) out.likedByMe = likes.some((id) => String(refId(id)) === String(viewerId));
+  if (Array.isArray(projected.reviews)) {
+    out.reviews = projected.reviews.map((review) => ({ rating: review?.rating ?? null, comment: review?.comment || '', createdAt: review?.createdAt || null }));
+  }
+  if (out._id) out.id = String(out._id);
+  return out;
+}
+
+function toPublicRate(value) {
+  const plain = value && typeof value.toObject === 'function' ? value.toObject() : (value || {});
+  const out = pick(plain, PUBLIC_RATE_FIELDS);
+  if (out.accommodation) out.accommodation = refId(out.accommodation);
+  if (out.roomCategory) out.roomCategory = refId(out.roomCategory);
+  return out;
+}
+
+function toPublicAccommodation(value, rates = []) {
+  if (!value) return null;
+  const plain = value && typeof value.toObject === 'function' ? value.toObject() : value;
+  const projected = projectApprovedPublicResource(plain);
+  const out = pick(projected, PUBLIC_ACCOMMODATION_FIELDS);
+  if (out.property) out.property = refId(out.property);
+  if (out.hotel) out.hotel = refId(out.hotel);
+  out.rates = rates.map(toPublicRate);
+  return out;
+}
+
+module.exports = {
+  PUBLIC_MAX_LIMIT, PUBLIC_DEFAULT_LIMIT, PUBLIC_SEARCH_PARAMS,
+  sanitizePublicSearchQuery, publicPagination, toPublicListing, toPublicAccommodation, toPublicRate,
+};
