@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Home, Search, X, AlertCircle,
     ChevronLeft, ChevronRight, Grid3x3, List,
-    SlidersHorizontal, Building2, Tag, AlertTriangle,
+    SlidersHorizontal, Building2, Tag, AlertTriangle, Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { searchAltimmo } from '../services/propertyService';
@@ -14,6 +14,8 @@ import { PropertySkeletonGrid, PropertySkeletonList } from '../components/Proper
 import { VILLES, getArrondissementsFor } from '../constants/locations';
 import { PROPERTY_TYPES_WITH_ALL, OFFER_TYPES } from '../constants/propertyTypes';
 import { ACCOMMODATION_TYPES } from '../constants/accommodation';
+import { assistantHref } from '../utils/assistantFilters';
+import AssistantEntryLink from '../components/assistant/AssistantEntryLink';
 
 // Correctif architecture recherche Altimmo (2026-07-25) : quand offerType==='hebergement', le
 // filtre secondaire doit proposer les vraies catégories d'hébergement (Accommodation.
@@ -304,6 +306,20 @@ const AltimmoAnnonces = () => {
         appliedFilters.propertyType !== 'tous' || appliedFilters.accommodationType !== 'tous' ||
         appliedFilters.city !== 'Toutes' ||
         appliedFilters.arrondissement !== 'Tous' || appliedFilters.price.min || appliedFilters.price.max;
+
+    // ALTIMMO-AI-01 / AI-INTEGRATION-02 — « Affiner avec l'assistant » : l'assistant reprend les
+    // filtres appliqués (mêmes clés canoniques que l'URL, revalidées côté serveur). Le lien n'est
+    // affiché que si le serveur confirme l'activation de l'assistant.
+    const forHebergementFilters = appliedFilters.offerType === 'hebergement';
+    const refineWithAssistantHref = assistantHref({
+        offerType:         appliedFilters.offerType,
+        propertyType:      forHebergementFilters ? undefined : appliedFilters.propertyType,
+        accommodationType: forHebergementFilters ? appliedFilters.accommodationType : undefined,
+        city:              appliedFilters.city,
+        arrondissement:    appliedFilters.arrondissement,
+        minPrice:          appliedFilters.price.min ? String(appliedFilters.price.min) : undefined,
+        maxPrice:          appliedFilters.price.max ? String(appliedFilters.price.max) : undefined,
+    });
 
     const priceRangeInvalid = draftPrice.min && draftPrice.max &&
         Number(draftPrice.min) > Number(draftPrice.max);
@@ -606,12 +622,18 @@ const AltimmoAnnonces = () => {
                             </span>
                         )}
                     </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <AssistantEntryLink href={refineWithAssistantHref} data-testid="refine-with-assistant"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44, padding: '0 14px', border: `1px solid ${GOLD}`, fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', fontWeight: 700, color: GOLD, textDecoration: 'none' }}>
+                        <Sparkles size={14} aria-hidden="true" /> Affiner avec l’assistant
+                    </AssistantEntryLink>
                     {hasFilters && (
                         <button onClick={handleReset}
                             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', fontWeight: 600, color: GOLD, cursor: 'pointer' }}>
                             <X size={13} /> Voir tous les biens
                         </button>
                     )}
+                    </div>
                 </div>
 
                 {/* Résultats */}
