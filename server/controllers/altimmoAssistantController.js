@@ -1,6 +1,7 @@
 // ALTIMMO-AI-INTEGRATION-01 — API de l'assistant de recherche Altimmo (lecture seule, publique).
 //
-// POST /api/altimmo/assistant/search   { query, page?, limit?, pageToken? }
+// GET  /api/altimmo/assistant/status   → { enabled } (aucune lecture de données)
+// POST /api/altimmo/assistant/search   { query?, filters?, page?, limit?, pageToken? } (query ou filters)
 // POST /api/altimmo/assistant/compare  { query, count? } | { propertyIds, query? }
 //
 // Le contrôleur ne parle qu'à la passerelle `assistantGateway` : chaque sortie traverse la garde
@@ -11,12 +12,13 @@
 const logger = require('../utils/logger');
 const gateway = require('../services/altimmoAssistant/assistantGateway');
 const { parseRealEstateRequest } = require('../services/altimmoAssistant/ruleParser');
+const { normalizeAssistantFilters, composeAssistantQuery } = require('../services/altimmoAssistant/filterQuery');
 const { isAltimmoAssistantEnabled, ALTIMMO_ASSISTANT_DISABLED } = require('../config/altimmoAssistant');
 
 const MAX_QUERY_LENGTH = 500;
 const MAX_PROPERTY_IDS = 5; // plafond par défaut de comparisonPolicy (DEFAULT_MAX_LISTINGS)
 const PUBLIC_CONTEXT = Object.freeze({ scopeMode: 'PUBLIC' });
-const SEARCH_KEYS = new Set(['query', 'page', 'limit', 'pageToken']);
+const SEARCH_KEYS = new Set(['query', 'filters', 'page', 'limit', 'pageToken']);
 const COMPARE_KEYS = new Set(['query', 'count', 'propertyIds']);
 
 // Rappels constants, hors contrat de l'assistant : ils ne dépendent d'aucune donnée.
@@ -61,14 +63,21 @@ const guarded = (handler) => async (req, res) => {
   }
 };
 
+// État d'activation, pour que les interfaces n'annoncent pas un assistant indisponible.
+const status = (req, res) => res.status(200).json({ status: 'success', data: { enabled: isAltimmoAssistantEnabled() } });
+
 const search = guarded(async (req, res) => {
   const body = readBody(req, SEARCH_KEYS);
-  if (!body || !validQuery(body.query) || !optionalPositiveInteger(body.page) || !optionalPositiveInteger(body.limit)
+  // Filtres des formulaires : validés contre le catalogue fermé, puis traduits pour l'analyseur.
+  const normalized = body ? normalizeAssistantFilters(body.filters) : { valid: false };
+  const query = normalized.valid ? composeAssistantQuery({ filters: normalized.filters, text: body.query }) : '';
+  if (!body || !normalized.valid || (body.query !== undefined && !validQuery(body.query)) || !validQuery(query)
+    || !optionalPositiveInteger(body.page) || !optionalPositiveInteger(body.limit)
     || (body.pageToken !== undefined && (typeof body.pageToken !== 'string' || body.pageToken.length > 2000))) {
     return fail(res, 400, 'ALTIMMO_ASSISTANT_INVALID_REQUEST', 'Requête invalide.');
   }
   const result = await gateway.searchAndRankRealEstate({
-    query: body.query, context: PUBLIC_CONTEXT,
+    query, context: PUBLIC_CONTEXT,
     pagination: { page: body.page, limit: body.limit },
     ...(body.pageToken !== undefined ? { pageToken: body.pageToken } : {}),
   });
@@ -98,4 +107,4 @@ const compare = guarded(async (req, res) => {
   }));
 });
 
-module.exports = { search, compare, MAX_QUERY_LENGTH, MAX_PROPERTY_IDS };
+module.exports = { status, search, compare, MAX_QUERY_LENGTH, MAX_PROPERTY_IDS };
