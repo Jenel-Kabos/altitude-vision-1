@@ -1,0 +1,10 @@
+{
+  "source": "https://api-docs.deepseek.com/quick_start/pricing",
+  "retrievedAt": "2026-11-01T19:20:00Z",
+  "note": "Tarifs relevés dans la documentation officielle ; ils peuvent changer. Vérifier avant toute campagne d'essais. Prix en USD par million de jetons.",
+  "peakHoursUtc": { "weekdays": [1, 2, 3, 4, 5], "ranges": [[1, 4], [6, 10]], "excludes": "jours fériés chinois (non modélisés : on applique le tarif de pointe par prudence)" },
+  "models": {
+    "deepseek-flash": { "version": "DeepSeek-V4.1-Flash-1017", "inputCacheHit": { "offPeak": 0.003, "peak": 0.006 }, "inputCacheMiss": { "offPeak": 0.15, "peak": 0.3 }, "output": { "offPeak": 0.6, "peak": 1.2 } },
+    "deepseek-v4-pro": { "version": "DeepSeek-V4-Pro-0813", "inputCacheHit": { "offPeak": 0.022, "peak": 0.044 }, "inputCacheMiss": { "offPeak": 0.66, "peak": 1.32 }, "output": { "offPeak": 1.98, "peak": 3.96 } }
+  }
+}

@@ -101,3 +101,18 @@ exports.altimmoAssistantLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// ALTIMMO-AI-INTEGRATION-01 (DeepSeek) — conseiller conversationnel (comptes internes autorisés) :
+// plafond par compte authentifié (et non par IP), en plus des limites de coût du conseiller.
+exports.altimmoAdvisorLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  keyGenerator: (req) => (req.user?._id ? `advisor:${String(req.user._id)}` : `advisor-ip:${req.ip}`),
+  message: {
+    status: "fail",
+    code: "ADVISOR_RATE_LIMITED",
+    message: "Trop de messages envoyés au conseiller. Réessayez dans une minute.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
