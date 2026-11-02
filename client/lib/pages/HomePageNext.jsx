@@ -8,6 +8,7 @@ import FacebookFeed  from '../components/FacebookFeed';
 import HeroEcosystem from '../components/public/HeroEcosystem';
 import IntentRouter from '../components/public/IntentRouter';
 import AltimmoDiscovery from '../components/public/AltimmoDiscovery';
+import AssistantPublicDiscovery from '../components/assistant/AssistantPublicDiscovery';
 import AltimmoAppShowcase from '../components/public/AltimmoAppShowcase';
 import AltcomDiscovery from '../components/public/AltcomDiscovery';
 import AltitudeApproach from '../components/public/AltitudeApproach';
@@ -360,6 +361,7 @@ const HomePage = () => {
       <HeroEcosystem />
       <IntentRouter />
       <AltimmoDiscovery />
+      <AssistantPublicDiscovery compact />
       <AltimmoAppShowcase />
       <AltcomDiscovery />
       <MilaEventsDiscovery />

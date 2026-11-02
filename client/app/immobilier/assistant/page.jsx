@@ -2,12 +2,10 @@ import { buildMetadata } from '@/lib/seo';
 import AltimmoAssistantGate from '@/lib/components/assistant/AltimmoAssistantGate';
 import { pickAssistantFilters } from '@/lib/utils/assistantFilters';
 
-// ALTIMMO-AI-INTEGRATION-02 — non indexée tant que l'assistant n'est pas activé par la Direction.
 export const metadata = buildMetadata({
-  title: 'Trouver mon bien avec l’assistant — Altimmo',
-  description: "Achat, location ou hébergement à Brazzaville et Pointe-Noire : l'assistant Altimmo recherche et compare les annonces publiées.",
+  title: 'Assistant immobilier IA Altimmo',
+  description: "Découvrez l'assistant immobilier IA Altimmo : recherche conversationnelle, exploration et comparaison des annonces immobilières.",
   url: '/immobilier/assistant',
-  noIndex: true,
 });
 
 // « Affiner avec l'assistant » : les filtres autorisés de la liste d'annonces sont repris.

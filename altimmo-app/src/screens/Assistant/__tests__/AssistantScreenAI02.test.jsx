@@ -36,14 +36,23 @@ const search = () => fireEvent.press(screen.getByTestId('assistant-search'));
 test('carte d’accueil : ouvre l’assistant', () => {
   const onPress = jest.fn();
   render(<AssistantEntryCard onPress={onPress} />);
-  fireEvent.press(screen.getByLabelText('Trouver mon bien avec l’assistant'));
+  fireEvent.press(screen.getByLabelText('Assistant immobilier IA'));
   expect(onPress).toHaveBeenCalled();
+});
+
+test('carte publique : identifie l’assistant et annonce la découverte quand il est indisponible', () => {
+  render(<AssistantEntryCard onPress={jest.fn()} available={false} />);
+  expect(screen.getByText('Assistant immobilier IA')).toBeTruthy();
+  expect(screen.getByText('Découvrir')).toBeTruthy();
 });
 
 test('désactivé : aucun formulaire, aucune recherche', async () => {
   getAssistantStatus.mockResolvedValue(false);
   render(<AssistantScreen navigation={nav()} route={{}} />);
   expect(await screen.findByTestId('assistant-disabled')).toBeTruthy();
+  expect(screen.getByText('Assistant immobilier IA Altimmo')).toBeTruthy();
+  expect(screen.getByText('Assistant IA — Bientôt disponible')).toBeTruthy();
+  expect(screen.getByText(/ne réserve pas, ne paie pas et ne garantit pas/)).toBeTruthy();
   expect(screen.queryByTestId('assistant-search')).toBeNull();
   expect(searchWithAssistant).not.toHaveBeenCalled();
 });

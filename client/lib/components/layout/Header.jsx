@@ -8,7 +8,7 @@ import {
   Menu, X, LayoutDashboard, Building, LogOut,
   UserCircle, Heart, MessageCircle, UserPlus,
   LogIn, ChevronDown, Home, Phone, Newspaper, Smartphone,
-  CreditCard, Calendar, Landmark, KeyRound, Palmtree, LayoutGrid,
+  CreditCard, Calendar, Landmark, KeyRound, Palmtree, LayoutGrid, Bot,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePlatformTenantRuntime } from '../../context/PlatformTenantRuntimeContext';
@@ -34,6 +34,7 @@ const NAV_LINKS = [
       { to: '/immobilier/annonces?offerType=vente',      label: 'Acheter',    Icon: Landmark, desc: 'Maisons, appartements, terrains…' },
       { to: '/immobilier/annonces?offerType=location',   label: 'Louer',      Icon: KeyRound, desc: 'Location longue durée avec bail' },
       { to: '/immobilier/sejourner',                     label: 'Séjourner',  Icon: Palmtree, desc: 'Meublés à la nuitée & hôtels' },
+      { to: '/immobilier/assistant',                      label: 'Assistant IA', Icon: Bot,    desc: 'Découvrir la recherche conversationnelle' },
       { to: '/altimmo/application',                      label: 'App Altimmo', Icon: null,    desc: 'Découvrir l’application' },
     ],
   },
