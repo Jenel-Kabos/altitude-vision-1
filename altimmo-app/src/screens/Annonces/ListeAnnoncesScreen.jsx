@@ -21,6 +21,8 @@ import { resolveMobileDestination } from '../../navigation/navigationSdk';
 import AssistantEntryCard from '../../components/AssistantEntryCard';
 import { assistantFiltersFromListFilters } from '../../utils/assistantFilters';
 import { getAssistantStatus } from '../../services/altimmoAssistantService';
+import { getAdvisorStatus } from '../../services/altimmoAdvisorService';
+import { getToken } from '../../services/api';
 import {
   Screen, Card, PrixFCFA, RecommendedCarousel, SearchPanel,
   GreetingBar, AdCarousel,
@@ -486,7 +488,11 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
   const [assistantEnabled, setAssistantEnabled] = useState(false);
   useEffect(() => {
     let active = true;
-    getAssistantStatus().then((value) => { if (active) setAssistantEnabled(value); }).catch(() => {}); // getAssistantStatus ne rejette pas : garde de forme
+    // AI-INTEGRATION-01 (DeepSeek) : carte aussi affichée pour un compte connecté autorisé au conseiller ; sans session, aucun appel.
+    getAssistantStatus().then(async (value) => {
+      const advisor = !value && (await getToken().catch(() => null)) ? (await getAdvisorStatus()).available === true : false;
+      if (active) setAssistantEnabled(value || advisor);
+    }).catch(() => {}); // les services d'état ne rejettent pas : garde de forme
     return () => { active = false; };
   }, []);
   const onOpenAssistant = useCallback(

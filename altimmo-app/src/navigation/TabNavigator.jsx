@@ -12,7 +12,7 @@ import ListeAnnoncesScreen  from '../screens/Annonces/ListeAnnoncesScreen';
 import DetailAnnonceScreen  from '../screens/Annonces/DetailAnnonceScreen';
 import CarteScreen          from '../screens/Annonces/CarteScreen';
 import NotificationsScreen  from '../screens/Notifications/NotificationsScreen';
-import AssistantScreen      from '../screens/Assistant/AssistantScreen';
+import AssistantGateScreen  from '../screens/Assistant/AssistantGateScreen';
 import MessagerieStack      from './stacks/MessagerieStack';
 import ProfilStack          from './stacks/ProfilStack';
 import VisitesScreen        from '../screens/Visites/VisitesScreen';
@@ -33,8 +33,9 @@ function AnnoncesStack() {
       <Stack.Screen name="ListeAnnonces" component={ListeAnnoncesScreen} />
       <Stack.Screen name="DetailAnnonce" component={DetailAnnonceScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      {/* ALTIMMO-AI-01 / AI-INTEGRATION-02 — assistant de recherche (sans connexion obligatoire). */}
-      <Stack.Screen name="Assistant" component={AssistantScreen} />
+      {/* ALTIMMO-AI-01 / AI-INTEGRATION-02 — assistant de recherche (sans connexion obligatoire).
+          AI-INTEGRATION-01 (DeepSeek) : conseiller conversationnel pour les seuls comptes autorisés par le serveur. */}
+      <Stack.Screen name="Assistant" component={AssistantGateScreen} />
     </Stack.Navigator>
   );
 }
