@@ -30,6 +30,7 @@ export default async function sitemap() {
     { url: `${SITE_URL}/`,                   priority: 1.0, changeFrequency: 'daily'   },
     { url: `${SITE_URL}/immobilier`,            priority: 0.9, changeFrequency: 'daily'   },
     { url: `${SITE_URL}/immobilier/annonces`,   priority: 0.9, changeFrequency: 'daily'   },
+    { url: `${SITE_URL}/immobilier/assistant`, priority: 0.8, changeFrequency: 'monthly' },
     { url: `${SITE_URL}/evenementiel`,        priority: 0.9, changeFrequency: 'daily'   },
     { url: `${SITE_URL}/evenementiel/annonces`, priority: 0.8, changeFrequency: 'daily' },
     { url: `${SITE_URL}/altcom`,             priority: 0.8, changeFrequency: 'weekly'  },

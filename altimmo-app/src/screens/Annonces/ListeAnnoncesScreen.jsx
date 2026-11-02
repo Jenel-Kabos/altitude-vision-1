@@ -506,7 +506,7 @@ export default function ListeAnnoncesScreen({ navigation, route }) {
   const ListHeader = useMemo(() => (
     <View>
       <GreetingBar onPressNotifications={onPressNotifications} />
-      {assistantEnabled ? <AssistantEntryCard onPress={onOpenAssistant} refine={activeFilterCount > 0} /> : null}
+          <AssistantEntryCard onPress={onOpenAssistant} refine={activeFilterCount > 0} available={assistantEnabled} />
 
       {pubs.length > 0 ? (
         <AdCarousel items={pubs} tintColor={c.gold} />

@@ -7,22 +7,27 @@
 import React, { useEffect, useState } from 'react';
 import AltimmoAssistant from './AltimmoAssistant';
 import AltimmoAdvisorChat from './AltimmoAdvisorChat';
+import AssistantPublicDiscovery from './AssistantPublicDiscovery';
 import { useAuth } from '../../context/AuthContext';
 import { getAdvisorStatus } from '../../services/altimmoAdvisorService';
+import { getAssistantStatus } from '../../services/altimmoAssistantService';
 
 export default function AltimmoAssistantGate({ initialFilters = null }) {
   const { user, loading } = useAuth();
   const [status, setStatus] = useState(null);
+  const [classicEnabled, setClassicEnabled] = useState(null);
   const [classic, setClassic] = useState(false);
 
   useEffect(() => {
     let alive = true;
     if (loading) return undefined;
-    if (!user) { setStatus({ available: false }); return undefined; }
+    getAssistantStatus().then((value) => { if (alive) setClassicEnabled(value); }).catch(() => { if (alive) setClassicEnabled(false); });
+    if (!user) { setStatus({ available: false }); return () => { alive = false; }; }
     getAdvisorStatus().then((value) => { if (alive) setStatus(value); }).catch(() => {}); // getAdvisorStatus ne rejette pas : garde de forme
     return () => { alive = false; };
   }, [user, loading]);
 
   if (status?.available && !classic) return <AltimmoAdvisorChat status={status} onUseClassic={() => setClassic(true)} />;
-  return <AltimmoAssistant initialFilters={initialFilters} />;
+  if (classicEnabled) return <AltimmoAssistant initialFilters={initialFilters} />;
+  return <AssistantPublicDiscovery />;
 }

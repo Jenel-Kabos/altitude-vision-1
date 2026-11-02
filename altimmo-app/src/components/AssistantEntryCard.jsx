@@ -6,8 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { fonts, fontSize, spacing, radius } from '../theme';
 
-export default function AssistantEntryCard({ onPress, refine = false }) {
-  const title = refine ? 'Affiner avec l’assistant' : 'Trouver mon bien avec l’assistant';
+export default function AssistantEntryCard({ onPress, refine = false, available = false }) {
+  const title = refine && available ? 'Affiner avec l’assistant' : 'Assistant immobilier IA';
   const { themeColors: c } = useTheme();
   const styles = useMemo(() => makeStyles(c), [c]);
   return (
@@ -15,7 +15,8 @@ export default function AssistantEntryCard({ onPress, refine = false }) {
       <View style={styles.icon}><Ionicons name="sparkles-outline" size={22} color={c.gold} /></View>
       <View style={styles.texts}>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{refine ? 'L’assistant reprend vos filtres pour affiner la recherche.' : 'Achat, location ou hébergement : décrivez votre recherche.'}</Text>
+        <Text style={styles.subtitle}>{available ? (refine ? 'L’assistant reprend vos filtres pour affiner la recherche.' : 'Trouvez un bien en décrivant simplement votre recherche.') : 'Trouvez plus facilement un bien en décrivant votre recherche.'}</Text>
+        <Text style={styles.action}>{available ? 'Discuter avec l’assistant' : 'Découvrir'}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
     </Pressable>
@@ -28,4 +29,5 @@ const makeStyles = (c) => StyleSheet.create({
   texts: { flex: 1 },
   title: { fontFamily: fonts.bodyBold, fontSize: fontSize.md, color: c.text },
   subtitle: { fontFamily: fonts.body, fontSize: fontSize.xs, color: c.textMuted, marginTop: 2 },
+  action: { fontFamily: fonts.bodyBold, fontSize: fontSize.xs, color: c.gold, marginTop: 5 },
 });

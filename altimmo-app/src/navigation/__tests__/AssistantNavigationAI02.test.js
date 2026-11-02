@@ -14,9 +14,9 @@ test('pile Annonces : écran Assistant enregistré', () => {
   expect(read('screens/Assistant/AssistantGateScreen.jsx')).toMatch(/return <AssistantScreen \{\.\.\.props\} \/>;/);
 });
 
-test('accueil : carte conditionnée à l’activation, filtres transmis', () => {
+test('accueil : carte publique toujours visible, état transmis, filtres transmis', () => {
   const home = read('screens/Annonces/ListeAnnoncesScreen.jsx');
-  expect(home).toMatch(/\{assistantEnabled \? <AssistantEntryCard onPress=\{onOpenAssistant\} refine=\{activeFilterCount > 0\} \/> : null\}/);
+  expect(home).toMatch(/<AssistantEntryCard onPress=\{onOpenAssistant\} refine=\{activeFilterCount > 0\} available=\{assistantEnabled\} \/>/);
   expect(home).toMatch(/getAssistantStatus\(\)\.then/);
   expect(home).toMatch(/await getToken\(\)\.catch\(\(\) => null\)\) \? \(await getAdvisorStatus\(\)\)\.available === true/);
   expect(home).toMatch(/navigation\.navigate\('Assistant', \{ filters: assistantFiltersFromListFilters\(activeFilters\) \}\)/);

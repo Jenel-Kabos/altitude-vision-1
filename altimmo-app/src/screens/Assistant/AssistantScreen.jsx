@@ -199,8 +199,15 @@ export default function AssistantScreen({ navigation, route }) {
           {enabled === null
             ? <ActivityIndicator color={c.gold} accessibilityLabel="Chargement de l’assistant" />
             : (
-              <Notice styles={styles} testID="assistant-disabled" title="L’assistant de recherche n’est pas encore disponible."
-                lines={['Vous pouvez consulter toutes les annonces publiées et utiliser les filtres de recherche.']} />
+              <View>
+                <Text style={styles.sectionLabel}>Assistant immobilier IA Altimmo</Text>
+                <Notice styles={styles} testID="assistant-disabled" title="Assistant IA — Bientôt disponible"
+                  lines={[
+                    'Votre recherche immobilière commence par une conversation.',
+                    'La fonctionnalité est en validation. Consultez les annonces et utilisez les filtres pendant cette phase.',
+                    'L’assistant accompagne la recherche : il ne réserve pas, ne paie pas et ne garantit pas la disponibilité ou une transaction.',
+                  ]} />
+              </View>
             )}
         </View>
       </SafeAreaView>

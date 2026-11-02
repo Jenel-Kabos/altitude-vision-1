@@ -18,6 +18,7 @@ import PropertyCard    from '../components/PropertyCard';
 import ReviewCard      from '../components/ReviewCard';
 import CtaCommission   from '../components/CtaCommission';
 import AltimmoContact  from '../components/AltimmoContact';
+import AssistantPublicDiscovery from '../components/assistant/AssistantPublicDiscovery';
 
 import { getLatestPropertiesByPole } from '../services/propertyService';
 import { getAltimmoReviews }         from '../services/reviewService';
@@ -742,6 +743,8 @@ const AltimmoPage = () => {
                     </div>
                 </div>
             </header>
+
+            <AssistantPublicDiscovery compact />
 
             {/* ══ À PROPOS ════════════════════════════════════════════ */}
             <section className="ai-about-section">
