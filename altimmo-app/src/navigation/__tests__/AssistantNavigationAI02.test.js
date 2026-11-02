@@ -8,14 +8,17 @@ const read = (relative) => fs.readFileSync(path.join(__dirname, '..', '..', rela
 
 test('pile Annonces : écran Assistant enregistré', () => {
   const tabs = read('navigation/TabNavigator.jsx');
-  expect(tabs).toMatch(/import AssistantScreen\s+from '\.\.\/screens\/Assistant\/AssistantScreen'/);
-  expect(tabs).toMatch(/<Stack\.Screen name="Assistant" component=\{AssistantScreen\} \/>/);
+  // AI-INTEGRATION-01 (DeepSeek) : l'écran passe par l'aiguillage, qui rend l'assistant existant par défaut.
+  expect(tabs).toMatch(/import AssistantGateScreen\s+from '\.\.\/screens\/Assistant\/AssistantGateScreen'/);
+  expect(tabs).toMatch(/<Stack\.Screen name="Assistant" component=\{AssistantGateScreen\} \/>/);
+  expect(read('screens/Assistant/AssistantGateScreen.jsx')).toMatch(/return <AssistantScreen \{\.\.\.props\} \/>;/);
 });
 
 test('accueil : carte conditionnée à l’activation, filtres transmis', () => {
   const home = read('screens/Annonces/ListeAnnoncesScreen.jsx');
   expect(home).toMatch(/\{assistantEnabled \? <AssistantEntryCard onPress=\{onOpenAssistant\} refine=\{activeFilterCount > 0\} \/> : null\}/);
   expect(home).toMatch(/getAssistantStatus\(\)\.then/);
+  expect(home).toMatch(/await getToken\(\)\.catch\(\(\) => null\)\) \? \(await getAdvisorStatus\(\)\)\.available === true/);
   expect(home).toMatch(/navigation\.navigate\('Assistant', \{ filters: assistantFiltersFromListFilters\(activeFilters\) \}\)/);
 });
 
@@ -23,4 +26,7 @@ test('couche de présentation identique au web', () => {
   const mobile = read('utils/assistantViewModel.js');
   const web = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'client', 'lib', 'utils', 'assistantViewModel.js'), 'utf8');
   expect(mobile).toBe(web);
+  const advisorMobile = read('utils/advisorViewModel.js');
+  const advisorWeb = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'client', 'lib', 'utils', 'advisorViewModel.js'), 'utf8');
+  expect(advisorMobile).toBe(advisorWeb);
 });
