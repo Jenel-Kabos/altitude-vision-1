@@ -1,5 +1,5 @@
 import { buildMetadata } from '@/lib/seo';
-import AltimmoAssistant from '@/lib/components/assistant/AltimmoAssistant';
+import AltimmoAssistantGate from '@/lib/components/assistant/AltimmoAssistantGate';
 import { pickAssistantFilters } from '@/lib/utils/assistantFilters';
 
 // ALTIMMO-AI-INTEGRATION-02 — non indexée tant que l'assistant n'est pas activé par la Direction.
@@ -11,7 +11,8 @@ export const metadata = buildMetadata({
 });
 
 // « Affiner avec l'assistant » : les filtres autorisés de la liste d'annonces sont repris.
+// ALTIMMO-AI-INTEGRATION-01 (DeepSeek) : conseiller conversationnel pour les seuls comptes autorisés par le serveur.
 export default async function Page({ searchParams }) {
   const params = (await searchParams) || {};
-  return <AltimmoAssistant initialFilters={pickAssistantFilters(params)} />;
+  return <AltimmoAssistantGate initialFilters={pickAssistantFilters(params)} />;
 }
