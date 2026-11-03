@@ -50,7 +50,22 @@ const {
   adminLiftSuspension,
   isPropertyCommerciallyAvailable,
   commerciallyPublishedMongoFilter,
+  submitPropertyForReview,
+  assertPropertyNotSold,
 } = require('../services/propertyPublicationLifecycleService');
+const { toPublicListing } = require('../services/publicListingService');
+
+// ALTIMMO-E2E-IMMOBILIER-02 (D-02) — champs qu'un propriétaire peut modifier sur son annonce
+// (`PUT /api/properties/:id`). Toute autre clé est ignorée (liste blanche).
+const OWNER_EDITABLE_PROPERTY_FIELDS = Object.freeze([
+  'title', 'description', 'price', 'type', 'address', 'latitude', 'longitude', 'location', 'surface',
+  'bedrooms', 'bathrooms', 'livingRooms', 'kitchens', 'constructionType', 'amenities', 'availability',
+  'honoraires', 'fraisVisite', 'cautionMultiplicateur', 'profilsLocataireRecherches', 'documentsRequis',
+]);
+// Le staff d'un tenant (Admin, Gestionnaire immobilier) sur un bien de SON tenant peut en plus
+// reclasser l'annonce et désigner l'agent. `recommande` reste réservé à la route plateforme dédiée.
+const TENANT_STAFF_EDITABLE_PROPERTY_FIELDS = Object.freeze(['status', 'pole', 'agent']);
+const EDITABLE_ADDRESS_FIELDS = Object.freeze(['street', 'neighborhood', 'arrondissement', 'city']);
 const { notifyPropertyLifecycleEvent } = require('../services/propertyPublicationNotificationService');
 
 const emitPropertyLifecycleNotification = (payload) => {
@@ -453,7 +468,8 @@ const createProperty = asyncHandler(async (req, res, next) => {
     images:          imagePaths,
     statusAdmin:     'En attente'
   });
-  const initialRevision = await createPendingRevision({ resourceType: 'Property', resource: newProperty, proposedSnapshot: publicSnapshot(newProperty), actor: req.user });
+  // ALTIMMO-E2E-IMMOBILIER-02 (D-01) — révision initiale rattachée au bien dans la même transaction.
+  const initialRevision = await submitPropertyForReview({ propertyId: newProperty._id, actor: req.user });
   emitPropertyLifecycleNotification({ event: 'submitted', property: newProperty, actor: req.user, transitionKey: String(initialRevision._id) });
 
   logger.success('✅ Propriété créée :', newProperty._id);
