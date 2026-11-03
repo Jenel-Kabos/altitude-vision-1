@@ -459,11 +459,23 @@ exports.enregistrerEspecesCheque = async (req, res) => {
     const tx = await Transaction.findById(req.params.id).populate('property', 'title');
     if (!tx) return res.status(404).json({ status: 'fail', message: 'Transaction introuvable.' });
     if (!(await assertTransactionTenantAccessForStaff(req, res, tx))) return;
+    // ALTIMMO-E2E-IMMOBILIER-02 (D-05) — une saisie espèces/chèque confirme le règlement INTÉGRAL :
+    // un montant différent du prix final (acompte, paiement partiel, trop-perçu) est refusé, faute de
+    // règle d'acompte documentée ; une transaction close ou déjà réglée ne reçoit pas de nouveau règlement.
+    if (['Annulée', 'Réussie'].includes(tx.status)) {
+      return res.status(409).json({ status: 'fail', code: 'TRANSACTION_CLOSED', message: 'Transaction close : aucun règlement ne peut être enregistré.' });
+    }
+    if (tx.paymentStatus === 'confirmé') {
+      return res.status(409).json({ status: 'fail', code: 'PAYMENT_ALREADY_CONFIRMED', message: 'Le règlement de cette transaction est déjà confirmé.' });
+    }
+    if (montant !== undefined && montant !== null && montant !== '' && Number(montant) !== Number(tx.finalAmount)) {
+      return res.status(422).json({ status: 'fail', code: 'PARTIAL_PAYMENT_NOT_SUPPORTED', message: 'Le montant doit correspondre au prix final : les acomptes et règlements partiels ne sont pas pris en charge.' });
+    }
 
     const paiement = await PaiementTransaction.create({
       transaction:       tx._id,
       initiéPar:         req.user._id,
-      montant:           montant || tx.finalAmount,
+      montant:           tx.finalAmount,
       methode,
       provider:          methode === 'cheque' ? 'Chèque' : 'Espèces',
       statut:            'confirmé',

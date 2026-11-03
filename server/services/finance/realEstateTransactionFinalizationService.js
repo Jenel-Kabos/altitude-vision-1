@@ -8,6 +8,7 @@ const { FinancialError } = require('./financialError');
 const { financialCheckpoint } = require('./financialFaultInjection');
 const { appendFinancialLedgerEntry } = require('./financialLedgerService');
 const RealEstateReservation = require('../../models/RealEstateReservation');
+const PaiementTransaction = require('../../models/PaiementTransaction');
 
 const inSession = (query, session) => (session ? query.session(session) : query);
 const operationKeyFor = (transactionId) => `real-estate:transaction:${transactionId}:finalize`;
@@ -75,6 +76,14 @@ async function finalizeCore({ transactionId, actorId, tauxCommission, operationK
   }
   if (['Vendu', 'Loué', 'Retiré'].includes(property.availability)) {
     throw new FinancialError('FINANCIAL_PROPERTY_ALREADY_CLOSED', 'Le bien est déjà vendu, loué ou retiré.', 409);
+  }
+  // ALTIMMO-E2E-IMMOBILIER-02 (D-05) — `paymentStatus: 'confirmé'` ne suffit plus : la somme des
+  // encaissements reconnus (confirmés) doit couvrir le prix final. Un acompte ou un règlement partiel
+  // ne permet jamais de finaliser une vente.
+  const recognisedPayments = await inSession(PaiementTransaction.find({ transaction: transaction._id, statut: { $in: ['confirmé', 'Payé'] } }).select('montant'), session);
+  const recognisedTotal = recognisedPayments.reduce((total, payment) => total + (Number(payment.montant) || 0), 0);
+  if (recognisedTotal < transaction.finalAmount) {
+    throw new FinancialError('PAYMENT_BALANCE_INSUFFICIENT', 'Les encaissements reconnus ne couvrent pas le prix final : finalisation impossible.', 409);
   }
   const commission = calculateCommission(transaction.finalAmount, tauxCommission || transaction.commission?.taux || 10, property.hasSpecialCommission);
   const previousPropertyState = { availability: property.availability, isPublished: property.isPublished };
