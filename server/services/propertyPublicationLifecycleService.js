@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const CommercialPublicationRevision = require('../models/CommercialPublicationRevision');
+const Transaction = require('../models/Transaction');
 const { publicSnapshot, classifySubstantiveChanges } = require('./commercialPublicationService');
 
 const PUBLICATION_STATES = Object.freeze({
@@ -76,6 +77,15 @@ async function inTransaction(work) {
   }
 }
 
+// ALTIMMO-E2E-IMMOBILIER-02 (D-07) — un bien dont la vente a été finalisée (Transaction « Réussie »)
+// ne revient jamais sur le marché par une modification, un retrait, une réactivation ou une levée de
+// suspension : aucune procédure de revente n'est définie, la remise en vente est donc bloquée.
+async function assertPropertyNotSold(propertyId, session = null) {
+  const query = Transaction.exists({ property: propertyId, transactionType: 'vente', status: 'Réussie' });
+  if (session) query.session(session);
+  if (await query) fail('PROPERTY_SOLD_LOCKED', 'Ce bien a été vendu : il ne peut pas être remis en commercialisation.', 409);
+}
+
 async function loadProperty(propertyId, session) {
   const property = await Property.findById(propertyId).session(session);
   if (!property) fail('PROPERTY_NOT_FOUND', 'Propriété introuvable.', 404);
@@ -121,10 +131,61 @@ async function createLifecycleRevision(property, { actor, reason, submissionType
   return revision;
 }
 
+// ALTIMMO-E2E-IMMOBILIER-02 (D-01) — toute soumission d'une version publique par le propriétaire
+// (dépôt web ou mobile, correction d'une annonce en attente ou rejetée, modification d'une annonce
+// publiée) ouvre une révision RATTACHÉE au bien dans la même transaction : la décision ne promeut que
+// la révision courante (`currentPublicationRevision`), sinon elle échouait toujours en 409.
+// Une annonce suspendue ou retirée n'est jamais remise en revue par une simple modification :
+// la levée de suspension et la réactivation ouvrent leur propre révision.
+const REVIEWABLE_SUBMISSION_STATES = new Set([
+  PUBLICATION_STATES.DRAFT, PUBLICATION_STATES.PENDING, PUBLICATION_STATES.REJECTED,
+  PUBLICATION_STATES.PUBLISHED, PUBLICATION_STATES.CHANGE_PENDING,
+]);
+
+async function submitPropertyForReview({ propertyId, actor, wasPublished = false, approvedBaseline = null }) {
+  return inTransaction(async (session) => {
+    const property = await loadProperty(propertyId, session);
+    const rawState = property.publicationLifecycleState || null;
+    if (rawState && !REVIEWABLE_SUBMISSION_STATES.has(rawState)) return null;
+    const proposedSnapshot = publicSnapshot(property);
+    const baseline = property.approvedPublicSnapshot || approvedBaseline || {};
+    const changedFields = classifySubstantiveChanges(baseline, proposedSnapshot);
+    if (!changedFields.length) return null;
+    // Une seconde modification avant décision reste une modification d'annonce publiée.
+    wasPublished = wasPublished || rawState === PUBLICATION_STATES.CHANGE_PENDING;
+    await supersedePending(property, actor, 'Remplacée par une révision plus récente.', session);
+    const submissionType = wasPublished ? 'content_change' : 'initial';
+    const [revision] = await CommercialPublicationRevision.create([{
+      resourceType: 'Property', resource: property._id, tenant: property.tenant || null,
+      owner: property.owner, baseVersion: Number(property.commercialPublicationVersion || 0),
+      proposedSnapshot, changedFields, submissionType, status: 'pending', submittedBy: actorId(actor),
+      history: [{ event: 'submitted', actor: actorId(actor) }],
+    }], { session });
+    // Annonce historique publiée sans instantané : la version approuvée en ligne est conservée
+    // comme référence avant d'être remplacée par la modification soumise.
+    if (wasPublished && !property.approvedPublicSnapshot && approvedBaseline) property.approvedPublicSnapshot = approvedBaseline;
+    const to = wasPublished ? PUBLICATION_STATES.CHANGE_PENDING : PUBLICATION_STATES.PENDING;
+    if (!(rawState === to && property.currentPublicationRevision)) {
+      appendTransition(property, {
+        to, actor,
+        action: wasPublished ? 'content_change_submitted' : 'owner_submission',
+        reason: wasPublished ? 'Modification substantielle soumise à une nouvelle approbation.' : 'Annonce soumise à l’approbation Altimmo.',
+      });
+    }
+    property.publicationLifecycleState = to;
+    property.currentPublicationRevision = revision._id;
+    property.statusAdmin = 'En attente';
+    property.isPublished = false;
+    await property.save({ session });
+    return revision;
+  });
+}
+
 async function ownerWithdrawProperty({ propertyId, actor, availability, reason = '' }) {
   return inTransaction(async (session) => {
     const property = await loadProperty(propertyId, session);
     assertOwner(property, actor);
+    await assertPropertyNotSold(property._id, session);
     if (derivePublicationState(property) === PUBLICATION_STATES.ADMIN_SUSPENDED) {
       fail('PROPERTY_ADMIN_SUSPENDED', 'La suspension Altimmo ne peut être levée par le propriétaire.', 409);
     }
@@ -148,6 +209,7 @@ async function ownerRequestReactivation({ propertyId, actor, reason = '' }) {
   return inTransaction(async (session) => {
     const property = await loadProperty(propertyId, session);
     assertOwner(property, actor);
+    await assertPropertyNotSold(property._id, session);
     if (derivePublicationState(property) === PUBLICATION_STATES.ADMIN_SUSPENDED) {
       fail('PROPERTY_ADMIN_SUSPENDED', 'La suspension Altimmo ne peut être levée par le propriétaire.', 409);
     }
@@ -191,6 +253,7 @@ async function adminLiftSuspension({ propertyId, actor, reason = '' }) {
     if (derivePublicationState(property) !== PUBLICATION_STATES.ADMIN_SUSPENDED) {
       fail('PROPERTY_NOT_SUSPENDED', 'Cette annonce ne fait pas l’objet d’une suspension Altimmo.', 409);
     }
+    await assertPropertyNotSold(property._id, session);
     property.availability = 'Disponible';
     property.isPublished = false;
     appendTransition(property, { to: PUBLICATION_STATES.PENDING, action: 'admin_lift_suspension', actor, reason });
@@ -236,4 +299,6 @@ module.exports = {
   adminSuspendProperty,
   adminLiftSuspension,
   ownerRequestSuspensionReview,
+  submitPropertyForReview,
+  assertPropertyNotSold,
 };

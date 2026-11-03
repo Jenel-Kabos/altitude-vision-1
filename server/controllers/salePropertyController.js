@@ -13,6 +13,8 @@ const SaleManagement = require('../models/SaleManagement');
 const RentalManagement = require('../models/RentalManagement');
 const { createFullSaleProperty, updateFullSaleProperty } = require('../services/salePropertyService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const { publicSnapshot } = require('../services/commercialPublicationService');
+const { submitPropertyForReview, assertPropertyNotSold } = require('../services/propertyPublicationLifecycleService');
 const {
   uploadFilesToCloudinary, parseAmenities, parseAddress, parseGeoLocation,
   parseNonNegativeAmount, buildBasePropertyData, parseNumericField, parseStringArray,
@@ -181,6 +183,16 @@ exports.updateFull = async (req, res) => {
 
     // Validé AVANT toute mutation de `property`, même convention que
     // accommodationController.updateFull (Sprint Hébergement).
+    // ALTIMMO-E2E-IMMOBILIER-02 (D-07) — un bien vendu n'est plus modifiable ; (D-01/D-02) la version
+    // publique approuvée avant modification sert de référence à la révision soumise par le propriétaire.
+    try {
+      await assertPropertyNotSold(property._id);
+    } catch (error) {
+      return fail(res, error.statusCode || 409, error.message);
+    }
+    const wasPublished = property.statusAdmin === 'Validée' && property.isPublished === true;
+    const approvedBaseline = publicSnapshot(property.approvedPublicSnapshot || property.toObject());
+
     let saleData;
     try {
       saleData = buildSaleData(req, { isOwnerActor });
@@ -252,9 +264,17 @@ exports.updateFull = async (req, res) => {
     // legacy) : un propriétaire qui modifie son bien repasse en modération,
     // jamais publié tel quel sans nouvelle revue — jamais retiré, seulement
     // répliqué pour ce nouveau chemin owner-authorized.
-    if (isOwnerActor) property.statusAdmin = 'En attente';
+    if (isOwnerActor) {
+      property.statusAdmin = 'En attente';
+      property.isPublished = false;
+      if (wasPublished && !property.approvedPublicSnapshot) property.approvedPublicSnapshot = approvedBaseline;
+    }
 
     await property.save();
+    // ALTIMMO-E2E-IMMOBILIER-02 (D-01) — révision rattachée, sinon l'annonce restait bloquée « En attente ».
+    if (isOwnerActor) {
+      await submitPropertyForReview({ propertyId: property._id, actor: req.user, wasPublished, approvedBaseline });
+    }
 
     const result = await updateFullSaleProperty({ property, saleData, actingUser: req.user });
 

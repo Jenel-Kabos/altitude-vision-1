@@ -12,6 +12,8 @@ const Property = require('../models/Property');
 const RentalManagement = require('../models/RentalManagement');
 const { createFullRentalProperty, updateFullRentalProperty } = require('../services/rentalPropertyService');
 const { logAction, buildAuteur } = require('../services/actionLogService');
+const { publicSnapshot } = require('../services/commercialPublicationService');
+const { submitPropertyForReview, assertPropertyNotSold } = require('../services/propertyPublicationLifecycleService');
 const {
   uploadFilesToCloudinary, parseAmenities, parseAddress, parseGeoLocation, parseStringArray,
   parseNonNegativeAmount, buildBasePropertyData, parseNumericField,
@@ -213,6 +215,16 @@ exports.updateFull = async (req, res) => {
       }
     }
 
+    // ALTIMMO-E2E-IMMOBILIER-02 (D-07) — un bien vendu n'est plus modifiable ; (D-01/D-02) la version
+    // publique approuvée avant modification sert de référence à la révision soumise par le propriétaire.
+    try {
+      await assertPropertyNotSold(property._id);
+    } catch (error) {
+      return fail(res, error.statusCode || 409, error.message);
+    }
+    const wasPublished = property.statusAdmin === 'Validée' && property.isPublished === true;
+    const approvedBaseline = publicSnapshot(property.approvedPublicSnapshot || property.toObject());
+
     let rentalData;
     try {
       rentalData = buildRentalData(req, { isOwnerActor });
@@ -279,9 +291,17 @@ exports.updateFull = async (req, res) => {
     // UX-OWNER-2 — même règle que salePropertyController.updateFull /
     // propertyController.updateProperty (route legacy) : repasse en
     // modération après une modification propriétaire.
-    if (isOwnerActor) property.statusAdmin = 'En attente';
+    if (isOwnerActor) {
+      property.statusAdmin = 'En attente';
+      property.isPublished = false;
+      if (wasPublished && !property.approvedPublicSnapshot) property.approvedPublicSnapshot = approvedBaseline;
+    }
 
     await property.save();
+    // ALTIMMO-E2E-IMMOBILIER-02 (D-01) — révision rattachée, sinon l'annonce restait bloquée « En attente ».
+    if (isOwnerActor) {
+      await submitPropertyForReview({ propertyId: property._id, actor: req.user, wasPublished, approvedBaseline });
+    }
 
     const result = await updateFullRentalProperty({ property, rentalData, actingUser: req.user });
 
