@@ -793,9 +793,11 @@ const PropertyDetailPage = () => {
         return;
       }
       setProperty(data);
-      setLocalLikes(data.likes.length);
+      // La fiche publique expose `likesCount`/`likedByMe` ; `likes` reste servi au propriétaire et au staff.
+      const likes = Array.isArray(data.likes) ? data.likes : [];
+      setLocalLikes(data.likesCount ?? likes.length);
       setLocalShares(data.shares);
-      if (user) setLiked(data.likes.some(id => id === user._id || id?._id === user._id));
+      if (user) setLiked(data.likedByMe ?? likes.some(id => id === user._id || id?._id === user._id));
     } catch (requestError) {
       if (requestError.code !== 'ERR_CANCELED') {
         setProperty(null);

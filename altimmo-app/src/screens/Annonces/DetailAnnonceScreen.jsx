@@ -314,11 +314,12 @@ export default function DetailAnnonceScreen({ route, navigation }) {
   // Même source que le web (PropertyDetailPage.jsx) : le compteur et l'état
   // "aimé" viennent de Property.likes[], jamais de la collection Like générique
   // (POST /likes) — ces deux systèmes ne sont pas synchronisés entre eux.
+  // La fiche publique expose `likesCount`/`likedByMe` ; `likes` reste servi au propriétaire et au staff.
   useEffect(() => {
     const likes = Array.isArray(annonce?.likes) ? annonce.likes : [];
-    setLikesCount(likes.length);
-    setFavori(!!user?._id && likes.some(id => (id?._id || id)?.toString() === user._id.toString()));
-  }, [annonce?.likes, user?._id]);
+    setLikesCount(annonce?.likesCount ?? likes.length);
+    setFavori(!!user?._id && (annonce?.likedByMe ?? likes.some(id => (id?._id || id)?.toString() === user._id.toString())));
+  }, [annonce?.likes, annonce?.likesCount, annonce?.likedByMe, user?._id]);
 
   // ─── Actions ───
   const toggleFavori = useCallback(async () => {
