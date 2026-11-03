@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const auth = require('../controllers/authController');
 const ctrl = require('../controllers/realEstateApplicationController');
 const realEstateApplicationUpload = require('../middleware/realEstateApplicationUpload');
@@ -9,6 +10,13 @@ const { requireTenantScopeForStaffOrPlatformOperator } = require('../middleware/
 
 const router = express.Router();
 router.use(auth.protect);
+// ALTIMMO-E2E-IMMOBILIER-02 (D-12) — un identifiant invalide répond 400 immédiatement : sans ce
+// contrôle, la CastError des contrôleurs async n'était pas capturée et la requête restait pendante.
+for (const param of ['id', 'attachmentId']) {
+  router.param(param, (req, res, next, value) => (mongoose.isValidObjectId(value)
+    ? next()
+    : res.status(400).json({ status: 'fail', code: 'INVALID_IDENTIFIER', message: 'Identifiant invalide.' })));
+}
 router.get('/', requireTenantScopeForStaffOrPlatformOperator, ctrl.list);
 router.post('/', ctrl.create);
 // SECURITY-FINAL-CLOSURE-BLOCKERS-HOTFIX-1 (FCA1-02) — même garde que les
