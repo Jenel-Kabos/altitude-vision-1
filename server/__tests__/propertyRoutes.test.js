@@ -94,6 +94,14 @@ jest.mock('../services/commercialPublicationService', () => ({
   createPendingRevision: jest.fn().mockResolvedValue({ _id: 'REVISION-1' }),
   decideRevision: jest.fn().mockResolvedValue({ _id: 'REVISION-1', status: 'approved' }),
 }));
+// ALTIMMO-E2E-IMMOBILIER-02 — la soumission rattachée (révision + cycle sous transaction) est
+// certifiée sur Mongo réel (altimmoE2eImmobilier02Regression) ; ici elle est simulée comme
+// `createPendingRevision`.
+jest.mock('../services/propertyPublicationLifecycleService', () => ({
+  ...jest.requireActual('../services/propertyPublicationLifecycleService'),
+  submitPropertyForReview: jest.fn().mockResolvedValue({ _id: 'REVISION-1' }),
+  assertPropertyNotSold: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('../services/platformTenant/organizationAssetInvariantService', () => ({
   ...jest.requireActual('../services/platformTenant/organizationAssetInvariantService'),
   resolvePropertyCreationTenant: jest.fn().mockImplementation(async ({ contextualTenantId }) => contextualTenantId || null),

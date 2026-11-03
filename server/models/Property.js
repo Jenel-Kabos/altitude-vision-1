@@ -50,6 +50,7 @@ const propertySchema = new mongoose.Schema(
     price: {
       type: Number,
       required: [true, 'Un prix est requis pour la propriété'],
+      min: [0, 'Le prix ne peut pas être négatif.'], // ALTIMMO-E2E-IMMOBILIER-02 (D-14)
     },
 
     honoraires: {
@@ -77,11 +78,15 @@ const propertySchema = new mongoose.Schema(
     latitude: {
       type: Number,
       required: [true, 'La latitude est requise pour la géolocalisation'],
+      min: [-90, 'La latitude doit être comprise entre -90 et 90.'], // ALTIMMO-E2E-IMMOBILIER-02 (D-14)
+      max: [90, 'La latitude doit être comprise entre -90 et 90.'],
     },
 
     longitude: {
       type: Number,
       required: [true, 'La longitude est requise pour la géolocalisation'],
+      min: [-180, 'La longitude doit être comprise entre -180 et 180.'],
+      max: [180, 'La longitude doit être comprise entre -180 et 180.'],
     },
 
     location: {

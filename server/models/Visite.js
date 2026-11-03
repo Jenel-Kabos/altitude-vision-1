@@ -33,7 +33,9 @@ const visiteSchema = new mongoose.Schema({
   message:       { type: String, default: '' },  // précisions du client
   statut: {
     type: String,
-    enum: ['En attente', 'Confirmée', 'En cours', 'Terminée', 'Annulée'],
+    // ALTIMMO-E2E-IMMOBILIER-02 (D-13) — 'Replanifiée' et 'Refusée' sont les libellés historiques des statuts
+    // `reprogrammee` et `refusee` (STATUS_TO_LEGACY) : absents de l'énumération, report et refus échouaient en 400.
+    enum: ['En attente', 'Confirmée', 'En cours', 'Terminée', 'Annulée', 'Replanifiée', 'Refusée'],
     default: 'En attente',
   },
   status: { type: String, default: null, index: true },
