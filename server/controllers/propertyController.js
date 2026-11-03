@@ -499,7 +499,7 @@ const createProperty = asyncHandler(async (req, res, next) => {
  *
  * @returns {Promise<{properties: object[], total: number}>}
  */
-async function runPropertySearch({ query, isAdmin, tenantId = null }) {
+async function runPropertySearch({ query, isAdmin, tenantId = null, viewerId = null }) {
   const workingQuery = { ...query };
 
   // ── 1. Filtre de base passé directement à Property.find() ───────────────
@@ -577,7 +577,9 @@ async function runPropertySearch({ query, isAdmin, tenantId = null }) {
     if (hebergementIds.length > 0) {
       properties = await decoratePublicHotelProperties(properties);
     }
-    properties = properties.map(projectApprovedPublicResource);
+    // ALTIMMO-E2E-IMMOBILIER-02 (D-03) — projection publique stricte (liste blanche canonique
+    // partagée avec le conseiller IA) : ni rue, ni propriétaire, ni commission, ni cycle, ni historique.
+    properties = properties.map((property) => toPublicListing(property, { viewerId }));
   }
 
   logger.info(`📦 [runPropertySearch] total=${total} results=${properties.length} baseFilter=${JSON.stringify(Object.keys(baseFilter))}`);
@@ -623,7 +625,7 @@ const getAllProperties = asyncHandler(async (req, res) => {
   const tenantId = isAdmin && req.adminScope?.mode === ADMINISTRATION_SCOPE_MODE.TENANT
     ? req.adminScope.tenantId
     : null;
-  let { properties, total } = await runPropertySearch({ query, isAdmin, tenantId });
+  let { properties, total } = await runPropertySearch({ query, isAdmin, tenantId, viewerId: req.user?._id || null });
 
   // PA-03 — enrichissement purement informatif, exécuté après l'autorité et
   // le filtre tenant. Les documents projetés ne participent jamais au scope.
@@ -780,19 +782,17 @@ const getProperty = asyncHandler(async (req, res) => {
 
   let responseProperty = property.toObject();
   if (!isAdmin && !isOwner) {
-    responseProperty = projectApprovedPublicResource(responseProperty);
-    delete responseProperty.documents;
-    delete responseProperty.latitude;
-    delete responseProperty.longitude;
-    delete responseProperty.location;
-    if (responseProperty.address) delete responseProperty.address.street;
-    if (responseProperty.owner) {
-      responseProperty.owner = {
-        _id: responseProperty.owner._id,
-        name: responseProperty.owner.name || 'Propriétaire vérifié',
-        photo: responseProperty.owner.photo || '',
-      };
-    }
+    // ALTIMMO-E2E-IMMOBILIER-02 (D-03) — liste blanche canonique (`toPublicListing`) au lieu d'une
+    // suppression champ par champ : commission, cycle de publication, historique de modération,
+    // réservation, rue et coordonnées exactes ne sortent plus. Restent, comme avant, l'identité
+    // publique du propriétaire (nom, photo), sans son identifiant de compte (le propriétaire lui-même
+    // reçoit le document complet). Les identifiants des comptes qui ont aimé le bien ne sont plus
+    // exposés : `likesCount` et `likedByMe` (pour le visiteur connecté) les remplacent.
+    const publicOwner = responseProperty.owner ? {
+      name: responseProperty.owner.name || 'Propriétaire vérifié',
+      photo: responseProperty.owner.photo || '',
+    } : undefined;
+    responseProperty = { ...toPublicListing(responseProperty, { viewerId: req.user?._id || null }), owner: publicOwner };
   }
 
   if (accommodation) {
@@ -1497,7 +1497,8 @@ const getRecommendedProperties = asyncHandler(async (req, res) => {
   }
 
   properties = await decoratePublicHotelProperties(properties);
-  properties = properties.map(projectApprovedPublicResource);
+  // ALTIMMO-E2E-IMMOBILIER-02 (D-03) — même projection publique stricte que la liste.
+  properties = properties.map((property) => toPublicListing(property, { viewerId: req.user?._id || null }));
 
   res.status(200).json({
     status: 'success',
