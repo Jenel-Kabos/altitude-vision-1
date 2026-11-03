@@ -3,7 +3,7 @@ const Visite   = require('../models/Visite');
 const User     = require('../models/User');
 const Property = require('../models/Property');
 const { isPropertyCommerciallyAvailable } = require('../services/propertyPublicationLifecycleService');
-const { assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
+const { assertResourceTenant, assertResourceTenantOrUnattributed } = require('../services/platformTenant/tenantResourceAttributionService');
 const { notify, notifyStaff } = require('../services/notificationService');
 const yabetooService = require('../services/yabetooService');
 const { isVisitPaymentInitiationEnabled, VISIT_PAYMENT_SUSPENDED } = require('../config/visitePayment');
@@ -47,10 +47,15 @@ async function scopedPropertyIdsForTenant(req) {
 // `res` positionné AVANT le throw (même convention qu'`assertObjectId`
 // ci-dessus) : errorMiddleware.js dérive son statusCode de `res.statusCode`,
 // jamais de `err.statusCode`.
-async function assertVisitePropertyInScope(req, res, visite) {
+// ALTIMMO-E2E-IMMOBILIER-02 (D-08) — pour une MUTATION (confirmation, report, lieu, paiement), le
+// staff d'un tenant doit être positivement rattaché au bien : une visite d'un bien personnel (non
+// attribué) relève d'Altitude Vision, jamais d'une agence partenaire. La lecture garde la règle
+// « non attribué = accessible » existante.
+async function assertVisitePropertyInScope(req, res, visite, { mutation = false } = {}) {
   if (!req.platformTenant) return;
+  const assertScope = mutation && !req.isPlatformOperatorContext ? assertResourceTenant : assertResourceTenantOrUnattributed;
   try {
-    await assertResourceTenantOrUnattributed({ resourceType: 'Visite', resource: visite, tenantId: req.platformTenant._id });
+    await assertScope({ resourceType: 'Visite', resource: visite, tenantId: req.platformTenant._id });
   } catch (error) {
     res.status(error.statusCode || 404);
     throw new Error('Visite non trouvée.');
@@ -376,7 +381,7 @@ exports.updateVisite = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Visite non trouvée.');
   }
-  await assertVisitePropertyInScope(req, res, visite);
+  await assertVisitePropertyInScope(req, res, visite, { mutation: true });
 
   const { dateProposee, dateConfirmee, statut, status, notes, scheduledStartAt,
     scheduledEndAt, meetingAddressSnapshot, coordinatesSnapshot, assignedAgent,
@@ -637,7 +642,7 @@ exports.updatePaiementVisite = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Visite non trouvée.');
   }
-  await assertVisitePropertyInScope(req, res, existing);
+  await assertVisitePropertyInScope(req, res, existing, { mutation: true });
 
   const visite = await Visite.findByIdAndUpdate(
     req.params.id,

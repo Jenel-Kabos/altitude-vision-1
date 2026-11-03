@@ -41,11 +41,15 @@ function classifySubstantiveChanges(current = {}, proposed = {}) {
     Object.prototype.hasOwnProperty.call(after, field) && !isDeepStrictEqual(before[field], after[field]));
 }
 
+// Superpose la version approuvée au document. Ce n'est PAS une projection publique : toute réponse
+// publique passe ensuite par une liste blanche (`publicListingService.toPublicListing`).
+// ALTIMMO-E2E-IMMOBILIER-02 (D-02/D-03) — seuls les champs publics substantiels de l'instantané sont
+// superposés, jamais une clé arbitraire qui y aurait été écrite.
 function projectApprovedPublicResource(value) {
   const source = plain(value);
   const approved = source.approvedPublicSnapshot;
   if (!approved || typeof approved !== 'object') return source;
-  return { ...source, ...approved, approvedPublicSnapshot: undefined };
+  return { ...source, ...publicSnapshot(approved), approvedPublicSnapshot: undefined };
 }
 
 async function withTransaction(work) {

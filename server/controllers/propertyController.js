@@ -948,29 +948,29 @@ const updateProperty = asyncHandler(async (req, res) => {
   // l'autorité tenant staff canonique. Aucun `User.role='Admin'` global.
   const isAdmin = isTenantStaff;
 
-  // Champs interdits à la modification directe
-  // PLATFORM-ADMIN-04B0 — `tenant` est une donnée de PROVENANCE protégée : une
-  // mutation ordinaire (owner, staff tenant, opérateur ; web ou mobile) n'est
-  // jamais un transfert organisationnel. La valeur client est ignorée, comme
-  // les autres champs exclus ; `tenant:null` reste une provenance valide. Une
-  // réattribution éventuelle relèvera d'un workflow dédié (hors de ce
-  // contrôleur). Les clés opérateur (`$set`, `$unset`…) et les chemins pointés
-  // sont également retirés : défense en profondeur, indépendante du
-  // `express-mongo-sanitize` global de server.js.
-  const excludedFields = ['_id', 'owner', 'createdAt', 'reviewedAt', 'images', 'tenant'];
-  const updateData = { ...req.body };
-  excludedFields.forEach(field => delete updateData[field]);
-  Object.keys(updateData)
-    .filter((key) => key.startsWith('$') || key.includes('.'))
-    .forEach((key) => delete updateData[key]);
-  delete updateData.statusAdmin; // toujours exclu du body
-  // Les champs de cycle de vie sont pilotés par la modération, la gestion
-  // locative ou la finalisation financière. Un propriétaire ne peut jamais
-  // les forcer via le formulaire générique.
-  if (!isAdmin) {
-    ['status', 'isPublished', 'pole', 'agent', 'recommande']
-      .forEach((field) => delete updateData[field]);
+  // ALTIMMO-E2E-IMMOBILIER-02 (D-07) — un bien vendu (transaction finalisée) n'est plus modifiable ici.
+  try {
+    await assertPropertyNotSold(property._id);
+  } catch (error) {
+    res.status(error.statusCode || 409);
+    throw error;
+  }
 
+  // ALTIMMO-E2E-IMMOBILIER-02 (D-02) — LISTE BLANCHE par acteur, en remplacement de l'ancienne liste
+  // noire : seuls les champs descriptifs de l'annonce sont acceptés. Commission, reversement, cycle de
+  // publication, instantané approuvé, réservation, modération, provenance (`owner`, `tenant`), compteurs
+  // et champs système ne sont JAMAIS écrits depuis ce formulaire, quel que soit l'acteur ; les clés
+  // inconnues, opérateurs (`$set`…) et chemins pointés sont ignorés. Toute modification substantielle
+  // passe ensuite par une révision soumise à Altimmo (voir `submitPropertyForReview`).
+  const allowedFields = new Set([
+    ...OWNER_EDITABLE_PROPERTY_FIELDS,
+    ...(isAdmin ? TENANT_STAFF_EDITABLE_PROPERTY_FIELDS : []),
+  ]);
+  const updateData = Object.fromEntries(Object.entries(req.body || {}).filter(([key]) => allowedFields.has(key)));
+  const ignoredFields = Object.keys(req.body || {})
+    .filter((key) => !allowedFields.has(key) && !key.startsWith('address[') && key !== 'existingImages');
+  if (ignoredFields.length) logger.warn(`⚠️ [updateProperty] champs non modifiables ignorés : ${ignoredFields.join(', ')}`);
+  if (!isAdmin) {
     // GL-ARCH-1 : un bien "pris en gestion" (RentalManagement.managementActivated)
     // suit désormais exclusivement les règles de l'agence — le propriétaire du
     // portail perd tout contrôle sur `availability` dès qu'il est géré. Sur son
@@ -1019,10 +1019,17 @@ const updateProperty = asyncHandler(async (req, res) => {
     updateData.images = [...existingImages, ...newImages];
   }
 
-  // 4. Parsing Adresse
+  // 4. Parsing Adresse — seules les sous-clés d'adresse connues, en texte, sont conservées.
   if (typeof updateData.address === 'string') {
     try { updateData.address = JSON.parse(updateData.address); }
     catch (e) { delete updateData.address; }
+  }
+  if (updateData.address !== undefined) {
+    const source = updateData.address && typeof updateData.address === 'object' && !Array.isArray(updateData.address) ? updateData.address : {};
+    updateData.address = Object.fromEntries(EDITABLE_ADDRESS_FIELDS
+      .filter((field) => typeof source[field] === 'string')
+      .map((field) => [field, source[field]]));
+    if (!Object.keys(updateData.address).length) delete updateData.address;
   }
 
   const addressFromFields = {
@@ -1060,7 +1067,14 @@ const updateProperty = asyncHandler(async (req, res) => {
     updateData.cautionMultiplicateur = parseFloat(updateData.cautionMultiplicateur);
   }
 
-  // 5. Parsing Location (GPS)
+  // 5. Parsing Location (GPS) — un GeoJSON fourni tel quel n'est accepté que sous la forme Point [lng, lat].
+  if (updateData.location !== undefined) {
+    const location = parseGeoLocation(updateData.location);
+    const valid = location?.type === 'Point' && Array.isArray(location.coordinates) && location.coordinates.length === 2
+      && location.coordinates.every((value) => Number.isFinite(Number(value)));
+    if (valid) updateData.location = { type: 'Point', coordinates: location.coordinates.map(Number) };
+    else delete updateData.location;
+  }
   if (updateData.longitude && updateData.latitude) {
     updateData.location = {
       type:        'Point',
@@ -1080,30 +1094,18 @@ const updateProperty = asyncHandler(async (req, res) => {
     proposedPublicSnapshot,
   );
   const alreadyPublic = property.statusAdmin === 'Validée' && property.isPublished === true;
-  let submittedRevision = null;
-  if (substantiveChanges.length && alreadyPublic) {
-    const revision = await createPendingRevision({ resourceType: 'Property', resource: property, proposedSnapshot: proposedPublicSnapshot, actor: req.user });
-    submittedRevision = revision;
+  if (substantiveChanges.length || !alreadyPublic) {
+    // Dépublication atomique avec l'écriture du contenu (aucune fenêtre où une version non approuvée
+    // serait publique) ; la révision rattachée est ouverte juste après.
     updateData.statusAdmin = 'En attente';
     updateData.isPublished = false;
-    updateData.publicationLifecycleState = 'change_pending';
-    updateData.currentPublicationRevision = revision._id;
-    updateData.publicationLifecycleHistory = [
-      ...(property.publicationLifecycleHistory || []).map((entry) => entry.toObject ? entry.toObject() : entry),
-      {
-        from: 'published', to: 'change_pending', action: 'content_change_submitted',
-        actor: req.user._id || req.user.id, reason: 'Modification substantielle soumise à une nouvelle approbation.',
-      },
-    ];
-  } else if (!alreadyPublic) {
-    updateData.statusAdmin = 'En attente';
-    updateData.isPublished = false;
+    if (alreadyPublic && !property.approvedPublicSnapshot) updateData.approvedPublicSnapshot = approvedBaseline;
   }
 
   const linkedPublishedHotel = !isAdmin
     ? await Hotel.exists({ property: property._id, publicationStatus: 'publie' })
     : null;
-  const updatedProperty = isAdmin || !linkedPublishedHotel
+  const updatedPropertyAfterWrite = isAdmin || !linkedPublishedHotel
     ? await Property.findByIdAndUpdate(
       req.params.id,
       updateData,
@@ -1115,9 +1117,12 @@ const updateProperty = asyncHandler(async (req, res) => {
       actorId: req.user.id,
     })).property;
 
-  if (substantiveChanges.length && !alreadyPublic) {
-    submittedRevision = await createPendingRevision({ resourceType: 'Property', resource: updatedProperty, proposedSnapshot: publicSnapshot(updatedProperty), actor: req.user });
-  }
+  // ALTIMMO-E2E-IMMOBILIER-02 (D-01) — la révision est rattachée au bien (`currentPublicationRevision`),
+  // pour une annonce en attente, rejetée ou publiée ; sinon l'approbation échouait toujours (409).
+  const submittedRevision = substantiveChanges.length
+    ? await submitPropertyForReview({ propertyId: property._id, actor: req.user, wasPublished: alreadyPublic, approvedBaseline })
+    : null;
+  const updatedProperty = submittedRevision ? await Property.findById(property._id) : updatedPropertyAfterWrite;
 
   if (submittedRevision) emitPropertyLifecycleNotification({ event: 'changed', property: updatedProperty, actor: req.user, transitionKey: String(submittedRevision._id) });
 
