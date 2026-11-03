@@ -142,12 +142,14 @@ const REVIEWABLE_SUBMISSION_STATES = new Set([
   PUBLICATION_STATES.PUBLISHED, PUBLICATION_STATES.CHANGE_PENDING,
 ]);
 
-async function submitPropertyForReview({ propertyId, actor, wasPublished = false, approvedBaseline = null }) {
+// `proposedSnapshot` : version proposée calculée par l'appelant (version approuvée + modification),
+// comme avant ; à défaut, la version publique du document enregistré (dépôt initial).
+async function submitPropertyForReview({ propertyId, actor, wasPublished = false, approvedBaseline = null, proposedSnapshot: proposed = null }) {
   return inTransaction(async (session) => {
     const property = await loadProperty(propertyId, session);
     const rawState = property.publicationLifecycleState || null;
     if (rawState && !REVIEWABLE_SUBMISSION_STATES.has(rawState)) return null;
-    const proposedSnapshot = publicSnapshot(property);
+    const proposedSnapshot = publicSnapshot(proposed || property);
     const baseline = property.approvedPublicSnapshot || approvedBaseline || {};
     const changedFields = classifySubstantiveChanges(baseline, proposedSnapshot);
     if (!changedFields.length) return null;
