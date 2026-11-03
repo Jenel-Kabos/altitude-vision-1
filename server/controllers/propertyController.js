@@ -1120,7 +1120,7 @@ const updateProperty = asyncHandler(async (req, res) => {
   // ALTIMMO-E2E-IMMOBILIER-02 (D-01) — la révision est rattachée au bien (`currentPublicationRevision`),
   // pour une annonce en attente, rejetée ou publiée ; sinon l'approbation échouait toujours (409).
   const submittedRevision = substantiveChanges.length
-    ? await submitPropertyForReview({ propertyId: property._id, actor: req.user, wasPublished: alreadyPublic, approvedBaseline })
+    ? await submitPropertyForReview({ propertyId: property._id, actor: req.user, wasPublished: alreadyPublic, approvedBaseline, proposedSnapshot: proposedPublicSnapshot })
     : null;
   const updatedProperty = submittedRevision ? await Property.findById(property._id) : updatedPropertyAfterWrite;
 
