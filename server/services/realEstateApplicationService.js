@@ -108,14 +108,27 @@ async function acceptApplication(input) {
   } finally { await session.endSession(); }
 }
 
-async function releaseReservation(reservation, { status, actorId, reason = '', session = null }) {
+async function releaseReservation(reservation, { status, actorId, reason = '', session = null, requireUnlinked = false }) {
   const opts = session ? { session } : {};
   if (reservation.status !== 'active') return false;
   const now = new Date();
-  reservation.status = status;
-  reservation.cancellationReason = reason;
-  reservation.history.push({ from: 'active', to: status, action: status, actor: actorId, reason, at: now });
-  await reservation.save(opts);
+  if (requireUnlinked) {
+    // ALTIMMO-E2E-IMMOBILIER-02 (D-06) — transition conditionnelle : une transaction ou un contrat
+    // rattaché entre la lecture et l'écriture fait échouer l'annulation au lieu de libérer le bien.
+    const claimed = await Reservation.updateOne(
+      { _id: reservation._id, status: 'active', transaction: null, contract: null },
+      { $set: { status, cancellationReason: reason }, $push: { history: { from: 'active', to: status, action: status, actor: actorId, reason, at: now } } },
+      opts,
+    );
+    if (claimed.modifiedCount !== 1) return false;
+    reservation.status = status;
+    reservation.cancellationReason = reason;
+  } else {
+    reservation.status = status;
+    reservation.cancellationReason = reason;
+    reservation.history.push({ from: 'active', to: status, action: status, actor: actorId, reason, at: now });
+    await reservation.save(opts);
+  }
   await Property.updateOne(
     { _id: reservation.property, 'reservationLock.reservation': reservation._id, availability: 'Réservé' },
     { $set: { availability: 'Disponible', reservationLock: { reservation: null, lockedAt: null, expiresAt: null } } }, opts,
@@ -124,11 +137,13 @@ async function releaseReservation(reservation, { status, actorId, reason = '', s
 }
 
 async function expireReservations(now = new Date()) {
-  const ids = await Reservation.find({ status: 'active', expiresAt: { $lte: now } }).distinct('_id');
+  // ALTIMMO-E2E-IMMOBILIER-02 (D-06) — une réservation portant une transaction ou un contrat n'expire
+  // pas automatiquement : son issue relève de la transaction (finalisation ou annulation tracée).
+  const ids = await Reservation.find({ status: 'active', expiresAt: { $lte: now }, transaction: null, contract: null }).distinct('_id');
   let expired = 0;
   for (const id of ids) {
     const reservation = await Reservation.findOneAndUpdate(
-      { _id: id, status: 'active', expiresAt: { $lte: now } },
+      { _id: id, status: 'active', expiresAt: { $lte: now }, transaction: null, contract: null },
       { $set: { status: 'expired' }, $push: { history: { from: 'active', to: 'expired', action: 'expired', at: now } } },
       { new: true },
     );

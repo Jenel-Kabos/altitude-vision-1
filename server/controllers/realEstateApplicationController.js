@@ -213,7 +213,13 @@ exports.cancelReservation = async (req, res) => {
   if (!allowed) return res.status(403).json({ status: 'fail', message: 'Accès refusé.' });
   if (!(await assertApplicationTenantAccessIfStaff(req, res, reservation.application, isStaff(req.user) && !isClientOrOwner))) return;
   if (isStaff(req.user) && !String(req.body.reason || '').trim()) return res.status(400).json({ status: 'fail', code: 'CANCELLATION_REASON_REQUIRED', message: 'Le motif est requis.' });
-  const changed = await workflow.releaseReservation(reservation, { status: 'cancelled', actorId: req.user._id, reason: req.body.reason });
+  // ALTIMMO-E2E-IMMOBILIER-02 (D-06) — une réservation liée à une transaction ou à un contrat ne
+  // s'annule plus directement (le bien revenait sur le marché pendant la transaction) : l'annulation
+  // passe par la transaction, qui libère la réservation de façon tracée.
+  if (reservation.status === 'active' && (reservation.transaction || reservation.contract)) {
+    return res.status(409).json({ status: 'fail', code: 'RESERVATION_LINKED_TO_TRANSACTION', message: 'Une transaction ou un contrat est en cours sur cette réservation : elle ne peut pas être annulée directement.' });
+  }
+  const changed = await workflow.releaseReservation(reservation, { status: 'cancelled', actorId: req.user._id, reason: req.body.reason, requireUnlinked: true });
   if (changed) {
     const recipients = [...new Set([String(reservation.client), String(reservation.property?.owner)].filter(Boolean))];
     await Promise.all(recipients.map((recipient) => notify({ recipient, type: 'real_estate_reservation_cancelled', title: 'Réservation annulée', body: 'La réservation immobilière a été annulée et le bien libéré.', entityType: 'RealEstateReservation', entityId: reservation._id, dedupeKey: `reservation:${reservation._id}:cancelled:${recipient}` })));
